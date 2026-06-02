@@ -7,7 +7,7 @@
 | **Status** | Draft |
 | **Author** | Chairul Akmal |
 | **Last updated** | 2026-06-03 |
-| **Target platform** | Mobile-first responsive web (Next.js, deployed on Railway) |
+| **Target platform** | Mobile-first responsive web (Next.js 16, deployed on Railway) |
 
 ---
 
@@ -100,7 +100,7 @@ directions plus `styles.css`); these serve as a visual reference for the card UI
 
 ## 5. System architecture
 
-The system is a **single full-stack Next.js (App Router) application**. The browser UI,
+The system is a **single full-stack Next.js 16 (App Router) application**. The browser UI,
 the JSON API (Route Handlers / Server Actions), the FSRS scheduling logic, and the
 Anthropic integration all live in one deployable, backed by a managed Postgres instance.
 
@@ -544,6 +544,7 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-06-03 | Pin the web framework to **Next.js 16** (React 19, Tailwind v4, Turbopack), scaffolded via `create-next-app` | Explicit author preference and the current stable major at project start; App Router + Server Actions + Turbopack are the modern defaults the architecture in §5 already assumes. | Author | §5 |
 | 2026-06-03 | Repo will be open-sourced; allowlist email stays env-only; existing git commit email accepted as public | No PII committed. `AUTH_ALLOWED_EMAIL` value lives only in Railway env; a dedicated alias will back it. Author's commit email is already public, so no history rewrite is warranted. | Author | §11.6 |
 | 2026-06-03 | Two study modes: "Anki mode" (FSRS recall) and "Duolingo mode" (gamified MC) | Serves both serious retention and a low-friction warm-up; MC distractors are a free same-level DB query, so the second mode adds little cost. | Author | §8 |
 | 2026-06-03 | Mobile-first, iPhone SE (375×667) baseline; usable on desktop | Primary usage is on phones; desktop treated as an additive breakpoint rather than the design center. | Author | §8.4 |

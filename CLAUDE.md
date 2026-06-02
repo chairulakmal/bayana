@@ -42,9 +42,9 @@ collaborative and explanatory.
 
 ## Tech stack (decided — see SPEC.md for rationale)
 
-- **Full-stack Next.js** (App Router) — a single deployable; UI + API (Route Handlers /
-  Server Actions) + FSRS logic + Anthropic integration in one service. Not a split
-  frontend/backend (see SPEC.md §5.1 and §14.1 for why).
+- **Full-stack Next.js 16** (App Router, React 19, Turbopack) — a single deployable; UI +
+  API (Route Handlers / Server Actions) + FSRS logic + Anthropic integration in one
+  service. Not a split frontend/backend (see SPEC.md §5.1 and §14.1 for why).
 - **TypeScript** end-to-end.
 - **Postgres** via **Prisma**.
 - **FSRS** scheduling via `ts-fsrs`.
@@ -52,8 +52,16 @@ collaborative and explanatory.
   generation and **prompt caching** for the shared system prompt.
 - **Auth.js** Email provider (passwordless magic link) via **Resend**, single-email
   allowlist at launch.
-- **Tailwind CSS**, mobile-first (iPhone SE 375×667 baseline).
+- **Tailwind CSS v4** (PostCSS plugin), mobile-first (iPhone SE 375×667 baseline).
 - **Railway** for hosting (1 web service + Postgres plugin).
+
+## Next.js 16 gotchas
+
+- **Route guards use `proxy.ts`, not `middleware.ts`.** v16 renamed middleware →
+  proxy; a `middleware.ts` file is **ignored**. Export a function named `proxy` (type
+  `NextProxy`, or use `NextRequest`/`NextResponse` from `next/server` as before). A
+  `config.matcher` array still scopes which paths it runs on. The proxy runs in the
+  **Node.js runtime** by default (not Edge).
 
 ## Project layout
 
@@ -66,6 +74,10 @@ collaborative and explanatory.
 
 - **Status:** early build. SPEC.md is settled enough to start Phase 1 (see its
   Milestones section). Confirm scope against SPEC.md before large changes.
+- **Track execution state in [TODO.md](TODO.md); keep it current.** It is the
+  cross-session "where we left off" checklist. Boundary: TODO.md holds *task state* only —
+  the plan/rationale stays in SPEC.md (§13 Milestones) and decisions go in SPEC.md §16,
+  never in TODO.md.
 - **Document decisions and tradeoffs in SPEC.md as part of the same change.** Whenever a
   design choice is made or changed, record it in SPEC.md so the doc and code never drift —
   and don't just record the *what*, capture the *why*: the reasoning, the options weighed,
