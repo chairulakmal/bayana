@@ -92,6 +92,9 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
 - [ ] Resolve MC↔FSRS coupling — feed the scheduler or stay a separate practice mode
   (SPEC §8.2, §15)
 - [ ] Light polish (optional): browse/search, daily new-card limit, basic stats
+- [x] Public homepage at `/` (brand + Pī mascot + Sign-in CTA + MIT/GitHub); study app
+  moved to `/study`; brand foundation (tokens/fonts in globals, `Parrot` component, Pī
+  favicon) per BRAND.md
 
 ## Phase 3 — Admin audit + on-demand generation (after Duolingo)
 - [ ] Admin review/audit page — admin-gated (`UserProfile.role`); add a review-status field

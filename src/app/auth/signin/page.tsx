@@ -72,7 +72,7 @@ export default async function SignInPage({
             try {
               await signIn("resend", {
                 email: String(formData.get("email") ?? ""),
-                redirectTo: "/",
+                redirectTo: "/study",
               });
             } catch (err) {
               // Denied/again? Show it on the page instead of a 500.

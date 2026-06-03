@@ -50,8 +50,11 @@ export function proxy(req: NextRequest) {
     }
   }
 
-  // Public: the sign-in page and all Auth.js endpoints (sign-in, callback, etc.).
-  const isPublic = pathname.startsWith("/auth") || pathname.startsWith("/api/auth");
+  // Public: the marketing homepage, the sign-in page, and all Auth.js endpoints.
+  const isPublic =
+    pathname === "/" ||
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/api/auth");
   const hasSession = SESSION_COOKIES.some((name) => req.cookies.has(name));
 
   if (!isPublic && !hasSession) {

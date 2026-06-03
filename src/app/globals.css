@@ -1,26 +1,99 @@
+/* Bayana global styles — brand foundation (BRAND.md).
+   Google Fonts must be @imported before any other rules. */
+@import url("https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800;900&family=M+PLUS+Rounded+1c:wght@400;500;700;800&display=swap");
 @import "tailwindcss";
 
+/* ── Design tokens (BRAND.md §8) ───────────────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* hero palette */
+  --magenta:#ff61f8; --pink:#ffa6fb; --yellow:#ffea6c; --cream:#fffba7;
+
+  /* ramps 100→700 */
+  --mag-100:#ffd6ff; --mag-200:#ffb1ff; --mag-300:#ff88ff; --mag-400:#ff61f8;
+  --mag-500:#d128cc; --mag-600:#a600a3; --mag-700:#760075;
+  --pink-100:#ffe2ff; --pink-200:#ffc6ff; --pink-300:#f7a7f3; --pink-400:#ffa6fb;
+  --pink-500:#cd76ca; --pink-600:#a04e9e; --pink-700:#702e6f;
+  --yel-100:#fcf4c1; --yel-200:#eee08f; --yel-300:#dbc95a; --yel-400:#ffea6c;
+  --yel-500:#c9b324; --yel-600:#9a8500; --yel-700:#6a5900;
+  --cream-100:#f5f4d0; --cream-200:#e4e2a9; --cream-300:#cfcc82; --cream-400:#fffba7;
+  --cream-500:#c6c16d; --cream-600:#95903e; --cream-700:#66621d;
+
+  /* N1 "premium" accent — imperial purple (murasaki, the historical highest-rank colour)
+     + gold (kin). Deliberately bluer/deeper than the magenta ramp so N1 reads as special. */
+  --murasaki:#3d1452; --gold:#f0c75e;
+
+  /* action / neutrals */
+  --grape:#b717b2; --grape-edge:#7c0079; --grape-hi:#cf1fc9; --yel-edge:#d9c24a;
+  --ink:#341832; --ink-soft:#684e65; --ink-faint:#9a8597;
+  --paper:#fcfaf1; --surface:#ffffff; --surface-cream:#fff7e4; --line:#efe4e9;
+
+  /* functional */
+  --good:#2fbf71; --good-edge:#1f9457; --bad:#ff5470;
+
+  /* shape & type */
+  --r-lg:28px; --r-md:18px; --r-sm:12px;
+  --shadow:0 14px 34px -16px rgba(52,24,50,.32);
+  --f-display:"Fredoka", system-ui, sans-serif;
+  --f-body:"Nunito", system-ui, sans-serif;
+  --f-jp:"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", sans-serif;
 }
 
+/* Expose a couple of tokens to Tailwind's theme so utilities stay on-brand. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
+  --font-sans: var(--f-body);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* ── Base ──────────────────────────────────────────────────────────────────── */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--f-body);
+}
+/* Japanese text always uses the rounded JP face (BRAND.md §4). */
+.jp { font-family: var(--f-jp); }
+
+/* ── Brand components ────────────────────────────────────────────────────────
+   The signature "springy lip": a solid bottom shadow that compresses on press
+   (BRAND.md §7). Reusable across the landing and Phase 2's Duolingo UI. */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5em;
+  font-family: var(--f-display); font-weight: 600; font-size: 18px; letter-spacing: .02em;
+  border: none; border-radius: var(--r-md); padding: 15px 30px; cursor: pointer;
+  text-decoration: none; line-height: 1;
+  transition: transform .06s ease, box-shadow .06s ease, filter .12s ease;
+}
+.btn:hover { filter: brightness(1.03); }
+.btn-lg { font-size: 20px; padding: 18px 36px; }
+
+.btn-primary { background: var(--grape); color: #fff; box-shadow: 0 5px 0 var(--grape-edge); }
+.btn-primary:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--grape-edge); }
+
+.btn-pop { background: var(--magenta); color: var(--ink); box-shadow: 0 5px 0 var(--mag-500); }
+.btn-pop:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--mag-500); }
+
+.btn-ghost {
+  background: #fff; color: var(--grape);
+  box-shadow: inset 0 0 0 2px var(--pink-200), 0 5px 0 var(--line);
+}
+.btn-ghost:active { transform: translateY(4px); box-shadow: inset 0 0 0 2px var(--pink-200), 0 1px 0 var(--line); }
+
+/* JLPT level chips — difficulty ramps with the palette (BRAND.md §7). */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--f-display); font-weight: 600; font-size: 13px;
+  padding: 5px 12px; border-radius: 999px;
+}
+.chip-n5 { background: var(--good); color: #fff; }
+.chip-n4 { background: var(--yellow); color: var(--ink); }
+.chip-n3 { background: var(--magenta); color: var(--ink); }
+.chip-n2 { background: var(--mag-600); color: #fff; }
+/* N1 is the "endgame" chip: imperial purple + gold text — premium and distinct from N2. */
+.chip-n1 { background: var(--murasaki); color: var(--gold); box-shadow: inset 0 0 0 1.5px rgba(240, 199, 94, 0.45); }
+
+/* Honor reduced-motion: keep the press functional, drop the spring (BRAND.md §7, SPEC §8.2). */
+@media (prefers-reduced-motion: reduce) {
+  .btn { transition: none; }
+  .btn:active { transform: none; }
 }

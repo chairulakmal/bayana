@@ -12,6 +12,14 @@ real tokens. Where this and the HTML disagree, the HTML wins; update this file t
 It complements **[SPEC.md](SPEC.md)** (the architecture/engineering doc) — SPEC §8.4 owns
 the responsive/mobile-first *rules*; this file owns the *look, feel, and tokens*.
 
+> **Platform focus.** Bayana is a **mobile-first web app** (no native apps). The design
+> target is the **phone browser at the iPhone SE baseline — 375 × 667 CSS px**: every
+> screen must look right and be fully usable there *first*, with full-width, thumb-reachable
+> controls (≥ 44 × 44 px) low in the viewport. Larger phones, tablets, and desktop are
+> additive breakpoints, never the design center — desktop stays usable but caps width and
+> centers rather than stretching. Design and review at 375 px wide before anything else.
+> (Engineering rules and rationale: SPEC §8.4.)
+
 ---
 
 ## 1. Personality & voice
@@ -89,6 +97,13 @@ legible.
 | `--surface-cream` | `#fff7e4` | Inset surfaces (example-sentence box) |
 | `--line` | `#efe4e9` | Borders / dividers |
 
+### N1 "premium" accent
+`--murasaki` `#3d1452` (imperial purple — historically Japan's highest-rank colour, the
+*forbidden colour* 禁色 reserved for the elite) + `--gold` `#f0c75e` (kin). Reserved for the
+**N1 level chip** so the top level feels earned. Chosen deliberately bluer/deeper than the
+magenta ramp so N1 reads as *special*, not merely "a darker N2." Purple + gold is the
+classic imperial pairing. Not for general decoration.
+
 ### Functional (system states only — never decoration)
 | State | Hex | JP |
 |-------|-----|----|
@@ -161,8 +176,10 @@ calls for minimal motion otherwise, and we respect `prefers-reduced-motion`.)
 | **Pop** | `--magenta` | ink | `--mag-500` | High-energy (Check) |
 | **Ghost** | white | grape | `--line` (+ inset pink ring) | Low-emphasis ("Maybe later") |
 
-- **JLPT level chips:** difficulty ramps with the palette — easy greens/yellows (N5) up to
-  deep grape (N1). Pill-shaped, Fredoka 600.
+- **JLPT level chips:** difficulty ramps with the palette — easy greens/yellows (N5) up
+  through deep magenta/plum. **N1 is the exception: imperial purple + gold** (murasaki +
+  kin, §3) — the "endgame" chip, set apart from the magenta ramp on purpose. Pill-shaped,
+  Fredoka 600.
 - **Flashcard:** white surface, `--r-lg` (28px) radius, soft shadow; big kanji (`--f-jp`
   800), magenta reading, ink gloss, example sentence in a `--surface-cream` inset box.
 - **MC answer:** correct option lifts with a **green lip**; wrong flashes **coral**

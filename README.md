@@ -1,9 +1,13 @@
-# 🦜 Bayana
+<p align="center">
+  <img src="public/pi.svg" alt="Pī, the Bayana mascot — a little magenta parrot" width="160" height="179">
+</p>
 
-**A JLPT vocab trainer that doesn't get in your way.**
+<h1 align="center">bayana <sub>ばやな</sub></h1>
 
-Learn Japanese words with spaced repetition + AI-written example sentences — on your
-phone, in the gaps of your day.
+<p align="center"><strong>A JLPT vocab trainer that doesn't get in your way.</strong></p>
+
+Meet **Pī** (ピー) 🦜 — your tropical study buddy. Learn Japanese words with spaced
+repetition + AI-written example sentences, on your phone, in the gaps of your day.
 
 ## Why?
 
@@ -46,7 +50,8 @@ Ports are themed 887 (ば・や・な 🙂): Postgres `5887`, app `3887`.
 ## The nerdy details
 
 Want the architecture, data model, generation pipeline, and *why* behind every choice?
-It's all in **[SPEC.md](SPEC.md)** (with a decision log, because future-me forgets).
+It's all in **[SPEC.md](SPEC.md)** (with a decision log, because future-me forgets). The
+look, feel, palette, and Pī himself live in **[BRAND.md](BRAND.md)**.
 
 Built with Next.js 16 + Prisma + Postgres, deployed on Railway.
 

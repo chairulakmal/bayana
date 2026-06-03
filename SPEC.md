@@ -377,8 +377,11 @@ Bayana offers two complementary study modes the user can switch between: **Anki 
 multiple-choice practice). Anki mode is the retention engine; Duolingo mode is the
 lightweight on-ramp and warm-up.
 
-**One-tap entry.** After signing in, the app opens straight into the due queue — starting a
-review or lesson is a single tap, with no deck selection or configuration (§2).
+**One-tap entry.** A **public marketing homepage** lives at `/` (brand + mascot + a single
+**Sign in** CTA, for logged-out visitors); the authenticated app lives at `/study`. After
+signing in — or whenever an already-authenticated visitor hits `/` — the app opens straight
+into the due queue at `/study`, a single tap with no deck selection or configuration (§2).
+The home/landing look-and-feel follows **[BRAND.md](BRAND.md)**.
 
 ### 8.1 Anki mode — flashcard review (FSRS)
 The classic spaced-repetition flashcard loop, modeled on Anki.
@@ -489,6 +492,9 @@ screens; the bulk of study happens on mobile.
   later enhancement (§13).
 - **Implementation:** Tailwind CSS with a mobile-first breakpoint strategy (base styles
   target the SE; `sm:`/`md:`/`lg:` add desktop affordances).
+- **Visual language** — palette, typography (Fredoka / Nunito / M PLUS Rounded 1c), the
+  mascot Pī, and components — is specified in **[BRAND.md](BRAND.md)** (design tokens in its
+  §8); the iPhone SE baseline above is the shared design target for both docs.
 
 ---
 
@@ -741,6 +747,8 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-06-03 | **N1 level chip = imperial purple + gold** (murasaki `#3d1452` + kin `#f0c75e`), not flat grape | In Japan purple is the historical highest-rank colour (禁色); gold is the luxury accent. N2 (`mag-600`) and the old N1 (`grape`) were both pinkish-purple and too close — shifting N1 to a deeper, bluer purple with gold text makes the top level read as "special," and is more culturally "premium" than gold alone (which also clashes with the N4 yellow). Author chose imperial-purple+gold over a gradient or solid gold. | Author | BRAND.md §3/§7 |
+| 2026-06-03 | **Public landing page at `/`**; the authenticated study app moves to `/study`. Brand foundation added (tokens + fonts in `globals.css`, reusable `Parrot` component, Pī favicon) per **BRAND.md**, which now states the mobile-first / iPhone-SE (375×667) design target. | A "Sign in" homepage is for logged-out visitors, so `/` can't also be the gated app; signed-in users are redirected `/` → `/study` to preserve one-tap start (§2). Committing the brand as code/tokens lets the landing — and Phase 2's Duolingo UI — build against the real design system. | Author | §8, §8.4 |
 | 2026-06-03 | **Re-prioritize roadmap: Duolingo mode is the current focus**; the **admin audit page + on-demand generation move to Phase 3** (right after Duolingo, ahead of multi-user). Duolingo UI bar set to "Duolingo-grade polish but minimal animation and zero ads." | All content is seeded (Phase 1c done), so the next user-facing value is the second study mode. On-demand generation is no longer needed for coverage, so it rides with the admin tooling as a safety net. Minimal-animation/no-ads is the product thesis (§1) — match Duolingo's quality without its spectacle or monetization. | Author | §8.2, §13 |
 | 2026-06-03 | Security review hardening: **case-insensitive allowlist** comparison; **global sign-in cap tightened 20 → 6**/10min; SPEC §9/§11.4 corrected to mark unbuilt routes "planned" and to require auth + rate-limit + cache-first + token-cap on a future `/api/generate` | Review confirmed no web-reachable Anthropic cost path exists (generate code is scripts-only) and Resend is well contained. The allowlist compare could lock out the legit user on a capitalization mismatch (availability footgun); a tighter global cap further bounds inbox-bombing for a single-user app; doc accuracy prevents assuming protections on routes that don't exist. | Author | §9, §11.3, §11.4 |
 | 2026-06-03 | Sign-in rate limiting uses an **in-memory fixed-window** limiter (per-IP 5/10min + global 20/10min), enforced in `proxy.ts`; session TTL set explicitly to 30 days | Single-user on one Railway Hobby instance, so a process-local counter needs no Redis/DB and zero deps; limits reset on redeploy / aren't shared across replicas (acceptable, swappable later). The global cap is the real inbox-bombing defense since the allowlist means only one inbox can receive a link. Postgres/Upstash stores rejected as over-built for now. | Author | §11.3 |
