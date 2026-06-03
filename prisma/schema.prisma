@@ -151,6 +151,8 @@ model ReviewLog {
   id            String    @id @default(cuid())
   userId        String
   wordId        String
+  // These mirror the ts-fsrs `ReviewLog` so we can `rollback()` for one-step undo
+  // and feed FSRS re-optimization later.
   rating        Int // 1=Again, 2=Hard, 3=Good, 4=Easy
   state         FsrsState // card state at review time
   due           DateTime // due date this review assigned
@@ -158,6 +160,7 @@ model ReviewLog {
   difficulty    Float?
   elapsedDays   Int       @default(0)
   scheduledDays Int       @default(0)
+  learningSteps Int       @default(0) // (re)learning step index at review time
   reviewedAt    DateTime  @default(now())
 
   @@index([userId, reviewedAt])

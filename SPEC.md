@@ -285,6 +285,7 @@ model ReviewLog {
   id            String    @id @default(cuid())
   userId        String
   wordId        String
+  // Fields mirror the ts-fsrs ReviewLog so we can rollback() for one-step undo.
   rating        Int                       // 1=Again, 2=Hard, 3=Good, 4=Easy
   state         FsrsState                 // card state at review time
   due           DateTime                  // due date this review assigned
@@ -292,6 +293,7 @@ model ReviewLog {
   difficulty    Float?
   elapsedDays   Int       @default(0)
   scheduledDays Int       @default(0)
+  learningSteps Int       @default(0)      // (re)learning step index at review time
   reviewedAt    DateTime  @default(now())
   @@index([userId, reviewedAt])
   @@index([userId, wordId])
@@ -663,6 +665,7 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-06-03 | `ReviewLog` mirrors the ts-fsrs review log (added `learningSteps`); one-step undo uses ts-fsrs `rollback()` | Storing the library's log verbatim makes undo correct without hand-rolled math and feeds FSRS re-optimization later. | Author | §6, §8.1 |
 | 2026-06-03 | Use **Prisma 7** with the `@prisma/adapter-pg` driver adapter (generated client in `src/generated/prisma`, config in `prisma.config.ts`) | Prisma 7 is the current major and makes driver adapters standard; pairs with the Postgres datasource. Local dev runs Postgres in Docker on port 5887. | Author | §6 |
 | 2026-06-03 | **One-tap start**: after login the app opens straight into a review/lesson — no deck picking or config | Frictionless entry is the core anti-Anki differentiator; the home screen defaults to the due queue. | Author | §2, §8 |
 | 2026-06-03 | Re-slice Phase 1 into **1a** (local playable: N3 review + undo) and **1b** (auth + full seed + deploy) | Get a usable study tool in hand ASAP; defer public-exposure work so it doesn't block daily use. | Author | §13 |

@@ -5,7 +5,7 @@ Execution checklist and progress tracker. **Plan and rationale live in
 state* — what's done and what's next. Keep it current; it's the "where we left off"
 record across sessions. Decisions do **not** go here — log them in SPEC.md §16.
 
-**Now:** Phase 1a → Data import: `scripts/import-csv.ts` for `decks/n3.csv`.
+**Now:** Phase 1a → review API routes (queue/review/undo) + the card UI; then AI generation.
 
 ---
 
@@ -23,9 +23,10 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
   `src/lib/db.ts` client singleton (Prisma 7 + `@prisma/adapter-pg`) — connection verified
 
 ### Data import (N3 only for now)
-- [ ] `scripts/import-csv.ts` — parse `decks/n3.csv` → `Word` rows (quoted commas,
-  `〜`/`(...)` placeholders, tag→level rules, `guid` unique key)
-- [ ] Seed the default `User` + `UserProfile`
+- [x] `scripts/import-csv.ts` — parse `decks/*.csv` → `Word` rows (quoted commas,
+  `〜`/`(...)` placeholders, tag→level rules, `guid` unique key). N3 imported (2,140).
+- [x] Seed the default `User` + `UserProfile` (`scripts/seed-user.ts`, idempotent);
+  `DEFAULT_USER_ID` written to `.env`
 
 ### AI sentence generation (N3)
 - [ ] Prompt design + `POST /api/generate` (on-demand); **validate JSON output**;
@@ -34,11 +35,11 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
 - [ ] `scripts/collect-batch.ts` — poll + upsert `ExampleSentence`; skip/log malformed
 
 ### Anki mode — review loop (JP→EN)
-- [ ] `ts-fsrs` adapter (map `ReviewState` ⇄ ts-fsrs `Card`)
-- [ ] `GET /api/cards/queue` (due + capped NEW cards, day boundary via `UserProfile`)
-- [ ] `POST /api/review` — apply FSRS, write `ReviewState` **and append `ReviewLog`**
-- [ ] **One-step undo** (restore prior state from `ReviewLog`)
-- [ ] Mobile-first card UI: flip + rate (iPhone SE baseline)
+- [x] `ts-fsrs` adapter (`src/lib/fsrs.ts`) — Card ⇄ ReviewState, scheduler, log mapping
+- [x] Review services (`src/lib/review.ts`) — `reviewWord` (+ `ReviewLog`),
+  `undoLastReview` (ts-fsrs `rollback`), `getStudyQueue` — verified end-to-end
+- [ ] API route handlers: `GET /api/cards/queue`, `POST /api/review`, undo endpoint
+- [ ] Mobile-first card UI: flip + rate + undo (iPhone SE baseline)
 
 ### Done when
 - [ ] Run locally and study N3 end-to-end off the app
