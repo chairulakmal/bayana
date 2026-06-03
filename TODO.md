@@ -5,7 +5,7 @@ Execution checklist and progress tracker. **Plan and rationale live in
 state* — what's done and what's next. Keep it current; it's the "where we left off"
 record across sessions. Decisions do **not** go here — log them in SPEC.md §16.
 
-**Now:** Phase 1a → mobile-first card UI (Anki mode: flip / rate / undo); then AI generation.
+**Now:** Phase 1a → AI sentence generation (N3, needs ANTHROPIC_API_KEY). App is already studyable: `npm run dev` → http://localhost:3887
 
 ---
 
@@ -40,7 +40,8 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
   `undoLastReview` (ts-fsrs `rollback`), `getStudyQueue` — verified end-to-end
 - [x] API route handlers: `GET /api/cards/queue`, `POST /api/review`,
   `POST /api/review/undo` — verified over HTTP (incl. 400 validation)
-- [ ] Mobile-first card UI: flip + rate + undo (iPhone SE baseline)
+- [x] Mobile-first card UI (`src/components/study-session.tsx` + home page) —
+  flip / rate / undo, iPhone SE baseline; builds + SSR-renders
 
 ### Done when
 - [ ] Run locally and study N3 end-to-end off the app
