@@ -579,8 +579,9 @@ This repository is intended to be **open-sourced**, so no personal data is commi
   (see §5.1, §7.1).
 - **Build:** Nixpacks autodetects Next.js, or a Dockerfile for finer control.
 - **Environment variables:** `DATABASE_URL`, `ANTHROPIC_API_KEY`, `RESEND_API_KEY`,
-  `AUTH_SECRET`, `AUTH_ALLOWED_EMAIL`, `DEFAULT_USER_ID` (the seeded user until additional
-  users exist).
+  `AUTH_SECRET`, `AUTH_ALLOWED_EMAIL`, `AUTH_EMAIL_FROM`, `AUTH_URL` (public origin, for
+  Auth.js callbacks). `DEFAULT_USER_ID` is **not** a production variable — it is only used
+  by the local `scripts/seed-user.ts` helper.
 - **Migrations & seed:** run `prisma migrate deploy` on release; load words with
   `scripts/import-csv.ts`. For the example-sentence cache, **transfer the
   already-generated sentences from local rather than regenerating** — regeneration would

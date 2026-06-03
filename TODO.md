@@ -5,8 +5,8 @@ Execution checklist and progress tracker. **Plan and rationale live in
 state* — what's done and what's next. Keep it current; it's the "where we left off"
 record across sessions. Decisions do **not** go here — log them in SPEC.md §16.
 
-**Now:** Phase 1b → test magic-link sign-in locally, then Railway deploy prep (you
-provision Railway; I prepare config + migration/cache-transfer scripts + runbook).
+**Now:** Phase 1b → **deploy via Railway following `notes/deploy.md`** (your click-through).
+Then Phase 1c (other levels + on-demand generation).
 
 ---
 
@@ -61,8 +61,11 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
   - [x] Seeded user linked to allowlist email (sign-in attaches to existing user)
   - [ ] Remaining hardening: **rate-limit** the sign-in request (§11.3 #5) — not yet done
   - [ ] Manual test: magic-link sign-in end-to-end (needs Resend delivery — see note below)
-- [ ] **Deploy** — Railway web + Postgres; env vars; `prisma migrate deploy`; transfer N3
-  cache by `Word.guid`; daily backups
+- [x] **Deploy prep** — `railway.json` (Nixpacks, `start:prod`), `postinstall` generate,
+  `start:prod` = migrate + `$PORT`, `prisma`/`dotenv` → runtime deps; **runbook in
+  `notes/deploy.md`**. Verified `prisma migrate deploy` runs clean.
+- [ ] **Deploy** (you, via Railway): create project + Postgres, set env vars, transfer the
+  N3 cache (`notes/deploy.md` §3 — pg_dump pipe), generate domain + set `AUTH_URL`, backups
 
 ## Phase 1c — Fill content (post-deploy)
 - [ ] Seed remaining levels N5/N4/N2/N1 (Batch API)
