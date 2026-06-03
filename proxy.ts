@@ -18,11 +18,12 @@ const SESSION_COOKIES = ["authjs.session-token", "__Secure-authjs.session-token"
 //   - perIp: stops a single client from hammering the endpoint or guessing.
 //   - global: the allowlist means only ONE inbox can ever receive a link, so a global cap
 //     is the real defense against inbox-bombing even from rotating IPs (and it protects
-//     our Resend send quota). Kept comfortably above perIp so a lone legit user is never
-//     blocked by it.
+//     our Resend send quota). Kept deliberately tight — this is a single-user app, so even
+//     a handful of sign-in emails per window is already abnormal; a low cap shrinks the
+//     inbox-bombing window without ever inconveniencing the one legitimate user.
 const WINDOW_MS = 10 * 60_000;
 const checkPerIpSignIn = createRateLimiter({ limit: 5, windowMs: WINDOW_MS });
-const checkGlobalSignIn = createRateLimiter({ limit: 20, windowMs: WINDOW_MS });
+const checkGlobalSignIn = createRateLimiter({ limit: 6, windowMs: WINDOW_MS });
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;

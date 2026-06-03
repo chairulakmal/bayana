@@ -5,8 +5,8 @@ Execution checklist and progress tracker. **Plan and rationale live in
 state* — what's done and what's next. Keep it current; it's the "where we left off"
 record across sessions. Decisions do **not** go here — log them in SPEC.md §16.
 
-**Now:** Phase 1b → **deploy via Railway following `notes/deploy.md`** (your click-through).
-Then Phase 1c (other levels + on-demand generation).
+**Now:** Phase 1b shipped — app is **live on Railway, magic-link sign-in works in prod**.
+Next: Phase 1c (other levels + on-demand generation).
 
 ---
 
@@ -62,18 +62,26 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
   - [x] Remaining hardening: **rate-limit** the sign-in request (§11.3 #5) — in-memory
     fixed-window limiter (`src/lib/rate-limit.ts`), enforced in `proxy.ts` on POST to the
     sign-in paths (per-IP 5/10min + global 20/10min); explicit 30-day session TTL (#6)
-  - [ ] Manual test: magic-link sign-in end-to-end (needs Resend delivery — see note below)
+  - [x] Manual test: magic-link sign-in end-to-end — verified locally **and in prod**
 - [x] **Deploy prep** — `railway.json` (Railpack, `start:prod`), `postinstall` generate,
   `start:prod` = migrate + `$PORT`, `prisma`/`dotenv` → runtime deps; **runbook in
   `notes/deploy.md`**. Verified `prisma migrate deploy` runs clean.
 - **Deploy** (you, via Railway):
   - [x] Push to GitHub; transfer N3 cache via `pg_dump` pipe
-  - [ ] Set env vars (fresh `AUTH_SECRET`, `AUTH_URL`, Resend/anthropic, `DATABASE_URL` ref); deploy
-  - [ ] Generate domain → set `AUTH_URL` → redeploy; smoke-test sign-in; enable daily backups
+  - [x] Set env vars (fresh `AUTH_SECRET`, `AUTH_URL`, Resend/anthropic, `DATABASE_URL` ref); deploy
+  - [x] Generate domain → set `AUTH_URL` → redeploy; smoke-test sign-in — **live, working**
+  - [ ] Take first manual `pg_dump` backup of **local** (the source of the paid sentence
+    cache — see `notes/deploy.md` §6). Prod is intentionally not backed up (Hobby egress);
+    prod-only study history is an accepted loss-risk (SPEC §12, §16).
 
 ## Phase 1c — Fill content (post-deploy)
-- [ ] Seed remaining levels N5/N4/N2/N1 (Batch API)
-- [ ] On-demand `/api/generate` + UI fetch-on-flip for not-yet-seeded words
+- [x] Seed remaining levels N5/N4/N2/N1 (Batch API) — **all 8,101 words now have a
+  sentence** (local DB). Batch ids + counts in `notes/batch-generation.md`.
+- [x] **Re-backup local** — fresh `pg_dump` taken after all decks seeded; the ~8,100-word
+  paid sentence cache is now captured (notes/deploy.md §6).
+- [ ] **Transfer local → prod** so the deployed app serves all levels (notes/deploy.md §3).
+- [ ] On-demand `/api/generate` + UI fetch-on-flip — now **optional/low priority**: every
+  word is pre-seeded, so this is only a safety net for future un-seeded additions.
 
 ## Phase 2+ (later)
 See SPEC.md §13 — Duolingo mode, suspend/leech, stats, multi-user, enhancements.

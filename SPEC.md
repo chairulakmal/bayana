@@ -361,6 +361,13 @@ tokens. At Haiku-class rates with the Batch 50% discount, total one-time cost la
 **low-single-digit to ~$10** range; prompt caching reduces input cost further. Treat this
 as a budget ceiling, not a quote — confirm against current published Haiku pricing.
 
+**Measured actual (2026-06-03).** The full one-time seed of all five levels (≈8,100 words,
+one sentence each) via the Batch API cost **≈ $2.55 cumulative** (Anthropic console) — N3
+first (~$0.62), then N5/N4/N2/N1 (~$1.7), plus a few cents of prompt-quality gating and
+straggler retries. Output tokens dominate (they can't be cached); the Batch discount and
+cached system prompt kept it well under the ceiling above. This confirms the core premise:
+the contextual-sentence benefit is achieved at a near-zero, one-time cost.
+
 ---
 
 ## 8. Study experience
@@ -475,17 +482,22 @@ screens; the bulk of study happens on mobile.
 
 ## 9. API surface (Next.js Route Handlers)
 
-| Method | Route | Purpose | Auth |
-|--------|-------|---------|------|
-| GET | `/api/cards/queue` | Today's FSRS study queue | required |
-| GET | `/api/cards?level=&q=&page=` | Browse / search | required |
-| POST | `/api/review` | Submit a rating → FSRS update | required |
-| POST | `/api/review/undo` | Revert the most recent review (one-step undo) | required |
-| GET | `/api/quiz?level=` | One multiple-choice question + distractors | required |
-| POST | `/api/generate` | On-demand single-sentence fallback | required |
-| `*` | `/api/auth/*` | Auth.js (sign-in request, callback, session) | public (rate-limited) |
-| POST | `/api/batch/submit` | Submit a generation batch (admin/script) | admin |
-| GET | `/api/batch/:id` | Poll batch status / collect (admin/script) | admin |
+The **Status** column reflects what is actually built today vs. designed-but-not-yet-built,
+so the auth/protection guarantees below can't be assumed for routes that don't yet exist.
+Batch operations are currently **scripts only** (run locally), not HTTP endpoints — there
+is intentionally no web-reachable, cost-incurring Anthropic route at present (see §11.4).
+
+| Method | Route | Purpose | Auth | Status |
+|--------|-------|---------|------|--------|
+| GET | `/api/cards/queue` | Today's FSRS study queue | required | **Implemented** |
+| POST | `/api/review` | Submit a rating → FSRS update | required | **Implemented** |
+| POST | `/api/review/undo` | Revert the most recent review (one-step undo) | required | **Implemented** |
+| `*` | `/api/auth/*` | Auth.js (sign-in request, callback, session) | public (rate-limited) | **Implemented** |
+| GET | `/api/cards?level=&q=&page=` | Browse / search | required | Planned (Phase 2) |
+| GET | `/api/quiz?level=` | One multiple-choice question + distractors | required | Planned (Phase 2) |
+| POST | `/api/generate` | On-demand single-sentence fallback | required + rate-limited | Planned (Phase 1c, optional — see §11.4) |
+| POST | `/api/batch/submit` | Submit a generation batch | admin | Not planned (scripts only) |
+| GET | `/api/batch/:id` | Poll batch status / collect | admin | Not planned (scripts only) |
 
 ---
 
@@ -534,8 +546,9 @@ A magic link is a bearer token in transit; the implementation **must** enforce:
 1. **High-entropy tokens** (≥ 256 bits) stored **hashed at rest** — never the raw token.
 2. **Single-use** tokens, invalidated immediately on redemption.
 3. **Short TTL** — 10–15 minutes.
-4. **Server-side allowlist enforcement** (`email === AUTH_ALLOWED_EMAIL`) *before* any
-   email is sent — without this the endpoint is an open email-spam relay.
+4. **Server-side allowlist enforcement** (case-insensitive `email === AUTH_ALLOWED_EMAIL`,
+   normalized on both sides) *before* any email is sent, and **failing closed** if the
+   allowlist is unset — without this the endpoint is an open email-spam relay.
 5. **Rate limiting** on the sign-in request endpoint (per-IP and global) to prevent inbox
    bombing and token-guessing.
 6. **Secure sessions** — `httpOnly`, `Secure`, `SameSite=Lax` cookies with a sane expiry
@@ -546,10 +559,19 @@ A magic link is a bearer token in transit; the implementation **must** enforce:
 - All secrets (`ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `AUTH_SECRET`, `DATABASE_URL`) are
   injected as Railway environment variables and never committed.
 - The Anthropic key is **server-only**; it is never exposed to the client and no model call
-  is reachable from the browser without an authenticated server route.
-- All cost-incurring endpoints (`/api/generate`, `/api/batch/*`) require authentication;
-  batch endpoints additionally require an admin marker so they cannot be driven by a normal
-  session.
+  is reachable from the browser without an authenticated server route. As built, the only
+  code that calls Anthropic lives in `src/lib/generate.ts` and is imported **only by the
+  local `scripts/`** — there is currently **no web-reachable route that spends Anthropic
+  tokens** (the on-demand endpoint below is not yet built; §9).
+- **If/when `/api/generate` is added** (the optional on-demand fallback, §7.4), it becomes
+  the single Anthropic cost-abuse vector and **must** ship with all of: (a) authentication
+  (`getCurrentUserId` → 401); (b) **rate limiting** (reuse `src/lib/rate-limit.ts`, per-user
+  and global) so an authenticated client can't loop it; (c) **cache-first** — call the model
+  only when the word has zero cached sentences, so repeated requests for the same word are
+  free; (d) a bounded `max_tokens`. Without (b)–(d), auth alone does not bound cost.
+- Batch operations are **scripts only** (run locally), not HTTP endpoints, so they expose no
+  cost-incurring route. Should they ever be exposed as `/api/batch/*`, they require an admin
+  marker beyond a normal session.
 
 ### 11.5 Path to multi-user
 Multi-user is reached by: removing the single-email allowlist (or widening it to an
@@ -591,16 +613,20 @@ This repository is intended to be **open-sourced**, so no personal data is commi
   stable `Word.guid` (a GUID-keyed export/import), or `pg_dump`/restore the
   `Word` + `ExampleSentence` tables together so ids stay aligned. `seed-sentences.ts` /
   `collect-batch.ts` remain for generating *new* levels directly on prod.
-- **Backups:** the Railway **Hobby** plan has no managed backups, so back up manually with
-  `pg_dump` (commands in `notes/deploy.md`), and always before a `prisma migrate deploy`.
-  Backup priorities: `ReviewState`/`ReviewLog` (study history — irreplaceable) and
-  `ExampleSentence` (paid to regenerate). `Word` is free to re-import from `decks/`.
-  Dump files contain personal data and are gitignored (`/backups`).
-  - The **local** Postgres (the `bayana-postgres` container) is the authoritative source of
-    the generated sentence cache — that is where Batch results land before they are
-    transferred to prod — so it warrants the same `pg_dump` discipline. For long-term
-    keeping, a `Word.guid`-keyed JSON export is preferred over a `pg_dump` `.dump`, which is
-    tied to the Postgres major version and schema.
+- **Backups:** the Railway **Hobby** plan has no managed backups. The backup target is the
+  **local** Postgres (the `bayana-postgres` container), which is the authoritative source of
+  the generated sentence cache — Batch results land there first, then are transferred to
+  prod — so backing it up protects `ExampleSentence`, the only paid, hard-to-regenerate
+  artifact. (`Word` is free to re-import from `decks/`.) Back it up with `pg_dump` (commands
+  in `notes/deploy.md`); for long-term keeping, a `Word.guid`-keyed JSON export is preferred
+  over a `.dump`, which is tied to the Postgres major version and schema. Dump files contain
+  personal data and are gitignored (`/backups`).
+  - **Prod is deliberately not backed up routinely**, to avoid Hobby-plan egress cost. The
+    accepted consequence: prod-only data — chiefly `ReviewState`/`ReviewLog` (study history,
+    which accumulates only in prod once studying happens there) — is **not recoverable** if
+    the prod database is lost. This is an accepted risk for a single-user learning project,
+    not a recommendation for multi-user (§11.5), where study history would warrant a managed
+    or scheduled backup.
 - **Domain:** Railway-generated domain for the initial release; custom domain later.
 
 ---
@@ -690,8 +716,10 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-06-03 | Security review hardening: **case-insensitive allowlist** comparison; **global sign-in cap tightened 20 → 6**/10min; SPEC §9/§11.4 corrected to mark unbuilt routes "planned" and to require auth + rate-limit + cache-first + token-cap on a future `/api/generate` | Review confirmed no web-reachable Anthropic cost path exists (generate code is scripts-only) and Resend is well contained. The allowlist compare could lock out the legit user on a capitalization mismatch (availability footgun); a tighter global cap further bounds inbox-bombing for a single-user app; doc accuracy prevents assuming protections on routes that don't exist. | Author | §9, §11.3, §11.4 |
 | 2026-06-03 | Sign-in rate limiting uses an **in-memory fixed-window** limiter (per-IP 5/10min + global 20/10min), enforced in `proxy.ts`; session TTL set explicitly to 30 days | Single-user on one Railway Hobby instance, so a process-local counter needs no Redis/DB and zero deps; limits reset on redeploy / aren't shared across replicas (acceptable, swappable later). The global cap is the real inbox-bombing defense since the allowlist means only one inbox can receive a link. Postgres/Upstash stores rejected as over-built for now. | Author | §11.3 |
 | 2026-06-03 | Build on Railway with **Railpack**, not Nixpacks | Nixpacks is deprecated; Railpack is Railway's current default builder. Set `build.builder: "RAILPACK"` in `railway.json`. | Author | §12 |
+| 2026-06-03 | **Back up the local DB only**, not prod (refines the earlier manual-`pg_dump` row) | Hobby-plan egress makes routine prod dumps costly, and the only paid/irreplaceable artifact — `ExampleSentence` — originates locally, so a local backup protects it. Accepted consequence: prod-only `ReviewState`/`ReviewLog` (study history) is unrecoverable if prod is lost — acceptable for a single-user learning project. | Author | §12 |
 | 2026-06-03 | **Backups are manual `pg_dump`** (revises the earlier "Railway daily" row) | The Railway **Hobby** plan has no managed/scheduled backups, so dumps are taken by hand: before each prod migration, and from the local container (the source of the paid sentence cache). A `Word.guid`-keyed JSON export is the version-proof long-term form. | Author | §12 |
 | 2026-06-03 | Ship Phase 1b with **N3 only** (auth + deploy first); seed other levels + on-demand generation after deploy (Phase 1c) | Get the app live and usable sooner; remaining levels and the on-demand fallback are content/polish that can follow on the deployed instance. | Author | §13 |
 | 2026-06-03 | Reuse generated sentences in prod by transferring the cache (keyed by `Word.guid`), not regenerating | The cache is a paid one-time artifact and `Word.id` cuids differ per DB; transfer by guid (or pg_dump/restore of Word + ExampleSentence) avoids paying the API again on deploy. | Author | §12 |

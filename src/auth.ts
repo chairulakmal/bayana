@@ -13,7 +13,13 @@ import Resend from "next-auth/providers/resend";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "@/lib/db";
 
-const ALLOWED_EMAIL = process.env.AUTH_ALLOWED_EMAIL;
+// Normalize the allowlisted address once (trim + lowercase). Auth.js already lowercases
+// the submitted identifier before our checks run, but normalizing BOTH sides makes the
+// comparison robust no matter how the env var happens to be capitalized — a stray
+// uppercase here would lock out the legitimate user (an availability footgun, not a
+// bypass). Email local-parts are technically case-sensitive per RFC 5321, but in practice
+// every real provider treats them case-insensitively, so this is safe.
+const ALLOWED_EMAIL = process.env.AUTH_ALLOWED_EMAIL?.trim().toLowerCase();
 const EMAIL_FROM = process.env.AUTH_EMAIL_FROM ?? "onboarding@resend.dev";
 const TOKEN_TTL_SECONDS = 15 * 60; // 15-minute magic links
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30-day database sessions
@@ -38,7 +44,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       maxAge: TOKEN_TTL_SECONDS,
       // Send the magic link ourselves so we can gate on the allowlist FIRST.
       async sendVerificationRequest({ identifier: email, url }) {
-        if (!ALLOWED_EMAIL || email !== ALLOWED_EMAIL) {
+        // Fails CLOSED: if ALLOWED_EMAIL is unset, no email is ever sent.
+        if (!ALLOWED_EMAIL || email.trim().toLowerCase() !== ALLOWED_EMAIL) {
           // Reject before any email is sent → no open relay (SPEC §11.3 #4).
           throw new Error("This email address is not allowed to sign in.");
         }
@@ -67,7 +74,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     // Defense in depth: reject any non-allowlisted email at verification time too.
     signIn({ user }) {
-      return !!user.email && user.email === ALLOWED_EMAIL;
+      return !!user.email && user.email.trim().toLowerCase() === ALLOWED_EMAIL;
     },
     // Expose the DB user id on the session so server code can scope queries by user.
     session({ session, user }) {
