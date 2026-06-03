@@ -85,15 +85,35 @@ export async function getStudyQueue(
     include: { word: { include: { sentences: { take: 1 } } } },
   });
 
-  const newWords = await db.word.findMany({
+  // New words: pick a RANDOM sample of never-seen words. The source deck is sorted by
+  // reading, so taking them in insertion order clusters similar-sounding words together;
+  // shuffling spreads them out and varies the cards across sessions.
+  const candidates = await db.word.findMany({
     where: {
       ...(opts.level ? { level: opts.level } : {}),
       reviews: { none: { userId } }, // no ReviewState for this user ⇒ never seen
     },
-    take: profile.newCardsPerDay,
-    orderBy: { id: "asc" },
+    select: { id: true }, // ids only — cheap to fetch the whole candidate pool and shuffle
+  });
+  const pickedIds = shuffle(candidates.map((c) => c.id)).slice(0, profile.newCardsPerDay);
+
+  // Fetch the chosen words, then restore the shuffled order (a `WHERE id IN (...)` query
+  // does not preserve the order of the id list).
+  const unordered = await db.word.findMany({
+    where: { id: { in: pickedIds } },
     include: { sentences: { take: 1 } },
   });
+  const byId = new Map(unordered.map((w) => [w.id, w]));
+  const newWords = pickedIds.map((id) => byId.get(id)).filter((w) => w !== undefined);
 
   return { due, newWords };
+}
+
+/** In-place Fisher–Yates shuffle. Returns the same array for chaining. */
+function shuffle<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
 }

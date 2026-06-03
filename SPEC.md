@@ -376,8 +376,10 @@ review or lesson is a single tap, with no deck selection or configuration (§2).
 ### 8.1 Anki mode — flashcard review (FSRS)
 The classic spaced-repetition flashcard loop, modeled on Anki.
 
-- The daily queue selects `ReviewState` rows where `due <= now` for the current user, plus
-  a configurable number of `NEW` cards/day, ordered by level then due date.
+- The daily queue selects `ReviewState` rows where `due <= now` for the current user
+  (ordered by due date), plus a configurable number of `NEW` cards/day **selected in
+  randomized order** so similar-sounding words (adjacent in the source deck) aren't
+  clustered together.
 - The card UI mirrors the Anki templates: the front shows the expression (or the meaning,
   in reverse direction); flipping reveals reading, meaning, and a **cached example
   sentence**.
@@ -666,6 +668,7 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-06-03 | Randomize new-card selection in the study queue | The deck is sorted by reading, so sequential new cards cluster similar sounds; a shuffled sample spreads them out and varies sessions. | Author | §8.1 |
 | 2026-06-03 | `ReviewLog` mirrors the ts-fsrs review log (added `learningSteps`); one-step undo uses ts-fsrs `rollback()` | Storing the library's log verbatim makes undo correct without hand-rolled math and feeds FSRS re-optimization later. | Author | §6, §8.1 |
 | 2026-06-03 | Use **Prisma 7** with the `@prisma/adapter-pg` driver adapter (generated client in `src/generated/prisma`, config in `prisma.config.ts`) | Prisma 7 is the current major and makes driver adapters standard; pairs with the Postgres datasource. Local dev runs Postgres in Docker on port 5887. | Author | §6 |
 | 2026-06-03 | **One-tap start**: after login the app opens straight into a review/lesson — no deck picking or config | Frictionless entry is the core anti-Anki differentiator; the home screen defaults to the due queue. | Author | §2, §8 |
