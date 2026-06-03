@@ -29,10 +29,12 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
   `DEFAULT_USER_ID` written to `.env`
 
 ### AI sentence generation (N3)
-- [ ] Prompt design + `POST /api/generate` (on-demand); **validate JSON output**;
-  sanity-check on ~5 N3 words
-- [ ] `scripts/seed-sentences.ts` — Batch API submit (N3)
-- [ ] `scripts/collect-batch.ts` — poll + upsert `ExampleSentence`; skip/log malformed
+- [x] `src/lib/generate.ts` — cached prompt + JSON validation; sanity-checked 5 N3 words
+  (~$0.003). On-demand `POST /api/generate` deferred to Phase 1b.
+- [x] `scripts/seed-sentences.ts` — `--test` quality gate + Batch API submit
+  (batch `msgbatch_01VKSSFCPCC8t5KECm3H83Gt`, 2135 N3 requests)
+- [ ] `scripts/collect-batch.ts` — built; **batch still processing — re-run to finish
+  storing** (`npx tsx scripts/collect-batch.ts msgbatch_01VKSSFCPCC8t5KECm3H83Gt`)
 
 ### Anki mode — review loop (JP→EN)
 - [x] `ts-fsrs` adapter (`src/lib/fsrs.ts`) — Card ⇄ ReviewState, scheduler, log mapping

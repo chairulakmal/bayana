@@ -581,9 +581,13 @@ This repository is intended to be **open-sourced**, so no personal data is commi
 - **Environment variables:** `DATABASE_URL`, `ANTHROPIC_API_KEY`, `RESEND_API_KEY`,
   `AUTH_SECRET`, `AUTH_ALLOWED_EMAIL`, `DEFAULT_USER_ID` (the seeded user until additional
   users exist).
-- **Migrations & seed:** run `prisma migrate deploy` on release; run `scripts/import-csv.ts`
-  once to load words, then `seed-sentences.ts` / `collect-batch.ts` via `railway run` to
-  fill the sentence cache.
+- **Migrations & seed:** run `prisma migrate deploy` on release; load words with
+  `scripts/import-csv.ts`. For the example-sentence cache, **transfer the
+  already-generated sentences from local rather than regenerating** — regeneration would
+  re-incur API cost. Because `Word.id` cuids differ per database, transfer keyed by the
+  stable `Word.guid` (a GUID-keyed export/import), or `pg_dump`/restore the
+  `Word` + `ExampleSentence` tables together so ids stay aligned. `seed-sentences.ts` /
+  `collect-batch.ts` remain for generating *new* levels directly on prod.
 - **Backups:** enable Railway **daily** Postgres volume backups, and run a `pg_dump`
   immediately **before each `prisma migrate deploy`**. The review history
   (`ReviewState` / `ReviewLog`) is the irreplaceable data — the deck and example sentences
@@ -673,6 +677,7 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-06-03 | Reuse generated sentences in prod by transferring the cache (keyed by `Word.guid`), not regenerating | The cache is a paid one-time artifact and `Word.id` cuids differ per DB; transfer by guid (or pg_dump/restore of Word + ExampleSentence) avoids paying the API again on deploy. | Author | §12 |
 | 2026-06-03 | Study session auto-refetches the queue when a batch is exhausted | Cards that become due mid-session (Again / learning steps) cycle back without a manual reload; "caught up" shows only when a fresh fetch is empty. | Author | §8.1 |
 | 2026-06-03 | Randomize new-card selection in the study queue | The deck is sorted by reading, so sequential new cards cluster similar sounds; a shuffled sample spreads them out and varies sessions. | Author | §8.1 |
 | 2026-06-03 | `ReviewLog` mirrors the ts-fsrs review log (added `learningSteps`); one-step undo uses ts-fsrs `rollback()` | Storing the library's log verbatim makes undo correct without hand-rolled math and feeds FSRS re-optimization later. | Author | §6, §8.1 |
