@@ -10,6 +10,7 @@
 // previous card to be re-rated; newly-due cards appear on the next load.
 
 import { useCallback, useEffect, useState } from "react";
+import { Parrot } from "@/components/parrot";
 
 // --- shapes returned by GET /api/cards/queue ---
 type QueueWord = {
@@ -32,11 +33,11 @@ type StudyCard = {
 
 type Rating = 1 | 2 | 3 | 4;
 
-const RATINGS: { value: Rating; label: string; className: string }[] = [
-  { value: 1, label: "Again", className: "bg-rose-600 active:bg-rose-700" },
-  { value: 2, label: "Hard", className: "bg-amber-600 active:bg-amber-700" },
-  { value: 3, label: "Good", className: "bg-emerald-600 active:bg-emerald-700" },
-  { value: 4, label: "Easy", className: "bg-sky-600 active:bg-sky-700" },
+const RATINGS: { value: Rating; label: string; cls: string }[] = [
+  { value: 1, label: "Again", cls: "rate-again" },
+  { value: 2, label: "Hard", cls: "rate-hard" },
+  { value: 3, label: "Good", cls: "rate-good" },
+  { value: 4, label: "Easy", cls: "rate-easy" },
 ];
 
 function toCard(word: QueueWord): StudyCard {
@@ -140,88 +141,133 @@ export function StudySession() {
   // --- render states ---
 
   if (cards === null) {
-    return <Centered>Loading…</Centered>;
+    return (
+      <Centered>
+        <Parrot expr="sleepy" style={{ width: 84, height: 94 }} />
+        <p className="mt-3" style={{ color: "var(--ink-soft)" }}>
+          Loading…
+        </p>
+      </Centered>
+    );
   }
 
   if (!current) {
     return (
       <Centered>
-        <p className="text-2xl font-semibold">🎉 All caught up!</p>
-        <p className="mt-2 text-slate-500">No cards are due right now.</p>
-        <button
-          onClick={() => void loadQueue()}
-          disabled={busy}
-          className="mt-6 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-        >
+        <Parrot expr="wow" title="Pī cheering" style={{ width: 124, height: 138 }} />
+        <p className="mt-4 text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
+          All caught up! 🎉
+        </p>
+        <p className="mt-1" style={{ color: "var(--ink-soft)" }}>
+          No cards are due right now. <span className="jp">またね！</span>
+        </p>
+        <button onClick={() => void loadQueue()} disabled={busy} className="btn btn-primary mt-6">
           Check for more
         </button>
+        {error && (
+          <p className="mt-3 text-sm" style={{ color: "var(--bad)" }}>
+            {error}
+          </p>
+        )}
       </Centered>
     );
   }
 
   const remaining = cards.length - index;
+  const progress = cards.length ? Math.round((index / cards.length) * 100) : 0;
 
   return (
-    <main className="flex min-h-dvh flex-col bg-white text-slate-900">
-      {/* Top bar: progress + undo */}
-      <header className="mx-auto flex w-full max-w-md items-center justify-between px-4 py-3 text-sm text-slate-500">
-        <span>{remaining} left</span>
-        <button
-          onClick={undo}
-          disabled={busy || reviewed.length === 0}
-          className="rounded px-2 py-1 underline disabled:opacity-30"
-        >
-          Undo
-        </button>
+    <main className="flex min-h-dvh flex-col">
+      {/* Top bar: progress bar + count + undo */}
+      <header className="mx-auto w-full max-w-md px-4 pt-4">
+        <div className="h-2.5 w-full overflow-hidden rounded-full" style={{ background: "var(--cream-100)" }}>
+          <div
+            className="h-full rounded-full transition-[width] duration-300"
+            style={{ width: `${progress}%`, background: "linear-gradient(90deg, var(--magenta), var(--mag-500))" }}
+          />
+        </div>
+        <div className="mt-2 flex items-center justify-between text-[13px]" style={{ color: "var(--ink-soft)" }}>
+          <span>{remaining} left</span>
+          <button
+            onClick={undo}
+            disabled={busy || reviewed.length === 0}
+            className="font-semibold underline underline-offset-2 disabled:opacity-30"
+            style={{ color: "var(--grape)" }}
+          >
+            Undo
+          </button>
+        </div>
       </header>
 
-      {/* Card: tap anywhere to reveal the answer */}
-      <button
-        type="button"
-        onClick={() => !flipped && setFlipped(true)}
-        className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-6 px-6 text-center"
-      >
-        <div className="text-5xl font-bold tracking-tight">{current.expression}</div>
-
-        {flipped ? (
-          <div className="flex flex-col items-center gap-3">
-            <div className="text-2xl text-slate-700">{current.reading}</div>
-            <div className="text-xl text-slate-900">{current.meaning}</div>
-            {current.sentence && (
-              <div className="mt-2 border-t border-slate-200 pt-3 text-base text-slate-600">
-                <p className="text-lg text-slate-800">{current.sentence.japanese}</p>
-                <p className="text-sm text-slate-500">{current.sentence.reading}</p>
-                <p className="mt-1 italic">{current.sentence.english}</p>
-              </div>
-            )}
+      {/* Card: tap anywhere to reveal the answer (BRAND.md §7 flashcard) */}
+      <section className="flex flex-1 items-center justify-center px-4 py-4">
+        <button
+          type="button"
+          onClick={() => !flipped && setFlipped(true)}
+          className="flex w-full max-w-md flex-col items-center justify-center gap-5 rounded-[var(--r-lg)] px-6 py-10 text-center"
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--line)",
+            boxShadow: "var(--shadow)",
+            minHeight: "58dvh",
+            cursor: flipped ? "default" : "pointer",
+          }}
+        >
+          <div className="jp text-6xl" style={{ fontWeight: 800, color: "var(--ink)", lineHeight: 1.1 }}>
+            {current.expression}
           </div>
-        ) : (
-          <span className="text-sm text-slate-400">Tap to reveal</span>
-        )}
-      </button>
 
-      {error && <p className="px-4 pb-2 text-center text-sm text-rose-600">{error}</p>}
+          {flipped ? (
+            <div className="flex w-full flex-col items-center gap-2">
+              <div className="jp text-2xl" style={{ color: "var(--mag-600)", fontWeight: 700 }}>
+                {current.reading}
+              </div>
+              <div className="text-xl" style={{ color: "var(--ink)" }}>
+                {current.meaning}
+              </div>
+              {current.sentence && (
+                <div
+                  className="mt-3 w-full rounded-[var(--r-md)] p-4 text-left"
+                  style={{ background: "var(--surface-cream)" }}
+                >
+                  <p className="jp text-[17px] leading-relaxed" style={{ color: "var(--ink)" }}>
+                    {current.sentence.japanese}
+                  </p>
+                  <p className="jp mt-1 text-[13px]" style={{ color: "var(--ink-faint)" }}>
+                    {current.sentence.reading}
+                  </p>
+                  <p className="mt-2 text-[14px] italic" style={{ color: "var(--ink-soft)" }}>
+                    {current.sentence.english}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <span className="jp text-sm" style={{ color: "var(--ink-faint)" }}>
+              タップして答え · tap to reveal
+            </span>
+          )}
+        </button>
+      </section>
+
+      {error && (
+        <p className="px-4 pb-2 text-center text-sm" style={{ color: "var(--bad)" }}>
+          {error}
+        </p>
+      )}
 
       {/* Footer: rating buttons appear once flipped */}
       <footer className="mx-auto w-full max-w-md p-3">
         {flipped ? (
           <div className="grid grid-cols-4 gap-2">
             {RATINGS.map((r) => (
-              <button
-                key={r.value}
-                onClick={() => rate(r.value)}
-                disabled={busy}
-                className={`min-h-14 rounded-xl text-sm font-semibold text-white disabled:opacity-50 ${r.className}`}
-              >
+              <button key={r.value} onClick={() => rate(r.value)} disabled={busy} className={`rate ${r.cls}`}>
                 {r.label}
               </button>
             ))}
           </div>
         ) : (
-          <button
-            onClick={() => setFlipped(true)}
-            className="min-h-14 w-full rounded-xl bg-slate-900 text-sm font-semibold text-white active:bg-slate-700"
-          >
+          <button onClick={() => setFlipped(true)} className="btn btn-primary w-full">
             Show answer
           </button>
         )}
@@ -230,10 +276,10 @@ export function StudySession() {
   );
 }
 
-// Simple full-screen centered container for loading / empty / done states.
+// Full-screen centered container for loading / empty / done states (paper + ink).
 function Centered({ children }: { children: React.ReactNode }) {
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center bg-white px-6 text-center text-slate-900">
+    <main className="flex min-h-dvh flex-col items-center justify-center px-6 text-center">
       {children}
     </main>
   );

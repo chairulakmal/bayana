@@ -92,8 +92,28 @@ body {
 /* N1 is the "endgame" chip: imperial purple + gold text — premium and distinct from N2. */
 .chip-n1 { background: var(--murasaki); color: var(--gold); box-shadow: inset 0 0 0 1.5px rgba(240, 199, 94, 0.45); }
 
+/* Anki-mode rating buttons — same springy lip, mapped to the functional palette
+   (BRAND.md §3): Again = coral, Hard = yellow, Good = green, Easy = grape. */
+.rate {
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--f-display); font-weight: 600; font-size: 15px;
+  min-height: 56px; border: none; border-radius: var(--r-md); cursor: pointer;
+  transition: transform .06s ease, box-shadow .06s ease, filter .12s ease;
+}
+.rate:hover { filter: brightness(1.03); }
+.rate:disabled { opacity: .5; cursor: not-allowed; }
+.rate-again { background: var(--bad);    color: #fff;        box-shadow: 0 4px 0 #d63a55; }
+.rate-hard  { background: var(--yellow); color: var(--ink);  box-shadow: 0 4px 0 var(--yel-edge); }
+.rate-good  { background: var(--good);   color: #fff;        box-shadow: 0 4px 0 var(--good-edge); }
+.rate-easy  { background: var(--grape);  color: #fff;        box-shadow: 0 4px 0 var(--grape-edge); }
+.rate:active:not(:disabled) { transform: translateY(3px); }
+.rate-again:active:not(:disabled) { box-shadow: 0 1px 0 #d63a55; }
+.rate-hard:active:not(:disabled)  { box-shadow: 0 1px 0 var(--yel-edge); }
+.rate-good:active:not(:disabled)  { box-shadow: 0 1px 0 var(--good-edge); }
+.rate-easy:active:not(:disabled)  { box-shadow: 0 1px 0 var(--grape-edge); }
+
 /* Honor reduced-motion: keep the press functional, drop the spring (BRAND.md §7, SPEC §8.2). */
 @media (prefers-reduced-motion: reduce) {
-  .btn { transition: none; }
-  .btn:active { transform: none; }
+  .btn, .rate { transition: none; }
+  .btn:active, .rate:active { transform: none; }
 }
