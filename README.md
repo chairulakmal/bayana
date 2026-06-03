@@ -57,5 +57,4 @@ Built with Next.js 16 + Prisma + Postgres, deployed on Railway.
 
 ## Credits
 
-Vocabulary from [open-anki-jlpt-decks](https://github.com/jamsinclair/open-anki-jlpt-decks)
-by Jam Sinclair (MIT). 🙏
+Vocabulary from [open-anki-jlpt-decks](https://github.com/jamsinclair/open-anki-jlpt-decks) (MIT). 🙏

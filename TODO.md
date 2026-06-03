@@ -85,6 +85,11 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
   coverage now that every word is seeded; returns as a safety net with the admin tooling).
 
 ## Phase 2 — Duolingo mode ◀ current focus
+- [ ] **Level scope** — add `UserProfile.activeLevel` (migration); scope the Anki queue
+  **and** the quiz to it; build the returning-user **mode picker** (Anki / Duolingo) at
+  `/study` (SPEC §8, §8.5)
+- [ ] **First-run onboarding** — level choice → 5-question Duolingo warm-up (non-scheduling)
+  → guided tour; add `UserProfile.onboardedAt` to branch first-time vs. returning (SPEC §8.5)
 - [ ] `GET /api/quiz` — target word + correct option + 3 confusability-scored distractors
   (shared kanji / reading / meaning, scored in app code; synonym guardrail) (SPEC §8.2)
 - [ ] MC quiz UI — **Duolingo-grade polish, minimal animation, zero ads**; respects

@@ -49,9 +49,10 @@ cost — and a study experience tailored to our own data and scheduling.
 - Be secure by default despite a single-user launch, and extend cleanly to multi-user.
 - Deliver a **mobile-first** experience optimized for small phone screens (iPhone SE
   baseline) that remains fully usable on desktop.
-- **One tap to start.** After signing in, beginning a lesson or review takes a single tap —
-  the app opens straight into the due queue, with no decks to choose or settings to
-  configure. Frictionless entry is a core differentiator from Anki.
+- **Minimal-friction start.** Returning users are a single tap from studying: after signing
+  in they pick a **mode** (Anki or Duolingo) for their remembered **active level** and go —
+  no decks, note types, or configuration. First-time users complete a one-time level choice
+  and a short warm-up first (§8.5). Frictionless entry is a core differentiator from Anki.
 
 **Non-goals (initial release)**
 - Native mobile apps (mobile-first responsive web only; see §8.4).
@@ -72,8 +73,7 @@ cost — and a study experience tailored to our own data and scheduling.
 ## 4. Source data
 
 The deck originates from
-[**open-anki-jlpt-decks**](https://github.com/jamsinclair/open-anki-jlpt-decks)
-by Jam Sinclair, **MIT-licensed** and freely usable with attribution. Our copy is
+[**open-anki-jlpt-decks**](https://github.com/jamsinclair/open-anki-jlpt-decks), **MIT-licensed** and freely usable with attribution. Our copy is
 committed at `decks/*.csv` — Anki export format, one file per JLPT level.
 
 | File | Rows (≈) | Level |
@@ -211,6 +211,8 @@ model UserProfile {
   displayName String?
   role        Role     @default(MEMBER)  // ADMIN gates the admin sentence-audit page (§13)
   // study preferences
+  activeLevel    Level?                   // JLPT level both modes operate on; set at onboarding (§8.5), changeable
+  onboardedAt    DateTime?                // set when first-run (level → warm-up → guide) completes; gates onboarding
   studyReverse   Boolean @default(false) // also review EN→JP (recall); default is JP→EN only (§8.1)
   newCardsPerDay Int     @default(20)     // daily NEW-card cap for the FSRS queue
   timezone       String  @default("UTC")  // IANA tz; defines the "day" for limits/streaks/stats
@@ -377,17 +379,25 @@ Bayana offers two complementary study modes the user can switch between: **Anki 
 multiple-choice practice). Anki mode is the retention engine; Duolingo mode is the
 lightweight on-ramp and warm-up.
 
-**One-tap entry.** A **public marketing homepage** lives at `/` (brand + mascot + a single
-**Sign in** CTA, for logged-out visitors); the authenticated app lives at `/study`. After
-signing in — or whenever an already-authenticated visitor hits `/` — the app opens straight
-into the due queue at `/study`, a single tap with no deck selection or configuration (§2).
-The home/landing look-and-feel follows **[BRAND.md](BRAND.md)**.
+**Level scope.** Both modes operate within a **single JLPT level at a time — the user's
+*active level***, chosen once at onboarding (§8.5) and changeable later (stored on
+`UserProfile.activeLevel`, §6). The Anki queue and the Duolingo quiz are both filtered to
+it, so scheduling, new-card selection, and multiple-choice distractors all stay within one
+level's vocabulary. The two modes are thus *separated by level* — you study or quiz one
+level at a time, not the whole deck at once.
+
+**Minimal-friction entry.** A **public marketing homepage** lives at `/` (brand + mascot + a
+single **Sign in** CTA, for logged-out visitors); the authenticated app lives at `/study`. A
+**returning** user signing in lands on a simple **mode picker** (Anki or Duolingo) for their
+active level and starts with one tap — no deck selection or config (§2). A **first-time**
+user is routed through onboarding first (§8.5). The home/landing look-and-feel follows
+**[BRAND.md](BRAND.md)**.
 
 ### 8.1 Anki mode — flashcard review (FSRS)
 The classic spaced-repetition flashcard loop, modeled on Anki.
 
 - The daily queue selects `ReviewState` rows where `due <= now` for the current user
-  (ordered by due date), plus a configurable number of `NEW` cards/day **selected in
+  **at their active level** (§8.5), ordered by due date, plus a configurable number of `NEW` cards/day **selected in
   randomized order** so similar-sounding words (adjacent in the source deck) aren't
   clustered together.
 - The card UI mirrors the Anki templates: the front shows the expression (or the meaning,
@@ -410,7 +420,9 @@ The classic spaced-repetition flashcard loop, modeled on Anki.
 
 ### 8.2 Duolingo mode — multiple choice
 A gamified, tap-to-answer quiz in the spirit of Duolingo: pick the right answer from four
-options, get instant feedback, keep momentum. Optimized for quick mobile sessions.
+options, get instant feedback, keep momentum. Optimized for quick mobile sessions. Questions
+are drawn from the user's **active level** (§8.5), and the first-run warm-up is five such
+questions, run as a **non-scheduling** practice (it doesn't affect FSRS state).
 
 - `GET /api/quiz` returns a target word plus one correct option and three distractors.
 - Variants: show `expression` → choose `meaning`, or `meaning` → choose
@@ -495,6 +507,21 @@ screens; the bulk of study happens on mobile.
 - **Visual language** — palette, typography (Fredoka / Nunito / M PLUS Rounded 1c), the
   mascot Pī, and components — is specified in **[BRAND.md](BRAND.md)** (design tokens in its
   §8); the iPhone SE baseline above is the shared design target for both docs.
+
+### 8.5 Onboarding & session flows
+Two user stories drive entry into the app. Both reach the same two level-scoped engines
+(§8.1, §8.2); they differ only in the first-run extras.
+
+- **First-time user (first run).** Sign in via the email magic link (§11.2) → **choose a
+  JLPT level** (N5–N1) → the app drops straight into a short **Duolingo-mode warm-up of 5
+  questions** at that level — low-stakes and **non-scheduling** (it does not touch FSRS
+  state) — so the first experience is *doing*, not reading → a brief **onboarding guide**
+  then walks through the app's functionality (the two modes, flip/rate, streak, switching
+  level). Completing the flow persists `UserProfile.activeLevel` and stamps `onboardedAt`
+  (§6), which is what distinguishes a first-time from a returning user.
+- **Returning user.** Sign in → a simple **mode picker: Anki mode or Duolingo mode** for the
+  remembered active level → start. That's it. The level is not re-chosen each session
+  (changing it is a secondary action in settings); there are no decks or configuration.
 
 ---
 
@@ -676,8 +703,13 @@ This repository is intended to be **open-sourced**, so no personal data is commi
   match Duolingo's quality (clean, satisfying, momentum-driven, mobile-first), but with
   **minimal animation** (snappy and lightweight, not flashy character/transition
   animations) and **zero ads** — the latter a core anti-Duolingo differentiator (§1, §8.2).
+- **Level scope & mode picker:** add `UserProfile.activeLevel`; scope both the Anki queue
+  and the quiz to it; build the returning-user **mode picker** (Anki / Duolingo) as `/study`.
+- **First-run onboarding (§8.5):** level choice → 5-question Duolingo warm-up (non-scheduling)
+  → guided tour; add `UserProfile.onboardedAt` to branch first-time vs. returning.
 - Resolve whether MC results feed the FSRS scheduler or stay a separate practice mode
-  (§8.2, §15).
+  (§8.2, §15). To improve students result, there should be some sinergy between the modes.
+  More research is still required.
 - Light polish may ride along: browse/search, daily new-card limits, basic stats.
 
 **Phase 3 — Admin audit + on-demand generation — next, after Duolingo**
@@ -747,6 +779,7 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-06-03 | **Both modes are scoped to one active JLPT level** (`UserProfile.activeLevel`); **first-run flow** = pick level → 5-question Duolingo warm-up (non-scheduling) → guided tour; **returning users** get an Anki/Duolingo **mode picker**. Refines the earlier "one-tap start." | Studying/quizzing one level at a time keeps scheduling and MC distractors coherent and the queue focused; a *doing-first* warm-up beats a wall of instructions for a new user; the level is a remembered preference so returning entry stays one tap (just pick a mode). `onboardedAt` distinguishes first-time vs. returning. | Author | §2, §6, §8, §8.5 |
 | 2026-06-03 | **N1 level chip = imperial purple + gold** (murasaki `#3d1452` + kin `#f0c75e`), not flat grape | In Japan purple is the historical highest-rank colour (禁色); gold is the luxury accent. N2 (`mag-600`) and the old N1 (`grape`) were both pinkish-purple and too close — shifting N1 to a deeper, bluer purple with gold text makes the top level read as "special," and is more culturally "premium" than gold alone (which also clashes with the N4 yellow). Author chose imperial-purple+gold over a gradient or solid gold. | Author | BRAND.md §3/§7 |
 | 2026-06-03 | **Public landing page at `/`**; the authenticated study app moves to `/study`. Brand foundation added (tokens + fonts in `globals.css`, reusable `Parrot` component, Pī favicon) per **BRAND.md**, which now states the mobile-first / iPhone-SE (375×667) design target. | A "Sign in" homepage is for logged-out visitors, so `/` can't also be the gated app; signed-in users are redirected `/` → `/study` to preserve one-tap start (§2). Committing the brand as code/tokens lets the landing — and Phase 2's Duolingo UI — build against the real design system. | Author | §8, §8.4 |
 | 2026-06-03 | **Re-prioritize roadmap: Duolingo mode is the current focus**; the **admin audit page + on-demand generation move to Phase 3** (right after Duolingo, ahead of multi-user). Duolingo UI bar set to "Duolingo-grade polish but minimal animation and zero ads." | All content is seeded (Phase 1c done), so the next user-facing value is the second study mode. On-demand generation is no longer needed for coverage, so it rides with the admin tooling as a safety net. Minimal-animation/no-ads is the product thesis (§1) — match Duolingo's quality without its spectacle or monetization. | Author | §8.2, §13 |
