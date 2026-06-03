@@ -59,7 +59,9 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
     DB sessions; route handler; sign-in page
   - [x] `proxy.ts` cookie guard; `getCurrentUserId` → session; API routes 401; page redirect
   - [x] Seeded user linked to allowlist email (sign-in attaches to existing user)
-  - [ ] Remaining hardening: **rate-limit** the sign-in request (§11.3 #5) — not yet done
+  - [x] Remaining hardening: **rate-limit** the sign-in request (§11.3 #5) — in-memory
+    fixed-window limiter (`src/lib/rate-limit.ts`), enforced in `proxy.ts` on POST to the
+    sign-in paths (per-IP 5/10min + global 20/10min); explicit 30-day session TTL (#6)
   - [ ] Manual test: magic-link sign-in end-to-end (needs Resend delivery — see note below)
 - [x] **Deploy prep** — `railway.json` (Railpack, `start:prod`), `postinstall` generate,
   `start:prod` = migrate + `$PORT`, `prisma`/`dotenv` → runtime deps; **runbook in

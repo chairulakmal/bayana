@@ -16,10 +16,19 @@ import { db } from "@/lib/db";
 const ALLOWED_EMAIL = process.env.AUTH_ALLOWED_EMAIL;
 const EMAIL_FROM = process.env.AUTH_EMAIL_FROM ?? "onboarding@resend.dev";
 const TOKEN_TTL_SECONDS = 15 * 60; // 15-minute magic links
+const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30-day database sessions
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),
-  session: { strategy: "database" },
+  session: {
+    strategy: "database",
+    // Explicit session expiry (SPEC §11.3 #6) rather than relying on the library default.
+    // 30 days suits a personal study app (stay signed in between sessions); shorten if a
+    // tighter window is wanted. `updateAge` makes it rolling: an active session is only
+    // re-persisted once per day, avoiding a DB write on every request.
+    maxAge: SESSION_TTL_SECONDS,
+    updateAge: 24 * 60 * 60,
+  },
   trustHost: true, // behind Railway's proxy (not Vercel), so trust the forwarded host
   pages: { signIn: "/auth/signin" },
   providers: [
