@@ -604,11 +604,15 @@ This repository is intended to be **open-sourced**, so no personal data is commi
 - **Anki-mode** review (JP→EN) via `ts-fsrs`, with **one-step undo**.
 - Mobile-first card UI (flip / rate). Runs locally, end-to-end.
 
-**Phase 1b — Shippable (public)**
+**Phase 1b — Shippable (public): auth + deploy, N3 only**
 - Magic-link auth (Auth.js + Resend, single-email allowlist) with §11.3 hardening and a
   `proxy.ts` route guard.
-- Import + seed the remaining levels (N5/N4/N2/N1).
-- Deploy to Railway with daily backups (§12).
+- Deploy to Railway with daily backups (§12); transfer the N3 sentence cache (by
+  `Word.guid`, §12) rather than regenerating.
+
+**Phase 1c — Fill out content (post-deploy)**
+- Seed the remaining levels (N5/N4/N2/N1) via the Batch API against prod.
+- On-demand `/api/generate` fallback + study-UI fetch-on-flip for not-yet-seeded words.
 
 **Phase 2 — Multiple choice + polish**
 - MC quiz mode and distractor query.
@@ -677,6 +681,7 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-06-03 | Ship Phase 1b with **N3 only** (auth + deploy first); seed other levels + on-demand generation after deploy (Phase 1c) | Get the app live and usable sooner; remaining levels and the on-demand fallback are content/polish that can follow on the deployed instance. | Author | §13 |
 | 2026-06-03 | Reuse generated sentences in prod by transferring the cache (keyed by `Word.guid`), not regenerating | The cache is a paid one-time artifact and `Word.id` cuids differ per DB; transfer by guid (or pg_dump/restore of Word + ExampleSentence) avoids paying the API again on deploy. | Author | §12 |
 | 2026-06-03 | Study session auto-refetches the queue when a batch is exhausted | Cards that become due mid-session (Again / learning steps) cycle back without a manual reload; "caught up" shows only when a fresh fetch is empty. | Author | §8.1 |
 | 2026-06-03 | Randomize new-card selection in the study queue | The deck is sorted by reading, so sequential new cards cluster similar sounds; a shuffled sample spreads them out and varies sessions. | Author | §8.1 |

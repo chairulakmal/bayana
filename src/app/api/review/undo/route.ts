@@ -10,7 +10,12 @@ import { undoLastReview } from "@/lib/review";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const userId = getCurrentUserId();
+  let userId: string;
+  try {
+    userId = await getCurrentUserId();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   let body: unknown;
   try {

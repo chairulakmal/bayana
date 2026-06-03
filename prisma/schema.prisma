@@ -29,11 +29,15 @@ datasource db {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model User {
-  id        String        @id @default(cuid())
-  email     String?       @unique // null for the seeded default local user
-  createdAt DateTime      @default(now())
-  profile   UserProfile? // 1:1 — app-specific data
-  reviews   ReviewState[]
+  id            String        @id @default(cuid())
+  email         String?       @unique // null only for the seeded pre-auth user
+  emailVerified DateTime? // set by Auth.js when a magic link is confirmed
+  image         String?
+  createdAt     DateTime      @default(now())
+  profile       UserProfile? // 1:1 — app-specific data
+  reviews       ReviewState[]
+  accounts      Account[] // Auth.js — unused with email-only, but the adapter expects it
+  sessions      Session[] // Auth.js database sessions (SPEC §11.3)
 }
 
 /// App-specific per-user data, one-to-one with User.
@@ -61,6 +65,47 @@ model UserProfile {
 enum Role {
   MEMBER
   ADMIN
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Auth.js (NextAuth) adapter models — standard shapes required by
+// @auth/prisma-adapter. Email magic-link sign-ins use VerificationToken; we use
+// database Sessions (SPEC §11.3). Account is only populated by OAuth providers
+// (none yet), but the adapter expects the model to exist.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

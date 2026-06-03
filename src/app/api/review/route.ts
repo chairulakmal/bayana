@@ -12,7 +12,12 @@ export const runtime = "nodejs";
 const VALID_RATINGS = [1, 2, 3, 4];
 
 export async function POST(request: Request) {
-  const userId = getCurrentUserId();
+  let userId: string;
+  try {
+    userId = await getCurrentUserId();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   // Parse + validate the body before touching the database.
   let body: unknown;

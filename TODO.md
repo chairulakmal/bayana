@@ -5,7 +5,8 @@ Execution checklist and progress tracker. **Plan and rationale live in
 state* — what's done and what's next. Keep it current; it's the "where we left off"
 record across sessions. Decisions do **not** go here — log them in SPEC.md §16.
 
-**Now:** Phase 1a → AI sentence generation (N3, needs ANTHROPIC_API_KEY). App is already studyable: `npm run dev` → http://localhost:3887
+**Now:** Phase 1b → test magic-link sign-in locally, then Railway deploy prep (you
+provision Railway; I prepare config + migration/cache-transfer scripts + runbook).
 
 ---
 
@@ -33,8 +34,8 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
   (~$0.003). On-demand `POST /api/generate` deferred to Phase 1b.
 - [x] `scripts/seed-sentences.ts` — `--test` quality gate + Batch API submit
   (batch `msgbatch_01VKSSFCPCC8t5KECm3H83Gt`, 2135 N3 requests)
-- [ ] `scripts/collect-batch.ts` — built; **batch still processing — re-run to finish
-  storing** (`npx tsx scripts/collect-batch.ts msgbatch_01VKSSFCPCC8t5KECm3H83Gt`)
+- [x] `scripts/collect-batch.ts` — collected 2,135 (0 malformed/failed); **N3 fully
+  covered: 2,140 / 2,140 words have a sentence**
 
 ### Anki mode — review loop (JP→EN)
 - [x] `ts-fsrs` adapter (`src/lib/fsrs.ts`) — Card ⇄ ReviewState, scheduler, log mapping
@@ -46,15 +47,26 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
   flip / rate / undo, iPhone SE baseline; builds + SSR-renders
 
 ### Done when
-- [ ] Run locally and study N3 end-to-end off the app
+- [x] Run locally and study N3 end-to-end off the app — cards now show example sentences
 
 ---
 
-## Phase 1b — Shippable (public)
-- [ ] Magic-link auth (Auth.js + Resend, single-email allowlist) + §11.3 hardening +
-  `proxy.ts` guard
-- [ ] Import + seed remaining levels (N5/N4/N2/N1)
-- [ ] Deploy to Railway; enable daily backups
+## Phase 1b — Shippable (public): auth + deploy (N3 only)
+- [x] **Auth** — magic-link (Auth.js v5 + Resend, single-email allowlist), database sessions
+  - [x] Verified Auth.js v5 ↔ Next 16 (proxy.ts is Node runtime → DB sessions OK)
+  - [x] Schema + migration (`User` fields + Account/Session/VerificationToken)
+  - [x] `src/auth.ts` — Resend provider, **allowlist enforced before send**, 15-min tokens,
+    DB sessions; route handler; sign-in page
+  - [x] `proxy.ts` cookie guard; `getCurrentUserId` → session; API routes 401; page redirect
+  - [x] Seeded user linked to allowlist email (sign-in attaches to existing user)
+  - [ ] Remaining hardening: **rate-limit** the sign-in request (§11.3 #5) — not yet done
+  - [ ] Manual test: magic-link sign-in end-to-end (needs Resend delivery — see note below)
+- [ ] **Deploy** — Railway web + Postgres; env vars; `prisma migrate deploy`; transfer N3
+  cache by `Word.guid`; daily backups
+
+## Phase 1c — Fill content (post-deploy)
+- [ ] Seed remaining levels N5/N4/N2/N1 (Batch API)
+- [ ] On-demand `/api/generate` + UI fetch-on-flip for not-yet-seeded words
 
 ## Phase 2+ (later)
 See SPEC.md §13 — Duolingo mode, suspend/leech, stats, multi-user, enhancements.

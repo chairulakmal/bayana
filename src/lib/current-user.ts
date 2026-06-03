@@ -1,14 +1,14 @@
-// Resolves the acting user for a request.
+// Resolves the acting user for a request — the real security boundary.
 //
-// Phase 1a is single-user: every request runs as the seeded DEFAULT_USER_ID. Phase 1b
-// replaces this with the Auth.js session user (and a proxy.ts route guard), at which
-// point the routes call the session lookup instead — their service calls don't change.
-export function getCurrentUserId(): string {
-  const id = process.env.DEFAULT_USER_ID;
-  if (!id) {
-    throw new Error(
-      "DEFAULT_USER_ID is not set — run `npx tsx scripts/seed-user.ts` and set it in .env.",
-    );
+// Validates the Auth.js session server-side (database session via the Prisma adapter)
+// and returns the signed-in user's id. Throws if there is no valid session, so callers
+// can return 401. This replaced the Phase-1a `DEFAULT_USER_ID` shim.
+import { auth } from "@/auth";
+
+export async function getCurrentUserId(): Promise<string> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error("Not authenticated");
   }
-  return id;
+  return session.user.id;
 }

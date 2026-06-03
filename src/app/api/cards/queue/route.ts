@@ -12,7 +12,12 @@ export const runtime = "nodejs"; // Prisma needs the Node runtime, not Edge
 export const dynamic = "force-dynamic"; // the queue changes after every review — never cache
 
 export async function GET(request: Request) {
-  const userId = getCurrentUserId();
+  let userId: string;
+  try {
+    userId = await getCurrentUserId();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   // Validate the level against the enum so a bad query string can't reach the DB.
   const levelParam = new URL(request.url).searchParams.get("level") ?? "N3";

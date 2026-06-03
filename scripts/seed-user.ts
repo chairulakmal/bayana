@@ -33,7 +33,16 @@ async function main() {
     user = (await db.user.findFirst()) ?? (await db.user.create({ data: {} }));
   }
 
-  // 2) Ensure the 1:1 profile exists (all other fields use schema defaults:
+  // 2) Link this user to the allowlisted email so magic-link sign-in attaches to it
+  //    (the Auth.js adapter matches users by email) — preserving existing study progress
+  //    instead of creating a brand-new user on first login.
+  const allowedEmail = process.env.AUTH_ALLOWED_EMAIL || null;
+  if (allowedEmail && user.email !== allowedEmail) {
+    user = await db.user.update({ where: { id: user.id }, data: { email: allowedEmail } });
+    console.log(`Linked email → ${allowedEmail}`);
+  }
+
+  // 3) Ensure the 1:1 profile exists (all other fields use schema defaults:
   //    role=MEMBER, studyReverse=false (JP→EN), newCardsPerDay=20, etc.).
   await db.userProfile.upsert({
     where: { userId: user.id },
