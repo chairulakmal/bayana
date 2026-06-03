@@ -5,7 +5,7 @@ Execution checklist and progress tracker. **Plan and rationale live in
 state* — what's done and what's next. Keep it current; it's the "where we left off"
 record across sessions. Decisions do **not** go here — log them in SPEC.md §16.
 
-**Now:** Phase 1a → review API routes (queue/review/undo) + the card UI; then AI generation.
+**Now:** Phase 1a → mobile-first card UI (Anki mode: flip / rate / undo); then AI generation.
 
 ---
 
@@ -38,7 +38,8 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
 - [x] `ts-fsrs` adapter (`src/lib/fsrs.ts`) — Card ⇄ ReviewState, scheduler, log mapping
 - [x] Review services (`src/lib/review.ts`) — `reviewWord` (+ `ReviewLog`),
   `undoLastReview` (ts-fsrs `rollback`), `getStudyQueue` — verified end-to-end
-- [ ] API route handlers: `GET /api/cards/queue`, `POST /api/review`, undo endpoint
+- [x] API route handlers: `GET /api/cards/queue`, `POST /api/review`,
+  `POST /api/review/undo` — verified over HTTP (incl. 400 validation)
 - [ ] Mobile-first card UI: flip + rate + undo (iPhone SE baseline)
 
 ### Done when

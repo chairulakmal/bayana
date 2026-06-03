@@ -473,6 +473,7 @@ screens; the bulk of study happens on mobile.
 | GET | `/api/cards/queue` | Today's FSRS study queue | required |
 | GET | `/api/cards?level=&q=&page=` | Browse / search | required |
 | POST | `/api/review` | Submit a rating → FSRS update | required |
+| POST | `/api/review/undo` | Revert the most recent review (one-step undo) | required |
 | GET | `/api/quiz?level=` | One multiple-choice question + distractors | required |
 | POST | `/api/generate` | On-demand single-sentence fallback | required |
 | `*` | `/api/auth/*` | Auth.js (sign-in request, callback, session) | public (rate-limited) |
