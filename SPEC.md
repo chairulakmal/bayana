@@ -39,6 +39,8 @@ cost — and a study experience tailored to our own data and scheduling.
 ## 2. Goals & non-goals
 
 **Goals**
+- **Match Anki's core review loop** (FSRS scheduling, undo, suspend, meaningful stats)
+  while eliminating its setup overhead — and without user-authored decks (see non-goals).
 - Import the existing deck and present it as study-ready flashcards.
 - Schedule reviews with a modern SRS (FSRS) for strong long-term retention.
 - Attach AI-generated, level-appropriate example sentences to every word, generated
@@ -47,6 +49,9 @@ cost — and a study experience tailored to our own data and scheduling.
 - Be secure by default despite a single-user launch, and extend cleanly to multi-user.
 - Deliver a **mobile-first** experience optimized for small phone screens (iPhone SE
   baseline) that remains fully usable on desktop.
+- **One tap to start.** After signing in, beginning a lesson or review takes a single tap —
+  the app opens straight into the due queue, with no decks to choose or settings to
+  configure. Frictionless entry is a core differentiator from Anki.
 
 **Non-goals (initial release)**
 - Native mobile apps (mobile-first responsive web only; see §8.4).
@@ -179,13 +184,45 @@ The schema is **single-user at launch but multi-user-ready**: one seeded `User` 
 all review state today. Introducing real authentication later means populating additional
 users and scoping queries by `userId` — no change to the core shape.
 
+**Identity vs. profile.** `User` is the **authentication identity** — once Auth.js is added
+(§11), its Prisma adapter owns this model (alongside `Account` / `Session` /
+`VerificationToken`) and expects a specific shape. App-specific data (display name, study
+preferences, role) therefore lives in a separate **one-to-one `UserProfile`**, keeping
+library-managed auth concerns decoupled from our own. `UserProfile` is also where the study
+**direction preference** (§8.1) and the **admin role** (gating the Phase 4 audit page, §13)
+live.
+
 ```prisma
 model User {
-  id        String   @id @default(cuid())
-  email     String?  @unique           // null for the default local user
-  createdAt DateTime @default(now())
+  id        String        @id @default(cuid())
+  email     String?       @unique        // null for the default local user
+  createdAt DateTime      @default(now())
+  profile   UserProfile?                 // 1:1 — app-specific data (see below)
   reviews   ReviewState[]
+  // Auth.js adapter will add: emailVerified, image, accounts[], sessions[]
 }
+
+// App-specific per-user data, one-to-one with User. Kept separate from the
+// auth-managed User so library concerns and product concerns don't mix.
+model UserProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique           // one row per user → enforces 1:1
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName String?
+  role        Role     @default(MEMBER)  // ADMIN gates the Phase 4 sentence-audit page
+  // study preferences
+  studyReverse   Boolean @default(false) // also review EN→JP (recall); default is JP→EN only (§8.1)
+  newCardsPerDay Int     @default(20)     // daily NEW-card cap for the FSRS queue
+  timezone       String  @default("UTC")  // IANA tz; defines the "day" for limits/streaks/stats
+  dayStartHour   Int     @default(4)       // local hour a new day begins (Anki-style 4am rollover)
+  // FSRS tuning — defaults now; personalized from ReviewLog later (§8.1)
+  fsrsParams       Float[]                 // FSRS weights w[]; empty ⇒ ts-fsrs library defaults
+  desiredRetention Float   @default(0.9)   // FSRS target recall probability
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum Role { MEMBER ADMIN }
 
 model Word {
   id         String   @id @default(cuid())
@@ -205,7 +242,7 @@ enum Level { N5 N4 N3 N2 N1 }
 model ExampleSentence {
   id          String   @id @default(cuid())
   wordId      String
-  word        Word     @relation(fields: [wordId], references: [id])
+  word        Word     @relation(fields: [wordId], references: [id], onDelete: Cascade)
   japanese    String                    // sentence using the word
   reading     String                    // furigana/kana reading of sentence
   english     String                    // translation
@@ -217,23 +254,47 @@ model ExampleSentence {
 
 enum GenSource { BATCH ONDEMAND }
 
-// FSRS per-(user,word) scheduling state
+// FSRS per-(user,word) scheduling state — fields mirror the ts-fsrs `Card` struct
+// (camelCase here; a thin app adapter maps to/from ts-fsrs's snake_case).
 model ReviewState {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  wordId      String
-  word        Word     @relation(fields: [wordId], references: [id])
-  // FSRS fields
-  stability   Float?
-  difficulty  Float?
-  due         DateTime @default(now())
-  lastReview  DateTime?
-  reps        Int      @default(0)
-  lapses      Int      @default(0)
-  state       FsrsState @default(NEW)
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wordId        String
+  word          Word      @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  // FSRS fields (ts-fsrs Card)
+  stability     Float?
+  difficulty    Float?
+  due           DateTime  @default(now())
+  lastReview    DateTime?
+  elapsedDays   Int       @default(0)   // days since previous review at last rating
+  scheduledDays Int       @default(0)   // interval assigned at last rating
+  learningSteps Int       @default(0)   // index into (re)learning steps
+  reps          Int       @default(0)
+  lapses        Int       @default(0)
+  state         FsrsState @default(NEW)
   @@unique([userId, wordId])
   @@index([userId, due])
+}
+
+// Append-only review history: one row per rating event. Powers statistics,
+// one-step undo (restore the card's prior scheduling state), and future FSRS
+// re-optimization. Never updated or deleted; kept decoupled from User/Word
+// (indexed scalar ids, no FK relation) so it stays immutable history.
+model ReviewLog {
+  id            String    @id @default(cuid())
+  userId        String
+  wordId        String
+  rating        Int                       // 1=Again, 2=Hard, 3=Good, 4=Easy
+  state         FsrsState                 // card state at review time
+  due           DateTime                  // due date this review assigned
+  stability     Float?
+  difficulty    Float?
+  elapsedDays   Int       @default(0)
+  scheduledDays Int       @default(0)
+  reviewedAt    DateTime  @default(now())
+  @@index([userId, reviewedAt])
+  @@index([userId, wordId])
 }
 
 enum FsrsState { NEW LEARNING REVIEW RELEARNING }
@@ -269,20 +330,26 @@ On-demand generation exists only as a fallback for the rare cache miss.
   ```
 - Sentence complexity is tuned to level: N5/N4 short and basic, N1 natural and idiomatic,
   with vocabulary/grammar restricted to at-or-below the target level where feasible.
-- We may request 2–3 sentences per word (more value per call; rotated in the UI).
+- **One sentence per word** at launch — simplest and lowest cost. The schema already
+  permits multiple `ExampleSentence` rows per word (§6), so generating more later needs no
+  core change. A future **admin review/audit** workflow (§13 Phase 4) will let an admin
+  accept or reject each generated sentence before it surfaces to learners.
 
 ### 7.3 Seeding order
 1. **N3 batch first** (priority) — ~2,140 words.
 2. Then N5, N4, N2, N1.
 3. `scripts/seed-sentences.ts` chunks words, builds Batch request files, and submits.
 4. `scripts/collect-batch.ts` polls status and, on completion, parses results and upserts
-   `ExampleSentence` rows (`source = BATCH`), keyed by word `guid`/`id`.
+   `ExampleSentence` rows (`source = BATCH`), keyed by word `guid`/`id`. Each model output
+   is **schema-validated** (well-formed JSON with non-empty `japanese`/`reading`/`english`);
+   malformed or empty results are skipped and logged for retry, never stored.
 5. The pipeline is re-runnable: words that already have cached sentences are skipped.
 
 ### 7.4 On-demand fallback
 `POST /api/generate` — when a card is opened and has zero `ExampleSentence` rows (e.g. a
-level not yet seeded), the server makes a single synchronous Haiku call, stores the result
-(`source = ONDEMAND`), and returns it. First view incurs ~1s latency; subsequent views are
+level not yet seeded), the server makes a single synchronous Haiku call, **validates the
+JSON output** (same schema check as seeding), stores the result (`source = ONDEMAND`), and
+returns it. First view incurs ~1s latency; subsequent views are
 cache hits. This endpoint is authenticated (§11) to prevent unauthorized cost.
 
 ### 7.5 Cost estimate (order of magnitude — verify against current Haiku pricing)
@@ -301,6 +368,9 @@ Bayana offers two complementary study modes the user can switch between: **Anki 
 multiple-choice practice). Anki mode is the retention engine; Duolingo mode is the
 lightweight on-ramp and warm-up.
 
+**One-tap entry.** After signing in, the app opens straight into the due queue — starting a
+review or lesson is a single tap, with no deck selection or configuration (§2).
+
 ### 8.1 Anki mode — flashcard review (FSRS)
 The classic spaced-repetition flashcard loop, modeled on Anki.
 
@@ -311,21 +381,57 @@ The classic spaced-repetition flashcard loop, modeled on Anki.
   sentence**.
 - The user rates **Again / Hard / Good / Easy**; `POST /api/review` invokes `ts-fsrs` to
   compute the new `stability`, `difficulty`, `due`, and `state`, which are persisted.
-- Both directions are supported (JP→EN recognition, EN→JP recall) as a setting.
+- Each rating is also appended to the immutable **`ReviewLog`** (§6), which powers
+  statistics, future FSRS re-optimization, and **one-step undo** — restoring the card's
+  prior scheduling state right after a misrating. Undo ships in the MVP.
+- **Direction:** new users default to **JP→EN** (recognition); **EN→JP** (recall) is
+  opt-in via user preferences. Example sentences are generated for the Japanese word only
+  (§7) and are therefore direction-independent — the same cached sentence appears on the
+  reveal side in either direction.
 
 ### 8.2 Duolingo mode — multiple choice
 A gamified, tap-to-answer quiz in the spirit of Duolingo: pick the right answer from four
 options, get instant feedback, keep momentum. Optimized for quick mobile sessions.
 
 - `GET /api/quiz` returns a target word plus one correct option and three distractors.
-- **Distractor selection (no AI):** three other words from the **same level** with
-  *different* meanings, optionally biased toward similar part-of-speech/length for
-  plausibility. This is a pure DB query — cheap, deterministic, zero marginal cost.
 - Variants: show `expression` → choose `meaning`, or `meaning` → choose
   `expression`/`reading`.
 - Instant correct/incorrect feedback with the cached example sentence shown on reveal.
 - Whether Duolingo-mode results feed the FSRS scheduler (correct ≈ Good, wrong ≈ Again) or
   remain a separate, non-scheduling practice mode is deferred to Phase 2 (§15, §16).
+
+#### Distractor selection — confusability scoring (no AI)
+Distractors are chosen to be *plausibly confusable* with the target rather than random, so
+that answering correctly requires actually knowing the word. Confusability is scored along
+three independent axes, all derivable from existing `Word` fields:
+
+- **Orthographic** — shares one or more kanji with the target's `expression`
+  (e.g. 見る / 見える).
+- **Phonetic** — identical or near-identical `reading`; homophones such as 会う / 合う are the
+  classic JLPT trap.
+- **Semantic** — overlapping `meaning`.
+
+**Implementation (MVP).** A single same-level query fetches the candidate pool
+(`WHERE level = $level AND id <> $targetId`; only ~700–2,700 rows), and candidates are
+**scored in application code** as a weighted sum of the three signals; the top-scoring
+candidates become the distractors, with a fallback to random same-level words when too few
+confusable candidates exist. Keeping the scoring in TypeScript (rather than SQL) keeps the
+weighting and guardrails readable and unit-testable, while SQL stays a plain pool fetch.
+
+**Fairness guardrail.** A distractor must never be a legitimate answer. Candidates whose
+`meaning` is a near-duplicate or superset of the target's (true synonyms) are excluded, so
+the semantic axis selects *similar-but-distinct*, never equivalent. The orthographic and
+phonetic axes do not carry this risk.
+
+**Difficulty mix.** Each question blends confusable and random distractors (e.g. two
+confusable + one random) so it is challenging but solvable; the exact ratio is tunable and
+is an open question (§15).
+
+**Scale path (Phase 2+).** If per-request scoring ever needs to move into the database, the
+Postgres-native upgrades are: a kanji `text[]` column with a GIN overlap index
+(orthographic), `pg_trgm` trigram similarity (phonetic/lexical), and **pgvector** over a
+one-time pass of `meaning` embeddings (true semantic similarity). None are required at
+launch scale.
 
 ### 8.3 Browse / search
 - A paginated, level-filtered list of all words with their cached example sentences, useful
@@ -468,18 +574,27 @@ This repository is intended to be **open-sourced**, so no personal data is commi
 - **Migrations & seed:** run `prisma migrate deploy` on release; run `scripts/import-csv.ts`
   once to load words, then `seed-sentences.ts` / `collect-batch.ts` via `railway run` to
   fill the sentence cache.
+- **Backups:** enable Railway **daily** Postgres volume backups, and run a `pg_dump`
+  immediately **before each `prisma migrate deploy`**. The review history
+  (`ReviewState` / `ReviewLog`) is the irreplaceable data — the deck and example sentences
+  can always be re-imported or regenerated.
 - **Domain:** Railway-generated domain for the initial release; custom domain later.
 
 ---
 
 ## 13. Milestones & rollout
 
-**Phase 1 — MVP (single user)**
-- CSV import, Postgres schema, seeded default user.
-- Magic-link auth (Auth.js + Resend, single-email allowlist) with §11.3 hardening.
-- FSRS flashcard review (both directions) with cached sentences.
-- Batch-seed N3, then N5/N4/N2/N1; on-demand fallback.
-- Deploy to Railway.
+**Phase 1a — Playable slice (run locally, study ASAP)**
+- Postgres schema (incl. `ReviewLog`); seeded default `User` + `UserProfile`.
+- CSV import for **N3**; batch-seed N3 example sentences (+ on-demand fallback).
+- **Anki-mode** review (JP→EN) via `ts-fsrs`, with **one-step undo**.
+- Mobile-first card UI (flip / rate). Runs locally, end-to-end.
+
+**Phase 1b — Shippable (public)**
+- Magic-link auth (Auth.js + Resend, single-email allowlist) with §11.3 hardening and a
+  `proxy.ts` route guard.
+- Import + seed the remaining levels (N5/N4/N2/N1).
+- Deploy to Railway with daily backups (§12).
 
 **Phase 2 — Multiple choice + polish**
 - MC quiz mode and distractor query.
@@ -492,6 +607,9 @@ This repository is intended to be **open-sourced**, so no personal data is commi
 - Per-user settings (directions, daily limits, level focus).
 
 **Phase 4 — Enhancements**
+- **Admin review/audit page:** inspect each AI-generated example sentence and accept or
+  reject it before it surfaces to learners (adds a review-status field to
+  `ExampleSentence`; optionally generate several candidates per word and keep the best).
 - Audio (TTS) for sentences, furigana rendering, streak/heatmap, sentence
   regeneration/voting, export back to Anki.
 
@@ -529,9 +647,10 @@ retain it only as a fallback for cache misses (§7.4).
 
 - Should multiple-choice results feed the FSRS scheduler, or remain a separate,
   non-scheduling mode? (§8.2)
-- How many example sentences per word — one, or 2–3 with rotation? (§7.2)
 - Furigana: store the reading as plain kana (current) or as ruby-annotated markup?
-- Should the reverse direction (EN→JP recall) default on or off for new users?
+- MCQ distractor difficulty mix: how many confusable vs random distractors per question,
+  and should the ratio adapt to the user's level/performance? When (if ever) should
+  rule-based scoring graduate to embeddings + pgvector? (§8.2)
 
 ---
 
@@ -544,6 +663,18 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-06-03 | Use **Prisma 7** with the `@prisma/adapter-pg` driver adapter (generated client in `src/generated/prisma`, config in `prisma.config.ts`) | Prisma 7 is the current major and makes driver adapters standard; pairs with the Postgres datasource. Local dev runs Postgres in Docker on port 5887. | Author | §6 |
+| 2026-06-03 | **One-tap start**: after login the app opens straight into a review/lesson — no deck picking or config | Frictionless entry is the core anti-Anki differentiator; the home screen defaults to the due queue. | Author | §2, §8 |
+| 2026-06-03 | Re-slice Phase 1 into **1a** (local playable: N3 review + undo) and **1b** (auth + full seed + deploy) | Get a usable study tool in hand ASAP; defer public-exposure work so it doesn't block daily use. | Author | §13 |
+| 2026-06-03 | Add append-only **`ReviewLog`** (write every review from day one) and ship **one-step undo** | History can't be backfilled; it unlocks stats, undo (restore prior state), and future FSRS re-optimization. Undo is Anki table-stakes. | Author | §6, §8.1 |
+| 2026-06-03 | Align `ReviewState` to the ts-fsrs **Card** shape; store FSRS params, desired retention, timezone/day-start on `UserProfile` | Avoids a mapping/migration layer; enables per-user FSRS tuning and correct day boundaries for limits/streaks. | Author | §6 |
+| 2026-06-03 | Add goal: **match Anki's core loop** (FSRS, undo, suspend, stats) minus setup; no user decks | Makes competitive parity an explicit target and deck import a deliberate non-goal. | Author | §2 |
+| 2026-06-03 | **Validate model output** before caching; skip/log malformed generations | LLM output is occasionally malformed; never store unvalidated sentences. | Author | §7.3 |
+| 2026-06-03 | **Backups**: Railway daily + `pg_dump` before each prod migration | Review history is irreplaceable; cheap insurance around schema changes. | Author | §12 |
+| 2026-06-03 | Add a one-to-one **`UserProfile`** model, separate from `User` | `User` is owned by the Auth.js adapter (fixed shape); app-specific data — display name, study preferences (direction, daily new-card cap), and `role` (admin gates the Phase 4 audit page) — belongs in a decoupled 1:1 profile rather than polluting the auth identity. | Author | §6 |
+| 2026-06-03 | **One example sentence per word** at launch; an admin review/audit page (accept/reject generated examples) is deferred to Phase 4 | Simplest and cheapest to start. The schema already allows multiple sentences per word, so adding more — gated by a quality-review workflow — needs no core change later. | Author | §7.2, §13 |
+| 2026-06-03 | Study direction defaults to **JP→EN** (recognition) for new users; **EN→JP** (recall) is opt-in in preferences. Example sentences are generated for Japanese words only and are direction-independent. | Recognition is the lower-friction default for new learners; recall stays available for those who want it. Anchoring sentences to the Japanese word means one cached sentence serves both directions. | Author | §8.1 |
+| 2026-06-03 | MCQ distractors use **confusability scoring** (shared kanji / reading / meaning), scored in app code over a same-level pool; embeddings + pgvector as the scale path | Random distractors are too easy — confusable ones force real recall. Rule-based in-app scoring fits launch scale, stays unit-testable, and keeps SQL a plain pool fetch; trigram/pgvector deferred until needed. A fairness guardrail excludes true synonyms. | Author | §8.2 |
 | 2026-06-03 | Pin the web framework to **Next.js 16** (React 19, Tailwind v4, Turbopack), scaffolded via `create-next-app` | Explicit author preference and the current stable major at project start; App Router + Server Actions + Turbopack are the modern defaults the architecture in §5 already assumes. | Author | §5 |
 | 2026-06-03 | Repo will be open-sourced; allowlist email stays env-only; existing git commit email accepted as public | No PII committed. `AUTH_ALLOWED_EMAIL` value lives only in Railway env; a dedicated alias will back it. Author's commit email is already public, so no history rewrite is warranted. | Author | §11.6 |
 | 2026-06-03 | Two study modes: "Anki mode" (FSRS recall) and "Duolingo mode" (gamified MC) | Serves both serious retention and a low-friction warm-up; MC distractors are a free same-level DB query, so the second mode adds little cost. | Author | §8 |

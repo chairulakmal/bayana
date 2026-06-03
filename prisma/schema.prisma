@@ -1,0 +1,172 @@
+// Bayana database schema.
+//
+// This mirrors SPEC.md §6 (Data model). It is the single source of truth for the
+// Postgres tables. After editing, run `npx prisma migrate dev --name <change>` to
+// create a migration and regenerate the client.
+//
+// Conventions (Prisma 7):
+//   - The generated client lands in src/generated/prisma (gitignored); import it
+//     through src/lib/db.ts, never directly.
+//   - The connection URL comes from prisma.config.ts (which loads .env), so the
+//     `datasource` block intentionally has no `url` here.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Identity & profile
+//
+// `User` is the authentication identity. Once Auth.js is added (Phase 1b), its
+// Prisma adapter owns this model and will extend it (emailVerified, image,
+// accounts[], sessions[]). App-specific data therefore lives in a separate 1:1
+// `UserProfile`, so library-managed auth concerns stay decoupled from ours.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id        String        @id @default(cuid())
+  email     String?       @unique // null for the seeded default local user
+  createdAt DateTime      @default(now())
+  profile   UserProfile? // 1:1 — app-specific data
+  reviews   ReviewState[]
+}
+
+/// App-specific per-user data, one-to-one with User.
+model UserProfile {
+  id          String  @id @default(cuid())
+  userId      String  @unique // one row per user → enforces the 1:1 relation
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName String?
+  role        Role    @default(MEMBER) // ADMIN gates the Phase 4 sentence-audit page
+
+  // Study preferences
+  studyReverse   Boolean @default(false) // also review EN→JP (recall); default is JP→EN only
+  newCardsPerDay Int     @default(20) // daily NEW-card cap for the FSRS queue
+  timezone       String  @default("UTC") // IANA tz; defines the "day" for limits/streaks/stats
+  dayStartHour   Int     @default(4) // local hour a new day begins (Anki-style 4am rollover)
+
+  // FSRS tuning — defaults now; personalized from ReviewLog later.
+  fsrsParams       Float[] // FSRS weights w[]; empty ⇒ ts-fsrs library defaults
+  desiredRetention Float   @default(0.9) // FSRS target recall probability
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  MEMBER
+  ADMIN
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Vocabulary (the deck) and its AI-generated example sentences
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A single vocabulary entry imported from decks/*.csv.
+model Word {
+  id         String            @id @default(cuid())
+  guid       String            @unique // stable Anki id from the CSV → idempotent imports
+  expression String // kanji / word
+  reading    String // kana
+  meaning    String // English
+  level      Level // N5..N1; authoritative source = the CSV file the row came from
+  tags       String[] // remaining raw tags (legacy/overlapping levels, etc.)
+  sentences  ExampleSentence[]
+  reviews    ReviewState[]
+
+  @@index([level])
+}
+
+enum Level {
+  N5
+  N4
+  N3
+  N2
+  N1
+}
+
+/// AI-generated example sentence for a Word. This table IS the cache: once a word
+/// has rows here, no API call is made. Multiple rows per word are allowed, leaving
+/// room for more examples / rotation later (one per word at launch — SPEC §7.2).
+model ExampleSentence {
+  id        String    @id @default(cuid())
+  wordId    String
+  word      Word      @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  japanese  String // sentence using the word
+  reading   String // furigana/kana reading of the sentence
+  english   String // translation
+  model     String // generating model, e.g. "claude-haiku-4-5" (provenance)
+  source    GenSource // how it was generated (batch seed vs on-demand)
+  createdAt DateTime  @default(now())
+
+  @@index([wordId])
+}
+
+enum GenSource {
+  BATCH // pre-generated via the Anthropic Batch API (seeding)
+  ONDEMAND // generated synchronously on first view (cache-miss fallback)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scheduling: current state + immutable history
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// FSRS per-(user, word) scheduling state — the CURRENT snapshot for a card.
+/// Fields mirror the ts-fsrs `Card` struct (camelCase here; a thin app adapter
+/// maps to/from ts-fsrs's snake_case).
+model ReviewState {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wordId String
+  word   Word   @relation(fields: [wordId], references: [id], onDelete: Cascade)
+
+  // FSRS fields (ts-fsrs Card)
+  stability     Float?
+  difficulty    Float?
+  due           DateTime  @default(now())
+  lastReview    DateTime?
+  elapsedDays   Int       @default(0) // days since previous review at last rating
+  scheduledDays Int       @default(0) // interval assigned at last rating
+  learningSteps Int       @default(0) // index into (re)learning steps
+  reps          Int       @default(0)
+  lapses        Int       @default(0)
+  state         FsrsState @default(NEW)
+
+  @@unique([userId, wordId]) // one scheduling row per user/word
+  @@index([userId, due]) // drives the "due now" daily-queue query
+}
+
+/// Append-only review history: one row per rating event. Powers statistics,
+/// one-step undo (restore the card's prior scheduling state), and future FSRS
+/// re-optimization. Never updated or deleted. Kept decoupled from User/Word
+/// (indexed scalar ids, no FK relation) so it stays immutable history that
+/// outlives row lifecycle.
+model ReviewLog {
+  id            String    @id @default(cuid())
+  userId        String
+  wordId        String
+  rating        Int // 1=Again, 2=Hard, 3=Good, 4=Easy
+  state         FsrsState // card state at review time
+  due           DateTime // due date this review assigned
+  stability     Float?
+  difficulty    Float?
+  elapsedDays   Int       @default(0)
+  scheduledDays Int       @default(0)
+  reviewedAt    DateTime  @default(now())
+
+  @@index([userId, reviewedAt])
+  @@index([userId, wordId])
+}
+
+enum FsrsState {
+  NEW
+  LEARNING
+  REVIEW
+  RELEARNING
+}

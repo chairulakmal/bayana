@@ -1,0 +1,37 @@
+# Local development Postgres for Bayana.
+#
+# Everything is named "bayana-*" and the host port is 5887 (not the default 5432)
+# so this won't collide with other Postgres instances / projects already running
+# on this machine. Production uses Railway's managed Postgres, NOT this file.
+#
+# Usage:
+#   docker compose up -d        # start the database
+#   docker compose down         # stop it (data is kept in the named volume)
+#   docker compose down -v      # stop AND wipe all data
+name: bayana
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bayana-postgres
+    restart: unless-stopped
+    environment:
+      # Local-dev credentials only — these are NOT secrets and never reach production.
+      POSTGRES_USER: bayana
+      POSTGRES_PASSWORD: bayana
+      POSTGRES_DB: bayana
+    ports:
+      # host:container — connect from the app at localhost:5887
+      - "5887:5432"
+    volumes:
+      # Named volume keeps data across restarts; remove with `docker compose down -v`.
+      - bayana-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Lets `docker compose up --wait` block until Postgres is actually ready.
+      test: ["CMD-SHELL", "pg_isready -U bayana -d bayana"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  bayana-pgdata:

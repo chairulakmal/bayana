@@ -86,8 +86,9 @@ collaborative and explanatory.
     rationale.
   - For any non-trivial fork, add (or update) an entry in **§14 Alternatives considered**
     naming the rejected option and *why* it lost.
-  - Append a dated, newest-first row to the **§16 Decision log** (append-only — never edit
-    history in place).
+  - Append a dated, newest-first row to the **§16 Decision log**. Entries may be *trimmed*
+    for brevity, but **never change an entry's date or reorder rows** — the chronology is
+    the record.
   - Update the **Status / Last updated** header and, if scope shifts, the **Milestones**
     and **Open questions** sections.
 - **Keep SPEC.md in formal "Google-style" design-doc language** — neutral, precise prose,
@@ -100,3 +101,11 @@ collaborative and explanatory.
   `AUTH_SECRET`, `DATABASE_URL`, `AUTH_ALLOWED_EMAIL`) — never commit them.
 - **Cost awareness:** sentence generation costs real money. Always prefer the cache; the
   Batch API and prompt caching exist to keep the one-time fill cheap (SPEC.md §7).
+- **Write code for review, not just for the machine** — this is a learning project. All
+  non-trivial code must be well-documented so the author can read and learn from it:
+  - A short header comment on each file/module stating its purpose and where it fits.
+  - Doc comments on exported functions/types: what it does, *why*, params, and return.
+  - Inline comments explaining the *why* behind any non-obvious logic, tradeoff, or
+    algorithm (e.g. FSRS math, distractor confusability scoring, batch polling).
+  - Favor clarity over cleverness; prefer readable code the author can follow over terse
+    one-liners. Comments explain reasoning, not restate the obvious.

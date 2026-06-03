@@ -29,12 +29,26 @@ N5–N1 built in.
 
 Early days — being built in the open as a learning project. 🚧
 
+## Develop locally
+
+Prereqs: **Node 20+** and **Docker**.
+
+```bash
+cp .env.example .env     # fill values in as features need them
+docker compose up -d     # Postgres on localhost:5887
+npm install
+npx prisma migrate dev   # create tables + generate the Prisma client
+npm run dev              # http://localhost:3887
+```
+
+Ports are themed 887 (ば・や・な 🙂): Postgres `5887`, app `3887`.
+
 ## The nerdy details
 
 Want the architecture, data model, generation pipeline, and *why* behind every choice?
 It's all in **[SPEC.md](SPEC.md)** (with a decision log, because future-me forgets).
 
-Built with Next.js 16 + Postgres, deployed on Railway.
+Built with Next.js 16 + Prisma + Postgres, deployed on Railway.
 
 ## Credits
 
