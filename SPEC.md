@@ -189,7 +189,7 @@ users and scoping queries by `userId` — no change to the core shape.
 `VerificationToken`) and expects a specific shape. App-specific data (display name, study
 preferences, role) therefore lives in a separate **one-to-one `UserProfile`**, keeping
 library-managed auth concerns decoupled from our own. `UserProfile` is also where the study
-**direction preference** (§8.1) and the **admin role** (gating the Phase 4 audit page, §13)
+**direction preference** (§8.1) and the **admin role** (gating the admin audit page, §13)
 live.
 
 ```prisma
@@ -209,7 +209,7 @@ model UserProfile {
   userId      String   @unique           // one row per user → enforces 1:1
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   displayName String?
-  role        Role     @default(MEMBER)  // ADMIN gates the Phase 4 sentence-audit page
+  role        Role     @default(MEMBER)  // ADMIN gates the admin sentence-audit page (§13)
   // study preferences
   studyReverse   Boolean @default(false) // also review EN→JP (recall); default is JP→EN only (§8.1)
   newCardsPerDay Int     @default(20)     // daily NEW-card cap for the FSRS queue
@@ -334,7 +334,7 @@ On-demand generation exists only as a fallback for the rare cache miss.
   with vocabulary/grammar restricted to at-or-below the target level where feasible.
 - **One sentence per word** at launch — simplest and lowest cost. The schema already
   permits multiple `ExampleSentence` rows per word (§6), so generating more later needs no
-  core change. A future **admin review/audit** workflow (§13 Phase 4) will let an admin
+  core change. A future **admin review/audit** workflow (§13 Phase 3) will let an admin
   accept or reject each generated sentence before it surfaces to learners.
 
 ### 7.3 Seeding order
@@ -416,7 +416,19 @@ options, get instant feedback, keep momentum. Optimized for quick mobile session
 - Whether Duolingo-mode results feed the FSRS scheduler (correct ≈ Good, wrong ≈ Again) or
   remain a separate, non-scheduling practice mode is deferred to Phase 2 (§15, §16).
 
-#### Distractor selection — confusability scoring (no AI)
+#### UI & feel — Duolingo-grade, deliberately restrained
+The mode should *feel* as polished and satisfying as Duolingo — that bar is the point — but
+with two deliberate departures that are part of the product thesis (§1):
+
+- **Minimal animation.** Snappy, lightweight transitions (instant answer feedback, a brief
+  correct/incorrect state) — **not** heavy character animations, celebratory cutscenes, or
+  motion that delays the next question. Momentum comes from speed and low friction, not
+  spectacle. Respect `prefers-reduced-motion`.
+- **Zero ads, ever.** No advertising, no interstitials, no upsell modals. This is a core
+  anti-Duolingo differentiator, not a future monetization slot.
+- Otherwise it inherits the mobile-first ergonomics of §8.4 (full-width thumb-reachable
+  options, ≥44×44 px targets, iPhone SE baseline) and shows the cached example sentence on
+  reveal for context.
 Distractors are chosen to be *plausibly confusable* with the target rather than random, so
 that answering correctly requires actually knowing the word. Confusability is scored along
 three independent axes, all derivable from existing `Word` fields:
@@ -474,7 +486,7 @@ screens; the bulk of study happens on mobile.
 - **PWA-friendly:** correct viewport meta, safe-area insets for notched devices, and
   responsive sizing units (`dvh`/`svh`) so the card fills the screen without being clipped
   by mobile browser chrome. Installable-PWA polish (icons, manifest, offline shell) is a
-  Phase 4 enhancement.
+  later enhancement (§13).
 - **Implementation:** Tailwind CSS with a mobile-first breakpoint strategy (base styles
   target the SE; `sm:`/`md:`/`lg:` add desktop affordances).
 
@@ -633,38 +645,51 @@ This repository is intended to be **open-sourced**, so no personal data is commi
 
 ## 13. Milestones & rollout
 
-**Phase 1a — Playable slice (run locally, study ASAP)**
+**Phase 1a — Playable slice (run locally, study ASAP) — ✅ done**
 - Postgres schema (incl. `ReviewLog`); seeded default `User` + `UserProfile`.
-- CSV import for **N3**; batch-seed N3 example sentences (+ on-demand fallback).
+- CSV import for **N3**; batch-seed N3 example sentences.
 - **Anki-mode** review (JP→EN) via `ts-fsrs`, with **one-step undo**.
 - Mobile-first card UI (flip / rate). Runs locally, end-to-end.
 
-**Phase 1b — Shippable (public): auth + deploy, N3 only**
+**Phase 1b — Shippable (public): auth + deploy — ✅ done**
 - Magic-link auth (Auth.js + Resend, single-email allowlist) with §11.3 hardening and a
   `proxy.ts` route guard.
-- Deploy to Railway with daily backups (§12); transfer the N3 sentence cache (by
-  `Word.guid`, §12) rather than regenerating.
+- Deployed to Railway; N3 sentence cache transferred (by `Word.guid`, §12) rather than
+  regenerated.
 
-**Phase 1c — Fill out content (post-deploy)**
-- Seed the remaining levels (N5/N4/N2/N1) via the Batch API against prod.
-- On-demand `/api/generate` fallback + study-UI fetch-on-flip for not-yet-seeded words.
+**Phase 1c — Fill out content — ✅ done (generation)**
+- All levels (N5–N1, ≈8,100 words) batch-seeded; every word now has a cached sentence
+  (§7.5). The on-demand `/api/generate` fallback is **no longer needed for coverage** and
+  has moved to Phase 3 (it returns there as a safety net for future additions).
 
-**Phase 2 — Multiple choice + polish**
-- MC quiz mode and distractor query.
-- Resolve MC↔FSRS coupling.
-- Browse/search, daily new-card limits, basic stats.
+**Phase 2 — Duolingo mode — ◀ current focus**
+- The active build target. A gamified multiple-choice quiz (§8.2): `GET /api/quiz` with
+  confusability-scored distractors, instant feedback, and the cached example sentence on
+  reveal.
+- **UI bar — Duolingo-grade polish, deliberately restrained:** the look-and-feel should
+  match Duolingo's quality (clean, satisfying, momentum-driven, mobile-first), but with
+  **minimal animation** (snappy and lightweight, not flashy character/transition
+  animations) and **zero ads** — the latter a core anti-Duolingo differentiator (§1, §8.2).
+- Resolve whether MC results feed the FSRS scheduler or stay a separate practice mode
+  (§8.2, §15).
+- Light polish may ride along: browse/search, daily new-card limits, basic stats.
 
-**Phase 3 — Multi-user**
+**Phase 3 — Admin audit + on-demand generation — next, after Duolingo**
+- **Admin review/audit page** (admin-gated via `UserProfile.role`): inspect each
+  AI-generated example sentence and accept or reject it before it surfaces to learners
+  (adds a review-status field to `ExampleSentence`; optionally generate several candidates
+  per word and keep the best).
+- **On-demand `/api/generate`** + study-UI fetch-on-flip for any not-yet-seeded words, with
+  the §11.4 guardrails (auth + rate-limit + cache-first + bounded `max_tokens`).
+
+**Phase 4 — Multi-user**
 - Widen/remove the email allowlist; real `User` rows; authorization checks scoping all
   reads/writes by `userId`.
 - Per-user settings (directions, daily limits, level focus).
 
-**Phase 4 — Enhancements**
-- **Admin review/audit page:** inspect each AI-generated example sentence and accept or
-  reject it before it surfaces to learners (adds a review-status field to
-  `ExampleSentence`; optionally generate several candidates per word and keep the best).
+**Phase 5 — Further enhancements**
 - Audio (TTS) for sentences, furigana rendering, streak/heatmap, sentence
-  regeneration/voting, export back to Anki.
+  regeneration/voting, export back to Anki, installable-PWA polish.
 
 ---
 
@@ -716,6 +741,7 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-06-03 | **Re-prioritize roadmap: Duolingo mode is the current focus**; the **admin audit page + on-demand generation move to Phase 3** (right after Duolingo, ahead of multi-user). Duolingo UI bar set to "Duolingo-grade polish but minimal animation and zero ads." | All content is seeded (Phase 1c done), so the next user-facing value is the second study mode. On-demand generation is no longer needed for coverage, so it rides with the admin tooling as a safety net. Minimal-animation/no-ads is the product thesis (§1) — match Duolingo's quality without its spectacle or monetization. | Author | §8.2, §13 |
 | 2026-06-03 | Security review hardening: **case-insensitive allowlist** comparison; **global sign-in cap tightened 20 → 6**/10min; SPEC §9/§11.4 corrected to mark unbuilt routes "planned" and to require auth + rate-limit + cache-first + token-cap on a future `/api/generate` | Review confirmed no web-reachable Anthropic cost path exists (generate code is scripts-only) and Resend is well contained. The allowlist compare could lock out the legit user on a capitalization mismatch (availability footgun); a tighter global cap further bounds inbox-bombing for a single-user app; doc accuracy prevents assuming protections on routes that don't exist. | Author | §9, §11.3, §11.4 |
 | 2026-06-03 | Sign-in rate limiting uses an **in-memory fixed-window** limiter (per-IP 5/10min + global 20/10min), enforced in `proxy.ts`; session TTL set explicitly to 30 days | Single-user on one Railway Hobby instance, so a process-local counter needs no Redis/DB and zero deps; limits reset on redeploy / aren't shared across replicas (acceptable, swappable later). The global cap is the real inbox-bombing defense since the allowlist means only one inbox can receive a link. Postgres/Upstash stores rejected as over-built for now. | Author | §11.3 |
 | 2026-06-03 | Build on Railway with **Railpack**, not Nixpacks | Nixpacks is deprecated; Railpack is Railway's current default builder. Set `build.builder: "RAILPACK"` in `railway.json`. | Author | §12 |

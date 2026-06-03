@@ -5,8 +5,9 @@ Execution checklist and progress tracker. **Plan and rationale live in
 state* — what's done and what's next. Keep it current; it's the "where we left off"
 record across sessions. Decisions do **not** go here — log them in SPEC.md §16.
 
-**Now:** Phase 1b shipped — app is **live on Railway, magic-link sign-in works in prod**.
-Next: Phase 1c (other levels + on-demand generation).
+**Now:** Phases 1a–1c done (live on Railway; all levels seeded). **Current focus: Phase 2 —
+Duolingo mode** (MC quiz; Duolingo-grade UI with minimal animation and no ads). Then
+Phase 3 (admin audit + on-demand generation).
 
 ---
 
@@ -80,11 +81,27 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
 - [x] **Re-backup local** — fresh `pg_dump` taken after all decks seeded; the ~8,100-word
   paid sentence cache is now captured (notes/deploy.md §6).
 - [ ] **Transfer local → prod** so the deployed app serves all levels (notes/deploy.md §3).
-- [ ] On-demand `/api/generate` + UI fetch-on-flip — now **optional/low priority**: every
-  word is pre-seeded, so this is only a safety net for future un-seeded additions.
+- On-demand `/api/generate` + fetch-on-flip — **moved to Phase 3** (no longer needed for
+  coverage now that every word is seeded; returns as a safety net with the admin tooling).
 
-## Phase 2+ (later)
-See SPEC.md §13 — Duolingo mode, suspend/leech, stats, multi-user, enhancements.
+## Phase 2 — Duolingo mode ◀ current focus
+- [ ] `GET /api/quiz` — target word + correct option + 3 confusability-scored distractors
+  (shared kanji / reading / meaning, scored in app code; synonym guardrail) (SPEC §8.2)
+- [ ] MC quiz UI — **Duolingo-grade polish, minimal animation, zero ads**; respects
+  `prefers-reduced-motion`; mobile-first (iPhone SE) (SPEC §8.2, §8.4, §13)
+- [ ] Resolve MC↔FSRS coupling — feed the scheduler or stay a separate practice mode
+  (SPEC §8.2, §15)
+- [ ] Light polish (optional): browse/search, daily new-card limit, basic stats
+
+## Phase 3 — Admin audit + on-demand generation (after Duolingo)
+- [ ] Admin review/audit page — admin-gated (`UserProfile.role`); add a review-status field
+  to `ExampleSentence`; accept/reject generated sentences (SPEC §13)
+- [ ] On-demand `/api/generate` + study-UI fetch-on-flip, with §11.4 guardrails
+  (auth + rate-limit + cache-first + bounded `max_tokens`)
+
+## Phase 4+ (later)
+See SPEC.md §13 — multi-user; enhancements (audio/TTS, furigana, streak/heatmap,
+regeneration/voting, export to Anki, installable-PWA polish).
 
 ## Open questions
 Tracked in SPEC.md §15.

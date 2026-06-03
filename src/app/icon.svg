@@ -1,9 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <text
-    x="50%"
-    y="50%"
-    dominant-baseline="central"
-    text-anchor="middle"
-    font-size="84"
-  >🦜</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="Bayana — Pī the parrot">
+  <!-- App-icon / favicon: Pī's face on the brand's signature magenta-on-yellow pairing.
+       Geometry matches the mascot in notes/bayana (brand.js, "happy" expression); the
+       tail and feet are dropped so the head + body read at favicon size (BRAND.md). -->
+  <rect width="240" height="240" rx="54" fill="#ffea6c"/>
+  <g transform="translate(10 15) scale(0.92)">
+    <!-- crest (yellow center merges into the tile by design; pink + cream feathers read) -->
+    <ellipse cx="120" cy="40" rx="10" ry="25" fill="#ffea6c"/>
+    <ellipse cx="98" cy="51" rx="9" ry="21" fill="#ffa6fb" transform="rotate(-26 98 51)"/>
+    <ellipse cx="142" cy="51" rx="9" ry="21" fill="#fffba7" transform="rotate(26 142 51)"/>
+    <!-- body -->
+    <rect x="52" y="62" width="136" height="152" rx="66" fill="#ff61f8"/>
+    <!-- belly -->
+    <ellipse cx="120" cy="158" rx="50" ry="52" fill="#ffa6fb"/>
+    <!-- wings -->
+    <ellipse cx="61" cy="150" rx="17" ry="41" fill="#fffba7" transform="rotate(10 61 150)"/>
+    <ellipse cx="179" cy="150" rx="17" ry="41" fill="#fffba7" transform="rotate(-10 179 150)"/>
+    <!-- cheeks -->
+    <circle cx="84" cy="150" r="11" fill="#ffc6ff" opacity="0.9"/>
+    <circle cx="156" cy="150" r="11" fill="#ffc6ff" opacity="0.9"/>
+    <!-- eyes (happy) -->
+    <circle cx="98" cy="116" r="23" fill="#fff"/>
+    <circle cx="142" cy="116" r="23" fill="#fff"/>
+    <circle cx="103" cy="120" r="12" fill="#341832"/>
+    <circle cx="137" cy="120" r="12" fill="#341832"/>
+    <circle cx="107" cy="115" r="4.6" fill="#fff"/>
+    <circle cx="141" cy="115" r="4.6" fill="#fff"/>
+    <!-- beak (happy) -->
+    <path d="M104 138 Q120 132 136 138 Q139 154 120 166 Q101 154 104 138 Z" fill="#ffea6c"/>
+    <path d="M109 150 Q120 156 131 150 Q125 165 120 166 Q115 165 109 150 Z" fill="#f4cf45"/>
+  </g>
 </svg>
