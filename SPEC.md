@@ -577,7 +577,9 @@ This repository is intended to be **open-sourced**, so no personal data is commi
 
 - **Services:** 1 × Next.js web + 1 × Postgres plugin. No Redis or worker tier is required
   (see §5.1, §7.1).
-- **Build:** Nixpacks autodetects Next.js, or a Dockerfile for finer control.
+- **Build:** **Railpack** (Railway's current default builder; configured in `railway.json`
+  as `build.builder: "RAILPACK"`) autodetects the Next.js app, or a Dockerfile for finer
+  control. Nixpacks is **deprecated** and is not used.
 - **Environment variables:** `DATABASE_URL`, `ANTHROPIC_API_KEY`, `RESEND_API_KEY`,
   `AUTH_SECRET`, `AUTH_ALLOWED_EMAIL`, `AUTH_EMAIL_FROM`, `AUTH_URL` (public origin, for
   Auth.js callbacks). `DEFAULT_USER_ID` is **not** a production variable — it is only used
@@ -589,10 +591,16 @@ This repository is intended to be **open-sourced**, so no personal data is commi
   stable `Word.guid` (a GUID-keyed export/import), or `pg_dump`/restore the
   `Word` + `ExampleSentence` tables together so ids stay aligned. `seed-sentences.ts` /
   `collect-batch.ts` remain for generating *new* levels directly on prod.
-- **Backups:** enable Railway **daily** Postgres volume backups, and run a `pg_dump`
-  immediately **before each `prisma migrate deploy`**. The review history
-  (`ReviewState` / `ReviewLog`) is the irreplaceable data — the deck and example sentences
-  can always be re-imported or regenerated.
+- **Backups:** the Railway **Hobby** plan has no managed backups, so back up manually with
+  `pg_dump` (commands in `notes/deploy.md`), and always before a `prisma migrate deploy`.
+  Backup priorities: `ReviewState`/`ReviewLog` (study history — irreplaceable) and
+  `ExampleSentence` (paid to regenerate). `Word` is free to re-import from `decks/`.
+  Dump files contain personal data and are gitignored (`/backups`).
+  - The **local** Postgres (the `bayana-postgres` container) is the authoritative source of
+    the generated sentence cache — that is where Batch results land before they are
+    transferred to prod — so it warrants the same `pg_dump` discipline. For long-term
+    keeping, a `Word.guid`-keyed JSON export is preferred over a `pg_dump` `.dump`, which is
+    tied to the Postgres major version and schema.
 - **Domain:** Railway-generated domain for the initial release; custom domain later.
 
 ---
@@ -682,6 +690,8 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-06-03 | Build on Railway with **Railpack**, not Nixpacks | Nixpacks is deprecated; Railpack is Railway's current default builder. Set `build.builder: "RAILPACK"` in `railway.json`. | Author | §12 |
+| 2026-06-03 | **Backups are manual `pg_dump`** (revises the earlier "Railway daily" row) | The Railway **Hobby** plan has no managed/scheduled backups, so dumps are taken by hand: before each prod migration, and from the local container (the source of the paid sentence cache). A `Word.guid`-keyed JSON export is the version-proof long-term form. | Author | §12 |
 | 2026-06-03 | Ship Phase 1b with **N3 only** (auth + deploy first); seed other levels + on-demand generation after deploy (Phase 1c) | Get the app live and usable sooner; remaining levels and the on-demand fallback are content/polish that can follow on the deployed instance. | Author | §13 |
 | 2026-06-03 | Reuse generated sentences in prod by transferring the cache (keyed by `Word.guid`), not regenerating | The cache is a paid one-time artifact and `Word.id` cuids differ per DB; transfer by guid (or pg_dump/restore of Word + ExampleSentence) avoids paying the API again on deploy. | Author | §12 |
 | 2026-06-03 | Study session auto-refetches the queue when a batch is exhausted | Cards that become due mid-session (Again / learning steps) cycle back without a manual reload; "caught up" shows only when a fresh fetch is empty. | Author | §8.1 |

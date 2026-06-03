@@ -61,11 +61,13 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
   - [x] Seeded user linked to allowlist email (sign-in attaches to existing user)
   - [ ] Remaining hardening: **rate-limit** the sign-in request (§11.3 #5) — not yet done
   - [ ] Manual test: magic-link sign-in end-to-end (needs Resend delivery — see note below)
-- [x] **Deploy prep** — `railway.json` (Nixpacks, `start:prod`), `postinstall` generate,
+- [x] **Deploy prep** — `railway.json` (Railpack, `start:prod`), `postinstall` generate,
   `start:prod` = migrate + `$PORT`, `prisma`/`dotenv` → runtime deps; **runbook in
   `notes/deploy.md`**. Verified `prisma migrate deploy` runs clean.
-- [ ] **Deploy** (you, via Railway): create project + Postgres, set env vars, transfer the
-  N3 cache (`notes/deploy.md` §3 — pg_dump pipe), generate domain + set `AUTH_URL`, backups
+- **Deploy** (you, via Railway):
+  - [x] Push to GitHub; transfer N3 cache via `pg_dump` pipe
+  - [ ] Set env vars (fresh `AUTH_SECRET`, `AUTH_URL`, Resend/anthropic, `DATABASE_URL` ref); deploy
+  - [ ] Generate domain → set `AUTH_URL` → redeploy; smoke-test sign-in; enable daily backups
 
 ## Phase 1c — Fill content (post-deploy)
 - [ ] Seed remaining levels N5/N4/N2/N1 (Batch API)
