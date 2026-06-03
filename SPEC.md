@@ -385,6 +385,11 @@ The classic spaced-repetition flashcard loop, modeled on Anki.
   sentence**.
 - The user rates **Again / Hard / Good / Easy**; `POST /api/review` invokes `ts-fsrs` to
   compute the new `stability`, `difficulty`, `due`, and `state`, which are persisted.
+- **Continuous sessions:** the study screen loads a batch of cards and, when it is
+  exhausted, **auto-refetches** the queue — so cards that have just become due (a card
+  rated *Again*, or a learning-step card) cycle back without a manual reload. The "all
+  caught up" state appears only when a fresh fetch returns nothing (with a *Check for more*
+  action to refetch).
 - Each rating is also appended to the immutable **`ReviewLog`** (§6), which powers
   statistics, future FSRS re-optimization, and **one-step undo** — restoring the card's
   prior scheduling state right after a misrating. Undo ships in the MVP.
@@ -668,6 +673,7 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-06-03 | Study session auto-refetches the queue when a batch is exhausted | Cards that become due mid-session (Again / learning steps) cycle back without a manual reload; "caught up" shows only when a fresh fetch is empty. | Author | §8.1 |
 | 2026-06-03 | Randomize new-card selection in the study queue | The deck is sorted by reading, so sequential new cards cluster similar sounds; a shuffled sample spreads them out and varies sessions. | Author | §8.1 |
 | 2026-06-03 | `ReviewLog` mirrors the ts-fsrs review log (added `learningSteps`); one-step undo uses ts-fsrs `rollback()` | Storing the library's log verbatim makes undo correct without hand-rolled math and feeds FSRS re-optimization later. | Author | §6, §8.1 |
 | 2026-06-03 | Use **Prisma 7** with the `@prisma/adapter-pg` driver adapter (generated client in `src/generated/prisma`, config in `prisma.config.ts`) | Prisma 7 is the current major and makes driver adapters standard; pairs with the Postgres datasource. Local dev runs Postgres in Docker on port 5887. | Author | §6 |

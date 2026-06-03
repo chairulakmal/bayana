@@ -58,26 +58,35 @@ export function StudySession() {
   const [reviewed, setReviewed] = useState<string[]>([]); // wordIds, for undo
   const [error, setError] = useState<string | null>(null);
 
-  // Load the queue once and flatten due + new into one ordered list.
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/cards/queue");
-        if (!res.ok) throw new Error(`queue ${res.status}`);
-        const data: QueueResponse = await res.json();
-        setCards([...data.due.map((d) => toCard(d.word)), ...data.newWords.map(toCard)]);
-      } catch {
-        setError("Couldn't load your study queue.");
-        setCards([]);
-      }
-    })();
+  // Fetch the queue and flatten due + new into one ordered list. Called on mount and
+  // again whenever a batch is exhausted (auto-refetch), so cards that have become due
+  // mid-session — e.g. a card you rated "Again", or a learning-step card — cycle back
+  // without a manual reload.
+  const loadQueue = useCallback(async () => {
+    try {
+      const res = await fetch("/api/cards/queue");
+      if (!res.ok) throw new Error(`queue ${res.status}`);
+      const data: QueueResponse = await res.json();
+      setCards([...data.due.map((d) => toCard(d.word)), ...data.newWords.map(toCard)]);
+      setIndex(0);
+      setReviewed([]);
+      setFlipped(false);
+      setError(null);
+    } catch {
+      setError("Couldn't load your study queue.");
+      setCards((prev) => prev ?? []); // first-load failure ⇒ show the empty state
+    }
   }, []);
+
+  useEffect(() => {
+    void loadQueue();
+  }, [loadQueue]);
 
   const current = cards && index < cards.length ? cards[index] : null;
 
   const rate = useCallback(
     async (rating: Rating) => {
-      if (!current || busy) return;
+      if (!current || !cards || busy) return;
       setBusy(true);
       setError(null);
       try {
@@ -87,16 +96,23 @@ export function StudySession() {
           body: JSON.stringify({ wordId: current.wordId, rating }),
         });
         if (!res.ok) throw new Error(`review ${res.status}`);
-        setReviewed((r) => [...r, current.wordId]);
-        setIndex((i) => i + 1);
-        setFlipped(false);
+
+        if (index >= cards.length - 1) {
+          // Last card in this batch → auto-refetch the next batch (newly-due + new).
+          // "All caught up" only shows if that fetch comes back empty.
+          await loadQueue();
+        } else {
+          setReviewed((r) => [...r, current.wordId]);
+          setIndex((i) => i + 1);
+          setFlipped(false);
+        }
       } catch {
         setError("Failed to save your review.");
       } finally {
         setBusy(false);
       }
     },
-    [current, busy],
+    [current, cards, index, busy, loadQueue],
   );
 
   const undo = useCallback(async () => {
@@ -131,12 +147,14 @@ export function StudySession() {
     return (
       <Centered>
         <p className="text-2xl font-semibold">🎉 All caught up!</p>
-        <p className="mt-2 text-slate-500">No cards due right now.</p>
-        {reviewed.length > 0 && (
-          <button onClick={undo} disabled={busy} className="mt-6 text-sky-600 underline">
-            Undo last
-          </button>
-        )}
+        <p className="mt-2 text-slate-500">No cards are due right now.</p>
+        <button
+          onClick={() => void loadQueue()}
+          disabled={busy}
+          className="mt-6 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          Check for more
+        </button>
       </Centered>
     );
   }
