@@ -1,7 +1,8 @@
-// GET /api/cards/queue?level=N3
+// GET /api/cards/queue?level=N3[&limit=20]
 //
-// Returns today's study queue for the current user: cards already due, plus a capped
-// number of brand-new words. Phase 1a defaults to N3.
+// Returns one session's worth of cards for the current user: due cards (oldest first,
+// capped to `limit`), plus new words filling the remaining slots. Defaults to 20 cards
+// per session. `limit` is clamped to 1–100 to prevent abuse.
 
 import { NextResponse } from "next/server";
 import { getCurrentUserId } from "@/lib/current-user";
@@ -19,14 +20,21 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const params = new URL(request.url).searchParams;
+
   // Validate the level against the enum so a bad query string can't reach the DB.
-  const levelParam = new URL(request.url).searchParams.get("level") ?? "N3";
+  const levelParam = params.get("level") ?? "N3";
   if (!(levelParam in Level)) {
     return NextResponse.json({ error: `Unknown level "${levelParam}"` }, { status: 400 });
   }
 
+  // Parse the optional session limit; clamp to a safe range so the client can't
+  // accidentally (or maliciously) request an unbounded queue.
+  const rawLimit = parseInt(params.get("limit") ?? "20", 10);
+  const sessionLimit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 100) : 20;
+
   try {
-    const queue = await getStudyQueue(userId, { level: levelParam as Level });
+    const queue = await getStudyQueue(userId, { level: levelParam as Level, sessionLimit });
     return NextResponse.json(queue);
   } catch (err) {
     console.error("GET /api/cards/queue failed:", err);

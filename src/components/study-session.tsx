@@ -21,7 +21,7 @@ type QueueWord = {
   meaning: string;
   sentences: { japanese: string; reading: string; english: string }[];
 };
-type QueueResponse = { due: { word: QueueWord }[]; newWords: QueueWord[] };
+type QueueResponse = { due: { word: QueueWord }[]; newWords: QueueWord[]; totalDue: number };
 
 // A normalized card for the session.
 type StudyCard = {
@@ -59,6 +59,11 @@ export function StudySession({ level }: { level: string }) {
   const [busy, setBusy] = useState(false); // disables controls during a request
   const [reviewed, setReviewed] = useState<string[]>([]); // wordIds, for undo
   const [error, setError] = useState<string | null>(null);
+  // sessionDone: true after the last card is rated — shows the session-complete screen
+  // instead of immediately auto-loading the next batch. remainingDue is the totalDue
+  // count from the last queue fetch (pre-cap), used for the "N more waiting" hint.
+  const [sessionDone, setSessionDone] = useState(false);
+  const [remainingDue, setRemainingDue] = useState(0);
 
   // Fetch the queue and flatten due + new into one ordered list. Called on mount and
   // again whenever a batch is exhausted (auto-refetch), so cards that have become due
@@ -70,9 +75,11 @@ export function StudySession({ level }: { level: string }) {
       if (!res.ok) throw new Error(`queue ${res.status}`);
       const data: QueueResponse = await res.json();
       setCards([...data.due.map((d) => toCard(d.word)), ...data.newWords.map(toCard)]);
+      setRemainingDue(data.totalDue);
       setIndex(0);
       setReviewed([]);
       setFlipped(false);
+      setSessionDone(false);
       setError(null);
     } catch {
       setError("Couldn't load your study queue.");
@@ -102,9 +109,10 @@ export function StudySession({ level }: { level: string }) {
         if (!res.ok) throw new Error(`review ${res.status}`);
 
         if (index >= cards.length - 1) {
-          // Last card in this batch → auto-refetch the next batch (newly-due + new).
-          // "All caught up" only shows if that fetch comes back empty.
-          await loadQueue();
+          // Last card in the session → show the session-complete screen. The user
+          // chooses whether to start another session or go home. We don't auto-refetch
+          // so there's a clear stopping point (FSRS sessions should feel finite).
+          setSessionDone(true);
         } else {
           setReviewed((r) => [...r, current.wordId]);
           setIndex((i) => i + 1);
@@ -116,7 +124,7 @@ export function StudySession({ level }: { level: string }) {
         setBusy(false);
       }
     },
-    [current, cards, index, busy, loadQueue],
+    [current, cards, index, busy],
   );
 
   const undo = useCallback(async () => {
@@ -154,19 +162,36 @@ export function StudySession({ level }: { level: string }) {
     );
   }
 
-  if (!current) {
+  // Session-complete: shown after rating the last card in a capped batch (sessionDone),
+  // or when the queue is genuinely empty (!current after a fetch).
+  if (sessionDone || !current) {
+    // "All caught up" only when the queue came back empty (not when we just hit the cap).
+    const allCaughtUp = !sessionDone;
+    // remainingDue is totalDue from the last fetch; subtract the session size for an
+    // estimate. "Again" cards may have cycled back in, so we call it approximate.
+    const approxRemaining = Math.max(0, remainingDue - (cards?.length ?? 0));
     return (
       <Centered>
-        <Parrot expr="wow" title="Pī cheering" style={{ width: 124, height: 138 }} />
+        <Parrot
+          expr={allCaughtUp ? "wow" : "happy"}
+          title={allCaughtUp ? "Pī cheering" : "Pī smiling"}
+          style={{ width: 124, height: 138 }}
+        />
         <p className="mt-4 text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
-          All caught up! 🎉
+          {allCaughtUp ? "All caught up! 🎉" : "Session done! 🎉"}
         </p>
         <p className="mt-1" style={{ color: "var(--ink-soft)" }}>
-          No cards are due right now. <span className="jp">またね！</span>
+          {allCaughtUp ? (
+            <>No cards are due right now. <span className="jp">またね！</span></>
+          ) : approxRemaining > 0 ? (
+            <>About {approxRemaining} more cards due today.</>
+          ) : (
+            <>All caught up! <span className="jp">おつかれさま</span></>
+          )}
         </p>
         <div className="mt-6 flex gap-3">
           <button onClick={() => void loadQueue()} disabled={busy} className="btn btn-primary">
-            Check for more
+            {allCaughtUp ? "Check for more" : "Another session?"}
           </button>
           <Link href="/home" className="btn btn-ghost">
             Home
@@ -194,22 +219,32 @@ export function StudySession({ level }: { level: string }) {
             style={{ width: `${progress}%`, background: "linear-gradient(90deg, var(--magenta), var(--mag-500))" }}
           />
         </div>
-        <div className="mt-2 flex items-center justify-between text-[13px]" style={{ color: "var(--ink-soft)" }}>
-          <span>
+        <div className="mt-2 flex items-center text-[13px]" style={{ color: "var(--ink-soft)" }}>
+          <span className="flex-1">
             <Link href="/home" className="font-semibold underline underline-offset-2" style={{ color: "var(--grape)" }}>
               Home
             </Link>
             <span className="mx-2" style={{ color: "var(--ink-faint)" }}>·</span>
             {remaining} left
           </span>
-          <button
-            onClick={undo}
-            disabled={busy || reviewed.length === 0}
-            className="font-semibold underline underline-offset-2 disabled:opacity-30"
-            style={{ color: "var(--grape)" }}
+          {/* Level chip — centred; uses the brand chip palette at a smaller scale so it
+              reads as context without pulling focus during recall */}
+          <span
+            className={`chip chip-${level.toLowerCase()}`}
+            style={{ fontSize: "10px", padding: "2px 8px" }}
           >
-            Undo
-          </button>
+            {level}
+          </span>
+          <span className="flex flex-1 justify-end">
+            <button
+              onClick={undo}
+              disabled={busy || reviewed.length === 0}
+              className="font-semibold underline underline-offset-2 disabled:opacity-30"
+              style={{ color: "var(--grape)" }}
+            >
+              Undo
+            </button>
+          </span>
         </div>
       </header>
 

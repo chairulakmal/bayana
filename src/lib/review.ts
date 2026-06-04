@@ -68,22 +68,40 @@ export async function undoLastReview(userId: string, wordId: string) {
 }
 
 /** Build the study queue:
- *   1. due cards — anything already in learning/review whose `due` has passed;
- *   2. new words — words this user has never reviewed, capped at `newCardsPerDay`.
- *  `level` scopes the new words (Phase 1a studies N3); due cards are returned regardless
- *  of level so nothing already in progress gets stranded. */
+ *   1. due cards — anything already in learning/review whose `due` has passed, prioritised
+ *      first and capped to `sessionLimit`;
+ *   2. new words — never-seen words that fill the remaining session slots, further capped
+ *      by `profile.newCardsPerDay` so the daily new-word limit is still respected.
+ *  `level` scopes the new words; due cards are returned regardless of level so nothing
+ *  already in progress gets stranded.
+ *  Returns `totalDue` (pre-cap count) so callers can tell the user how many are waiting. */
 export async function getStudyQueue(
   userId: string,
-  opts: { level?: Level; now?: Date } = {},
+  opts: { level?: Level; now?: Date; sessionLimit?: number } = {},
 ) {
+  // sessionLimit caps the total cards shown in one sitting (due first, then new).
+  // Default 20 matches the Anki community norm for a focused daily session.
+  const sessionLimit = opts.sessionLimit ?? 20;
   const now = opts.now ?? new Date();
   const profile = await db.userProfile.findUniqueOrThrow({ where: { userId } });
 
-  const due = await db.reviewState.findMany({
+  const allDue = await db.reviewState.findMany({
     where: { userId, due: { lte: now } },
     orderBy: { due: "asc" },
     include: { word: { include: { sentences: { take: 1 } } } },
   });
+
+  // totalDue is the raw count before capping — returned to the client so it can show
+  // "N more waiting" on the session-complete screen.
+  const totalDue = allDue.length;
+  const due = allDue.slice(0, sessionLimit);
+
+  // How many slots remain for new words, honouring both the session cap and the
+  // per-day new-card preference (whichever is smaller wins).
+  const newSlots = Math.min(
+    Math.max(0, sessionLimit - due.length),
+    profile.newCardsPerDay,
+  );
 
   // New words: pick a RANDOM sample of never-seen words. The source deck is sorted by
   // reading, so taking them in insertion order clusters similar-sounding words together;
@@ -95,7 +113,7 @@ export async function getStudyQueue(
     },
     select: { id: true }, // ids only — cheap to fetch the whole candidate pool and shuffle
   });
-  const pickedIds = shuffle(candidates.map((c) => c.id)).slice(0, profile.newCardsPerDay);
+  const pickedIds = shuffle(candidates.map((c) => c.id)).slice(0, newSlots);
 
   // Fetch the chosen words, then restore the shuffled order (a `WHERE id IN (...)` query
   // does not preserve the order of the id list).
@@ -106,7 +124,7 @@ export async function getStudyQueue(
   const byId = new Map(unordered.map((w) => [w.id, w]));
   const newWords = pickedIds.map((id) => byId.get(id)).filter((w) => w !== undefined);
 
-  return { due, newWords };
+  return { due, newWords, totalDue };
 }
 
 /** In-place Fisher–Yates shuffle. Returns the same array for chaining. */
