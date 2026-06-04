@@ -48,14 +48,15 @@ export default async function Home() {
               className="mt-4 text-[40px] leading-[1.05] sm:text-[52px]"
               style={{ fontFamily: "var(--f-display)", fontWeight: 700, letterSpacing: "-.01em" }}
             >
-              Japanese vocab,
+              Japanese vocab
               <br />
-              ten words at a time.
+              that sticks.
             </h1>
 
             <p className="mx-auto mt-4 max-w-md text-[17px] md:mx-0" style={{ color: "var(--ink-soft)" }}>
-              Spaced-repetition flashcards with AI-written example sentences. No deck setup,
-              no ads — sign in and study.
+              Ten words at a time, two minutes a day. Real spaced repetition with an
+              AI example sentence for every word — no decks to build, no ads to dodge,
+              open it anytime.
             </p>
 
             {/* Primary CTA — the one thing this page is for. Both buttons share btn-lg so
@@ -75,7 +76,7 @@ export default async function Home() {
             </div>
 
             <p className="mt-4 text-[13px]" style={{ color: "var(--ink-faint)" }}>
-              Bayana is a personal, invite-only project.
+              A personal, invite-only project — built in the open.
             </p>
           </div>
 
@@ -103,23 +104,23 @@ export default async function Home() {
             <Feature
               emoji="🎴"
               title="Flashcard mode"
-              body="Proper spaced repetition (FSRS, the algorithm modern Anki uses), with one-step undo."
+              body="Real spaced repetition — FSRS, the same engine modern Anki runs on. Cards come back right as you're about to forget them."
             />
             <Feature
               emoji="⚡"
               title="Quiz mode"
-              body="Quick, gamified multiple-choice for momentum — like Duolingo, minus the ads."
+              body="Fast multiple-choice rounds for when you want momentum, not a marathon. Like Duolingo — minus the ads and the guilt-trips."
               tag="soon"
             />
             <Feature
               emoji="🤖"
               title="AI example sentences"
-              body="Every word gets a level-appropriate sentence, written once and cached forever."
+              body="Every word comes with a sentence pitched to its level, so it sticks in context — not in a vacuum. Written once by Claude, kept forever."
             />
             <Feature
               emoji="📱"
               title="Mobile-first, no ads"
-              body="Designed for your phone. ~8,800 words, N5 to N1, built in."
+              body="Thumb-friendly, made to fit between train stops. All ~8,800 words, N5 to N1, ready from day one."
             />
           </div>
         </section>
@@ -130,10 +131,11 @@ export default async function Home() {
             The bit in between
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-[16px]" style={{ color: "var(--ink-soft)" }}>
-            <strong>Anki</strong>{" "}is powerful, but it&apos;s <em>all</em>{" "}setup —
-            decks, note types, add-ons. <strong>Duolingo</strong>{" "}is fun, but
-            it&apos;s ad-riddled and has no real JLPT course. Bayana is the thing in
-            between: open it and study.
+            <strong>Anki</strong>{" "}is incredibly powerful — and incredibly fiddly:
+            decks, note types, add-ons, sync configs. <strong>Duolingo</strong>{" "}is fun
+            until the ads, and it has no real JLPT track anyway. Bayana lives in the gap —
+            open it, and study.{" "}
+            <strong style={{ color: "var(--ink)" }}>That&apos;s the whole pitch.</strong>
           </p>
         </section>
       </main>

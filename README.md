@@ -22,12 +22,14 @@ N5–N1 built in.
 
 ## What you get
 
-- 🎴 **Flashcard mode** — proper spaced repetition (FSRS, the same algorithm modern Anki uses).
-- ⚡ **Quiz mode** — quick, gamified multiple-choice for momentum (like Duolingo, minus the ads).
-- 🤖 **AI example sentences** — every word gets a level-appropriate sentence (written once
-  by Claude Haiku, cached forever), because words stick better in context.
-- 📱 **Mobile-first** — designed for your phone, fine on a laptop.
-- 🈁 **~8,800 words, N5 → N1** — ready to go.
+- 🎴 **Flashcard mode** — real spaced repetition (FSRS, the same engine modern Anki runs
+  on). Cards come back right as you're about to forget them.
+- ⚡ **Quiz mode** — fast multiple-choice rounds for when you want momentum, not a marathon
+  (like Duolingo, minus the ads and the guilt-trips).
+- 🤖 **AI example sentences** — every word comes with a sentence pitched to its level, so it
+  sticks in context, not in a vacuum (written once by Claude Haiku, kept forever).
+- 📱 **Mobile-first** — thumb-friendly, made to fit between train stops; fine on a laptop too.
+- 🈁 **~8,800 words, N5 → N1** — ready from day one.
 
 ## Status
 
