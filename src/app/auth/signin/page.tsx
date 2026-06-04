@@ -72,7 +72,7 @@ export default async function SignInPage({
             try {
               await signIn("resend", {
                 email: String(formData.get("email") ?? ""),
-                redirectTo: "/study",
+                redirectTo: "/home",
               });
             } catch (err) {
               // Denied/again? Show it on the page instead of a 500.
@@ -97,6 +97,17 @@ export default async function SignInPage({
             Send magic link
           </button>
         </form>
+
+        {/* Dev-only shortcut: skip the magic link locally (SPEC §11.7). Rendered only when
+            the bypass is actually enabled, so it never appears in production. */}
+        {process.env.NODE_ENV !== "production" && process.env.DEV_AUTH === "1" && (
+          <a
+            href="/api/dev/login"
+            className="mt-4 inline-block text-[13px] font-semibold text-slate-400 underline"
+          >
+            Dev login (skip email)
+          </a>
+        )}
       </div>
     </main>
   );

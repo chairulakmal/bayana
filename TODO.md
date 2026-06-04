@@ -80,20 +80,26 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
   sentence** (local DB). Batch ids + counts in `notes/batch-generation.md`.
 - [x] **Re-backup local** — fresh `pg_dump` taken after all decks seeded; the ~8,100-word
   paid sentence cache is now captured (notes/deploy.md §6).
-- [ ] **Transfer local → prod** so the deployed app serves all levels (notes/deploy.md §3).
+- [x] **Transfer local → prod** so the deployed app serves all levels (notes/deploy.md §3).
 - On-demand `/api/generate` + fetch-on-flip — **moved to Phase 3** (no longer needed for
   coverage now that every word is seeded; returns as a safety net with the admin tooling).
 
 ## Phase 2 — Duolingo mode ◀ current focus
-- [ ] **Level scope** — add `UserProfile.activeLevel` (migration); scope the Anki queue
-  **and** the quiz to it; build the returning-user **mode picker** (Anki / Duolingo) at
-  `/study` (SPEC §8, §8.5)
+- [x] **Level scope + home hub** — `UserProfile.activeLevel` added (⚠ run `npx prisma
+  migrate dev` once the DB is up); `/home` mode picker + inline level chips (`setActiveLevel`
+  server action); `/study` & `/quiz` read the active level; login/dev-login/`/` → `/home`
+  (SPEC §8.5). Full stats dashboard deferred to Phase 4.
 - [ ] **First-run onboarding** — level choice → 5-question Duolingo warm-up (non-scheduling)
   → guided tour; add `UserProfile.onboardedAt` to branch first-time vs. returning (SPEC §8.5)
-- [ ] `GET /api/quiz` — target word + correct option + 3 confusability-scored distractors
-  (shared kanji / reading / meaning, scored in app code; synonym guardrail) (SPEC §8.2)
-- [ ] MC quiz UI — **Duolingo-grade polish, minimal animation, zero ads**; respects
-  `prefers-reduced-motion`; mobile-first (iPhone SE) (SPEC §8.2, §8.4, §13)
+- [x] `GET /api/quiz?level=&count=` — batch of JP→EN MC questions; **random** distractors
+  with meaning-dedupe guard, non-scheduling; selection isolated in `src/lib/quiz.ts`
+  (confusability scoring — shared kanji / reading similarity — still TODO, SPEC §8.2)
+- [x] MC quiz UI (`/quiz` + `src/components/quiz-session.tsx`) — brand-styled, instant
+  feedback, score summary with Pī; `prefers-reduced-motion`-aware; mobile-first
+- [x] **Dev login** — `GET /api/dev/login` mints a real session for the seeded user
+  (gated by `DEV_AUTH`, 404 in prod); dev button on the sign-in page (SPEC §11.7)
+- [ ] Upgrade distractors to **confusability scoring** (shared kanji / reading / meaning)
+  + the Anki↔Duolingo synergy (FSRS-informed selection / feeding results back) (SPEC §8.2, §15)
 - [ ] Resolve MC↔FSRS coupling — feed the scheduler or stay a separate practice mode
   (SPEC §8.2, §15)
 - [ ] Light polish (optional): browse/search, daily new-card limit, basic stats

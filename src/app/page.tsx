@@ -8,7 +8,7 @@ import { Parrot } from "@/components/parrot";
 // SPEC §2). The authenticated app lives at /study; `/` is public (see proxy.ts).
 export default async function Home() {
   const session = await auth();
-  if (session) redirect("/study");
+  if (session) redirect("/home");
 
   const year = new Date().getFullYear();
 

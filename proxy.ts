@@ -50,11 +50,14 @@ export function proxy(req: NextRequest) {
     }
   }
 
-  // Public: the marketing homepage, the sign-in page, and all Auth.js endpoints.
+  // Public: the marketing homepage, the sign-in page, and all Auth.js endpoints. The
+  // dev-login bypass is reachable without a session (it creates one) — but only outside
+  // production; the route itself also 404s in prod (SPEC §11.7).
   const isPublic =
     pathname === "/" ||
     pathname.startsWith("/auth") ||
-    pathname.startsWith("/api/auth");
+    pathname.startsWith("/api/auth") ||
+    (process.env.NODE_ENV !== "production" && pathname.startsWith("/api/dev"));
   const hasSession = SESSION_COOKIES.some((name) => req.cookies.has(name));
 
   if (!isPublic && !hasSession) {

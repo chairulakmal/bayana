@@ -519,9 +519,15 @@ Two user stories drive entry into the app. Both reach the same two level-scoped 
   then walks through the app's functionality (the two modes, flip/rate, streak, switching
   level). Completing the flow persists `UserProfile.activeLevel` and stamps `onboardedAt`
   (§6), which is what distinguishes a first-time from a returning user.
-- **Returning user.** Sign in → a simple **mode picker: Anki mode or Duolingo mode** for the
-  remembered active level → start. That's it. The level is not re-chosen each session
-  (changing it is a secondary action in settings); there are no decks or configuration.
+- **Returning user.** Sign in → the **home hub** (`/home`) → start. That's it.
+
+**The home hub (`/home`).** The returning-user landing — sign-in, the dev login, and the
+public `/` all redirect here. It is the **mode picker** (two large cards → Anki `/study` /
+Duolingo `/quiz`) plus an **inline level selector** (the five JLPT chips; tapping one
+persists `UserProfile.activeLevel` via a server action and re-scopes both engines). The
+level is therefore changed *here*, not on a separate settings page. The hub is deliberately
+**not a full dashboard** — stats, streak, and history live in a richer dashboard in Phase 4
+(§13). `/study` and `/quiz` each read the active level and link back to the hub.
 
 ---
 
@@ -538,8 +544,9 @@ is intentionally no web-reachable, cost-incurring Anthropic route at present (se
 | POST | `/api/review` | Submit a rating → FSRS update | required | **Implemented** |
 | POST | `/api/review/undo` | Revert the most recent review (one-step undo) | required | **Implemented** |
 | `*` | `/api/auth/*` | Auth.js (sign-in request, callback, session) | public (rate-limited) | **Implemented** |
+| GET | `/api/quiz?level=&count=` | Batch of JP→EN multiple-choice questions (non-scheduling) | required | **Implemented** (random distractors; confusability scoring deferred, §8.2) |
+| GET | `/api/dev/login` | **Dev-only**: mint a session for the seeded user (skip the magic link) | none (dev-only) | **Implemented** — 404 in prod; gated by `DEV_AUTH` (§11.7) |
 | GET | `/api/cards?level=&q=&page=` | Browse / search | required | Planned (Phase 2) |
-| GET | `/api/quiz?level=` | One multiple-choice question + distractors | required | Planned (Phase 2) |
 | POST | `/api/generate` | On-demand single-sentence fallback | required + rate-limited | Planned (Phase 1c, optional — see §11.4) |
 | POST | `/api/batch/submit` | Submit a generation batch | admin | Not planned (scripts only) |
 | GET | `/api/batch/:id` | Poll batch status / collect | admin | Not planned (scripts only) |
@@ -637,6 +644,17 @@ This repository is intended to be **open-sourced**, so no personal data is commi
   author already publishes, so no history rewrite or noreply alias is required. (Decision:
   author's call — the trade-off is permanent public exposure of that address, accepted
   because it is already public.)
+
+### 11.7 Development auth bypass (must be impossible in production)
+Local development skips the magic-link round-trip via a **dev-only** route,
+`GET /api/dev/login` (§9), which mints a real database session for the seeded user and sets
+its cookie. Producing a genuine session keeps full parity with the production flow — `auth()`,
+the `proxy.ts` guard, and `getCurrentUserId` all work unchanged. It is **doubly gated** so it
+cannot exist in the deployed app: the handler returns 404 when `NODE_ENV === "production"`,
+**and** only runs when `DEV_AUTH=1` is explicitly set (never set in prod). `proxy.ts` likewise
+treats `/api/dev/*` as public only outside production. We deliberately did **not** use an
+Auth.js Credentials provider for this: it requires the JWT session strategy, whereas Bayana
+uses database sessions (§11.3 #6).
 
 ---
 
@@ -779,6 +797,8 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-06-03 | **Home hub at `/home`** is the post-login landing: a lightweight **mode picker** + **inline level selector** (writes `UserProfile.activeLevel`). No standalone settings/dashboard page; a full **stats dashboard is deferred to Phase 4**. Login / dev-login / public `/` all redirect to `/home`; `/study` and `/quiz` read the active level. | Setting a level and choosing a mode are a chip and two buttons — a dashboard would fight the one-tap, no-config ethos (§2). Keeping level-setting inline on the hub avoids a settings page; stats genuinely warrant a richer screen, but only later. | Author | §8.5, §6 |
+| 2026-06-03 | **Duolingo-mode MVP**: `GET /api/quiz` returns a batch of JP→EN MC questions for a level; **random distractors** with a meaning-dedupe guard, **non-scheduling** (no FSRS writes). Distractor selection isolated so confusability scoring slots in later. **Dev-only `/api/dev/login`** mints a real DB session (gated by `DEV_AUTH`, 404 in prod). | Ship the second mode fast without the Anki↔Duolingo synergy or confusability scoring (deferred, §8.2/§15); the dedupe guard is the one correctness must-have even when random. A real-session dev bypass keeps parity with prod (Credentials provider rejected — needs JWT, we use DB sessions). | Author | §8.2, §8.5, §9, §11.7 |
 | 2026-06-03 | **Both modes are scoped to one active JLPT level** (`UserProfile.activeLevel`); **first-run flow** = pick level → 5-question Duolingo warm-up (non-scheduling) → guided tour; **returning users** get an Anki/Duolingo **mode picker**. Refines the earlier "one-tap start." | Studying/quizzing one level at a time keeps scheduling and MC distractors coherent and the queue focused; a *doing-first* warm-up beats a wall of instructions for a new user; the level is a remembered preference so returning entry stays one tap (just pick a mode). `onboardedAt` distinguishes first-time vs. returning. | Author | §2, §6, §8, §8.5 |
 | 2026-06-03 | **N1 level chip = imperial purple + gold** (murasaki `#3d1452` + kin `#f0c75e`), not flat grape | In Japan purple is the historical highest-rank colour (禁色); gold is the luxury accent. N2 (`mag-600`) and the old N1 (`grape`) were both pinkish-purple and too close — shifting N1 to a deeper, bluer purple with gold text makes the top level read as "special," and is more culturally "premium" than gold alone (which also clashes with the N4 yellow). Author chose imperial-purple+gold over a gradient or solid gold. | Author | BRAND.md §3/§7 |
 | 2026-06-03 | **Public landing page at `/`**; the authenticated study app moves to `/study`. Brand foundation added (tokens + fonts in `globals.css`, reusable `Parrot` component, Pī favicon) per **BRAND.md**, which now states the mobile-first / iPhone-SE (375×667) design target. | A "Sign in" homepage is for logged-out visitors, so `/` can't also be the gated app; signed-in users are redirected `/` → `/study` to preserve one-tap start (§2). Committing the brand as code/tokens lets the landing — and Phase 2's Duolingo UI — build against the real design system. | Author | §8, §8.4 |

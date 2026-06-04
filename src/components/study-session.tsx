@@ -10,6 +10,7 @@
 // previous card to be re-rated; newly-due cards appear on the next load.
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Parrot } from "@/components/parrot";
 
 // --- shapes returned by GET /api/cards/queue ---
@@ -51,7 +52,7 @@ function toCard(word: QueueWord): StudyCard {
   };
 }
 
-export function StudySession() {
+export function StudySession({ level }: { level: string }) {
   const [cards, setCards] = useState<StudyCard[] | null>(null); // null = still loading
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
@@ -65,7 +66,7 @@ export function StudySession() {
   // without a manual reload.
   const loadQueue = useCallback(async () => {
     try {
-      const res = await fetch("/api/cards/queue");
+      const res = await fetch(`/api/cards/queue?level=${encodeURIComponent(level)}`);
       if (!res.ok) throw new Error(`queue ${res.status}`);
       const data: QueueResponse = await res.json();
       setCards([...data.due.map((d) => toCard(d.word)), ...data.newWords.map(toCard)]);
@@ -77,7 +78,7 @@ export function StudySession() {
       setError("Couldn't load your study queue.");
       setCards((prev) => prev ?? []); // first-load failure ⇒ show the empty state
     }
-  }, []);
+  }, [level]);
 
   useEffect(() => {
     void loadQueue();
@@ -161,9 +162,14 @@ export function StudySession() {
         <p className="mt-1" style={{ color: "var(--ink-soft)" }}>
           No cards are due right now. <span className="jp">またね！</span>
         </p>
-        <button onClick={() => void loadQueue()} disabled={busy} className="btn btn-primary mt-6">
-          Check for more
-        </button>
+        <div className="mt-6 flex gap-3">
+          <button onClick={() => void loadQueue()} disabled={busy} className="btn btn-primary">
+            Check for more
+          </button>
+          <Link href="/home" className="btn btn-ghost">
+            Home
+          </Link>
+        </div>
         {error && (
           <p className="mt-3 text-sm" style={{ color: "var(--bad)" }}>
             {error}
@@ -187,7 +193,13 @@ export function StudySession() {
           />
         </div>
         <div className="mt-2 flex items-center justify-between text-[13px]" style={{ color: "var(--ink-soft)" }}>
-          <span>{remaining} left</span>
+          <span>
+            <Link href="/home" className="font-semibold underline underline-offset-2" style={{ color: "var(--grape)" }}>
+              Home
+            </Link>
+            <span className="mx-2" style={{ color: "var(--ink-faint)" }}>·</span>
+            {remaining} left
+          </span>
           <button
             onClick={undo}
             disabled={busy || reviewed.length === 0}

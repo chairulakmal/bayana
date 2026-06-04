@@ -49,6 +49,8 @@ model UserProfile {
   role        Role    @default(MEMBER) // ADMIN gates the Phase 4 sentence-audit page
 
   // Study preferences
+  activeLevel    Level?   // JLPT level both modes operate on; chosen on the home hub (§8.5), null until set
+  onboardedAt    DateTime? // set when first-run onboarding completes; null ⇒ first-time user (§8.5)
   studyReverse   Boolean @default(false) // also review EN→JP (recall); default is JP→EN only
   newCardsPerDay Int     @default(20) // daily NEW-card cap for the FSRS queue
   timezone       String  @default("UTC") // IANA tz; defines the "day" for limits/streaks/stats

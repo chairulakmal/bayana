@@ -112,8 +112,24 @@ body {
 .rate-good:active:not(:disabled)  { box-shadow: 0 1px 0 var(--good-edge); }
 .rate-easy:active:not(:disabled)  { box-shadow: 0 1px 0 var(--grape-edge); }
 
+/* Duolingo-mode answer options (BRAND.md §7 "MC answer"). White by default; on reveal the
+   correct option turns green and a wrong pick turns coral. */
+.opt {
+  display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+  width: 100%; text-align: left;
+  font-family: var(--f-body); font-weight: 700; font-size: 16px;
+  padding: 14px 16px; border-radius: var(--r-md); cursor: pointer;
+  background: var(--surface); color: var(--ink);
+  border: 2px solid var(--line); box-shadow: 0 3px 0 var(--line);
+  transition: transform .06s ease, box-shadow .06s ease;
+}
+.opt:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 0 0 var(--line); }
+.opt:disabled { cursor: default; }
+.opt-correct { background: #eafaf1; border-color: var(--good); color: var(--good-edge); box-shadow: 0 3px 0 var(--good-edge); }
+.opt-wrong   { background: #ffe9ee; border-color: var(--bad);  color: #b12a44;        box-shadow: 0 3px 0 #d63a55; }
+
 /* Honor reduced-motion: keep the press functional, drop the spring (BRAND.md §7, SPEC §8.2). */
 @media (prefers-reduced-motion: reduce) {
-  .btn, .rate { transition: none; }
-  .btn:active, .rate:active { transform: none; }
+  .btn, .rate, .opt { transition: none; }
+  .btn:active, .rate:active, .opt:active { transform: none; }
 }
