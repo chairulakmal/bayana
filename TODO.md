@@ -5,8 +5,11 @@ Execution checklist and progress tracker. **Plan and rationale live in
 state* — what's done and what's next. Keep it current; it's the "where we left off"
 record across sessions. Decisions do **not** go here — log them in SPEC.md §16.
 
-**Now:** Phases 1a–1c done (live on Railway; all levels seeded). **Current focus: Phase 2 —
-Quiz mode** (MC quiz; Duolingo-grade UI with minimal animation and no ads). Then
+**Now:** Phases 1a–1c done (live on Railway; all 8,101 words seeded). **Phase 2 — Quiz mode
+is functionally complete**: MC quiz with confusability-scored distractors, level-scoped home
+hub, light `/stats`, installable PWA, and a sustainable 10-new-words/day pace. **Next:
+browse/search** — the last concrete Phase 2 build. The MC↔FSRS coupling and Flashcard↔Quiz
+synergy are deferred *by choice* (revisit after browse). Then
 Phase 3 (admin audit + on-demand generation).
 
 ---
@@ -108,12 +111,8 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
 - [ ] **Browse/search** ◀ next — whole-deck lookup for the active level (search by
   kanji/reading/meaning, sentence on tap); search-first with a render cap; browser-cached
   word list (no sentences up front)
-- [x] **Default `newCardsPerDay` 20 → 10** (migration `20260604163321_lower_new_cards_default`,
-  existing rows brought down too) + a "ten words a day" pace note with a tap-to-open
-  rationale (`InfoBubble`) on the landing hero and home hub (SPEC §16).
-- [ ] Light polish (optional): new-card-pace UI control to change `newCardsPerDay` (the
-  per-build cap is enforced in `getStudyQueue`). NOTE: a rolling per-calendar-day ceiling
-  is a **deliberate non-goal** — users may exceed the pace by choice (SPEC §16, 2026-06-04).
+- [ ] Light polish (optional): daily new-card-limit UI control (limit already enforced
+  server-side in `getStudyQueue`)
 - [x] Public homepage at `/` (brand + Pī mascot + Sign-in CTA + MIT/GitHub); study app
   moved to `/study`; brand foundation (tokens/fonts in globals, `Parrot` component, Pī
   favicon) per BRAND.md
