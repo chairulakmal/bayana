@@ -211,7 +211,7 @@ export function StudySession({ level }: { level: string }) {
   const progress = cards.length ? Math.round((index / cards.length) * 100) : 0;
 
   return (
-    <main className="flex min-h-dvh flex-col">
+    <main className="flex min-h-dvh flex-col pt-safe pb-safe">
       {/* Top bar: progress bar + count + undo */}
       <SessionHeader
         progress={progress}
@@ -310,7 +310,7 @@ export function StudySession({ level }: { level: string }) {
 // Full-screen centered container for loading / empty / done states (paper + ink).
 function Centered({ children }: { children: React.ReactNode }) {
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center px-6 text-center">
+    <main className="flex min-h-dvh flex-col items-center justify-center px-6 text-center pt-safe pb-safe">
       {children}
     </main>
   );

@@ -54,6 +54,14 @@ body {
 /* Japanese text always uses the rounded JP face (BRAND.md §4). */
 .jp { font-family: var(--f-jp); }
 
+/* ── PWA safe-area insets ────────────────────────────────────────────────────
+   When the app runs installed (standalone/fullscreen) with viewport-fit=cover,
+   these pad content clear of the notch (top) and the home indicator / gesture bar
+   (bottom). In a normal browser tab env() resolves to 0, so they are inert there.
+   Applied to the session <main> so study/quiz fill the screen without clipping. */
+.pt-safe { padding-top: env(safe-area-inset-top); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+
 /* ── Brand components ────────────────────────────────────────────────────────
    The signature "springy lip": a solid bottom shadow that compresses on press
    (BRAND.md §7). Reusable across the landing and Phase 2's Duolingo UI. */
@@ -92,7 +100,7 @@ body {
 /* N1 is the "endgame" chip: imperial purple + gold text — premium and distinct from N2. */
 .chip-n1 { background: var(--murasaki); color: var(--gold); box-shadow: inset 0 0 0 1.5px rgba(240, 199, 94, 0.45); }
 
-/* Anki-mode rating buttons — same springy lip, mapped to the functional palette
+/* Flashcard-mode rating buttons — same springy lip, mapped to the functional palette
    (BRAND.md §3): Again = coral, Hard = yellow, Good = green, Easy = grape. */
 .rate {
   display: flex; align-items: center; justify-content: center;

@@ -106,6 +106,11 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
 - [x] Public homepage at `/` (brand + Pī mascot + Sign-in CTA + MIT/GitHub); study app
   moved to `/study`; brand foundation (tokens/fonts in globals, `Parrot` component, Pī
   favicon) per BRAND.md
+- [x] **Installable-PWA basics** (pulled forward from Phase 5, SPEC §8.4/§16): manifest
+  (`src/app/manifest.ts`) + icons (192/512/maskable via `scripts/gen-pwa-icons.mjs`),
+  `display: fullscreen` + portrait, `viewport-fit=cover` + safe-area insets on the
+  study/quiz screens. Android = true chrome-free fullscreen; iOS falls back to standalone.
+  **Offline shell / service worker still deferred** (Phase 5).
 
 ## Phase 3 — Admin audit + on-demand generation (after Quiz mode)
 - [ ] Admin review/audit page — admin-gated (`UserProfile.role`); add a review-status field
@@ -115,7 +120,8 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
 
 ## Phase 4+ (later)
 See SPEC.md §13 — multi-user; enhancements (audio/TTS, furigana, streak/heatmap,
-regeneration/voting, export to Anki, installable-PWA polish).
+regeneration/voting, export to Anki, **PWA offline shell / service worker** — install +
+fullscreen basics already done, see Phase 2).
 
 ## Open questions
 Tracked in SPEC.md §15.

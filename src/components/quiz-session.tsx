@@ -121,7 +121,7 @@ export function QuizSession({ level }: { level: string }) {
   };
 
   return (
-    <main className="flex min-h-dvh flex-col">
+    <main className="flex min-h-dvh flex-col pt-safe pb-safe">
       {/* Progress + exit to the home hub */}
       <SessionHeader
         progress={Math.round((index / total) * 100)}
@@ -192,7 +192,7 @@ export function QuizSession({ level }: { level: string }) {
 // Full-screen centered container for loading / empty / summary states (paper + ink).
 function Centered({ children }: { children: React.ReactNode }) {
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center px-6 text-center">
+    <main className="flex min-h-dvh flex-col items-center justify-center px-6 text-center pt-safe pb-safe">
       {children}
     </main>
   );

@@ -6,7 +6,7 @@
 |---|---|
 | **Status** | Draft |
 | **Author** | Chairul Akmal |
-| **Last updated** | 2026-06-03 |
+| **Last updated** | 2026-06-04 |
 | **Target platform** | Mobile-first responsive web (Next.js 16, deployed on Railway) |
 
 ---
@@ -498,10 +498,16 @@ screens; the bulk of study happens on mobile.
 - **Typography:** Japanese text (expression/reading) is sized for legibility on small
   screens and must render correctly with appropriate CJK font fallbacks; respects dynamic
   type / user font-scaling.
-- **PWA-friendly:** correct viewport meta, safe-area insets for notched devices, and
-  responsive sizing units (`dvh`/`svh`) so the card fills the screen without being clipped
-  by mobile browser chrome. Installable-PWA polish (icons, manifest, offline shell) is a
-  later enhancement (§13).
+- **Installable PWA (basics shipped 2026-06-04):** a Web App Manifest (`src/app/manifest.ts`,
+  served at `/manifest.webmanifest`) plus PNG icons (192 / 512 / maskable, generated from
+  `src/app/icon.svg` by `scripts/gen-pwa-icons.mjs`) make Bayana installable to the home
+  screen. `display: "fullscreen"` runs the study/quiz session chrome-free and edge-to-edge
+  on Android; iOS Safari ignores `fullscreen` and degrades to `standalone` (chrome-free but
+  the status bar remains) — an accepted limitation, as the author is on Android (§16).
+  `viewport-fit=cover` plus `env(safe-area-inset-*)` (`.pt-safe`/`.pb-safe`, applied to the
+  session `<main>`) keep controls clear of the notch and home indicator, and `dvh` sizing
+  fills the screen without browser-chrome clipping. The **offline shell (service worker)**
+  remains deferred (§13).
 - **Implementation:** Tailwind CSS with a mobile-first breakpoint strategy (base styles
   target the SE; `sm:`/`md:`/`lg:` add desktop affordances).
 - **Visual language** — palette, typography (Fredoka / Nunito / M PLUS Rounded 1c), the
@@ -745,7 +751,9 @@ uses database sessions (§11.3 #6).
 
 **Phase 5 — Further enhancements**
 - Audio (TTS) for sentences, furigana rendering, streak/heatmap, sentence
-  regeneration/voting, export back to Anki, installable-PWA polish.
+  regeneration/voting, export back to Anki. (Installable-PWA *basics* — manifest, icons,
+  fullscreen + safe-area — were pulled forward to 2026-06-04, §8.4/§16; the **offline
+  shell / service worker** is what remains here.)
 
 ---
 
@@ -775,6 +783,20 @@ principle, but strictly inferior here given Resend is already available.
 but adds latency to first views and forgoes the ≈50% Batch discount for the bulk fill. We
 retain it only as a fallback for cache misses (§7.4).
 
+### 14.4 Service-worker / offline support shipped with the PWA basics
+**Deferred (not rejected).** When making Bayana installable (manifest + icons + fullscreen,
+2026-06-04), the option was to also add a Workbox-style service worker (e.g. `@serwist/next`,
+the maintained `next-pwa` successor) to precache the app shell so it opens offline. It was
+deferred because the install/fullscreen goal — a chrome-free, edge-to-edge study session —
+needs **no** service worker, while a SW adds a real maintenance surface (cache-versioning
+and invalidation, stale-asset bugs, extra Turbopack/Next 16 integration risk) for little
+benefit on an always-online, single-user app. The manifest alone is enough for an Android
+install; iOS "Add to Home Screen" likewise needs no SW. Offline support can be added later
+(§13 Phase 5) once there is a concrete offline use case. Also considered and rejected for
+the same release: the browser **Fullscreen API** (`requestFullscreen`) to force a single
+route truly fullscreen — it is unsupported on iPhone Safari, so it is not a portable answer,
+whereas the manifest `display` mode covers Android cleanly.
+
 ---
 
 ## 15. Open questions
@@ -797,6 +819,7 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-06-04 | **Installable-PWA basics pulled forward** from Phase 5: Web App Manifest (`app/manifest.ts`) + PNG icons (192/512/maskable, via `scripts/gen-pwa-icons.mjs`), `display: "fullscreen"`, `orientation: "portrait"`, `viewport-fit=cover` + `env(safe-area-inset-*)` on the session screens. **Offline shell / service worker stays deferred.** Two sub-calls: (a) iOS keeps `apple-mobile-web-app-status-bar-style: "default"`, *not* `black-translucent`; (b) the maskable icon uses the **yellow** tile, not BRAND's "canonical magenta." | The author **primarily uses Android**, where `display: fullscreen` delivers the goal — a chrome-free, edge-to-edge study session like Duolingo; iOS Safari ignores `fullscreen` (falls back to `standalone`, status bar stays), accepted rather than engineered around. No service worker is needed for install or fullscreen, so offline was deferred to avoid cache-invalidation complexity on an always-online single-user app (§14.4). `black-translucent` was rejected because it draws **white** status-bar text over the light paper UI (invisible); magenta tile rejected because Pī's magenta body on magenta is muddy (the very reason the favicon is yellow, BRAND §6). | Author | §8.4, §13, §14.4 |
 | 2026-06-04 | **Rename study modes**: "Anki mode" → **"Flashcard mode"**; "Duolingo mode" → **"Quiz mode"** across all UI, docs, and code comments. References to the Anki and Duolingo products are retained in descriptive/comparative context (e.g., "FSRS, the algorithm modern Anki uses"; "like Duolingo, minus the ads"). | Using third-party brand names as our own feature labels risks trademark confusion and implies endorsement. Descriptive names ("Flashcard", "Quiz") are clearer to new users and own-able long-term; the product comparison copy in the landing page "Why?" section provides the necessary context. Author decided after trademark review. | Author | §8.1, §8.2 |
 | 2026-06-03 | **Home hub at `/home`** is the post-login landing: a lightweight **mode picker** + **inline level selector** (writes `UserProfile.activeLevel`). No standalone settings/dashboard page; a full **stats dashboard is deferred to Phase 4**. Login / dev-login / public `/` all redirect to `/home`; `/study` and `/quiz` read the active level. | Setting a level and choosing a mode are a chip and two buttons — a dashboard would fight the one-tap, no-config ethos (§2). Keeping level-setting inline on the hub avoids a settings page; stats genuinely warrant a richer screen, but only later. | Author | §8.5, §6 |
 | 2026-06-03 | **Quiz mode MVP**: `GET /api/quiz` returns a batch of JP→EN MC questions for a level; **random distractors** with a meaning-dedupe guard, **non-scheduling** (no FSRS writes). Distractor selection isolated so confusability scoring slots in later. **Dev-only `/api/dev/login`** mints a real DB session (gated by `DEV_AUTH`, 404 in prod). | Ship the second mode fast without the Flashcard↔Quiz synergy or confusability scoring (deferred, §8.2/§15); the dedupe guard is the one correctness must-have even when random. A real-session dev bypass keeps parity with prod (Credentials provider rejected — needs JWT, we use DB sessions). | Author | §8.2, §8.5, §9, §11.7 |
