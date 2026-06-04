@@ -91,8 +91,9 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
   login/dev-login/`/` → `/home` (SPEC §8.5). Full stats dashboard deferred to Phase 4.
 - [x] `GET /api/quiz?level=&count=` — batch of JP→EN MC questions; **random** distractors
   with meaning-dedupe guard, non-scheduling; selection isolated in `src/lib/quiz.ts`
-- [ ] **Confusability-scored distractors** ◀ in progress — replace random picks with
-  shared-kanji / reading-similarity scoring in `pickDistractors` (SPEC §8.2)
+- [x] **Confusability-scored distractors** — `pickDistractors` ranks by shared kanji
+  (Jaccard) + reading similarity (normalized Levenshtein); meaning is a guard against
+  near-synonyms; top-K then random for variety, random fallback (SPEC §8.2)
 - [x] MC quiz UI (`/quiz` + `src/components/quiz-session.tsx`) — brand-styled, instant
   feedback, score summary with Pī; `prefers-reduced-motion`-aware; mobile-first
 - [x] **Dev login** — `GET /api/dev/login` mints a real session for the seeded user
@@ -101,7 +102,14 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
   back) — depends on resolving the MC↔FSRS coupling below (SPEC §8.2, §15)
 - [ ] Resolve MC↔FSRS coupling — feed the scheduler or stay a separate practice mode
   (SPEC §8.2, §15)
-- [ ] Light polish (optional): browse/search, daily new-card limit, basic stats
+- [x] **Basic stats** (light, not the Phase-4 dashboard) — `/stats` page + `src/lib/stats.ts`;
+  per active level: words started/total + mature, due now, 30-day recall rate; linked from
+  `/home`. Day streak deferred (timezone/rollover) to a follow-up.
+- [ ] **Browse/search** ◀ next — whole-deck lookup for the active level (search by
+  kanji/reading/meaning, sentence on tap); search-first with a render cap; browser-cached
+  word list (no sentences up front)
+- [ ] Light polish (optional): daily new-card-limit UI control (limit already enforced
+  server-side in `getStudyQueue`)
 - [x] Public homepage at `/` (brand + Pī mascot + Sign-in CTA + MIT/GitHub); study app
   moved to `/study`; brand foundation (tokens/fonts in globals, `Parrot` component, Pī
   favicon) per BRAND.md

@@ -20,17 +20,22 @@ export default async function HomePage() {
     // so the centred mode buttons don't hop when Android's gesture/nav bar shows or hides
     // in the installed PWA. dvh recomputes live and shifts the vertical centre.
     <main className="mx-auto flex min-h-svh w-full max-w-md flex-col px-5 py-8">
-      {/* Greeting */}
-      <div className="flex items-center gap-3">
-        <Parrot expr="happy" style={{ width: 48, height: 54 }} />
-        <div>
-          <p className="jp text-[15px]" style={{ color: "var(--ink-soft)" }}>
-            おかえり
-          </p>
-          <p className="text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
-            Let&apos;s study
-          </p>
+      {/* Greeting + quiet link to the stats page */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Parrot expr="happy" style={{ width: 48, height: 54 }} />
+          <div>
+            <p className="jp text-[15px]" style={{ color: "var(--ink-soft)" }}>
+              おかえり
+            </p>
+            <p className="text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
+              Let&apos;s study
+            </p>
+          </div>
         </div>
+        <Link href="/stats" className="text-[13px]" style={{ color: "var(--ink-soft)" }}>
+          Stats →
+        </Link>
       </div>
 
       {/* Level — the inline "set your level" control */}
