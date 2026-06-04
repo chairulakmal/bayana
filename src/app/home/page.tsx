@@ -16,7 +16,10 @@ export default async function HomePage() {
   const level = await getActiveLevel(userId);
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 py-8">
+    // min-h-svh (not dvh): the "small" viewport height is fixed at the bar-visible size,
+    // so the centred mode buttons don't hop when Android's gesture/nav bar shows or hides
+    // in the installed PWA. dvh recomputes live and shifts the vertical centre.
+    <main className="mx-auto flex min-h-svh w-full max-w-md flex-col px-5 py-8">
       {/* Greeting */}
       <div className="flex items-center gap-3">
         <Parrot expr="happy" style={{ width: 48, height: 54 }} />
