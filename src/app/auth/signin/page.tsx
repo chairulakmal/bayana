@@ -1,8 +1,9 @@
 import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
+import { Parrot } from "@/components/parrot";
 
-// Minimal sign-in screen: enter the allowlisted email → receive a one-time magic link.
+// Sign-in screen (BRAND.md): enter the allowlisted email → receive a one-time magic link.
 // The form posts to a server action that calls Auth.js `signIn`; on success Auth.js sends
 // the email and redirects to its "check your email" page.
 //
@@ -42,22 +43,33 @@ export default async function SignInPage({
   const contactEmail = process.env.OWNER_CONTACT_EMAIL;
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center bg-white px-6 text-slate-900">
-      <div className="w-full max-w-sm text-center">
-        <h1 className="text-3xl font-bold">🦜 Bayana</h1>
-        <p className="mt-2 text-slate-500">Sign in with your email to study.</p>
+    <main className="flex min-h-dvh flex-col items-center justify-center px-6">
+      <div
+        className="w-full max-w-sm rounded-[var(--r-lg)] px-6 py-8 text-center"
+        style={{ background: "var(--surface)", border: "1px solid var(--line)", boxShadow: "var(--shadow)" }}
+      >
+        <Parrot expr="happy" title="Pī, the Bayana mascot" style={{ width: 72, height: 80, margin: "0 auto" }} />
+
+        <h1 className="mt-3 text-3xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600, color: "var(--ink)" }}>
+          b<b style={{ color: "var(--mag-700)" }}>a</b>yana
+        </h1>
+        <p className="mt-1 text-[15px]" style={{ color: "var(--ink-soft)" }}>
+          <span className="jp">メールのリンクでログイン</span> · sign in with your email
+        </p>
 
         {message && (
           <div
             role="alert"
-            className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+            className="mt-5 rounded-[var(--r-md)] px-4 py-3 text-left text-sm"
+            style={{ background: "#ffe9ee", color: "#b12a44" }}
           >
             <p>{message}</p>
             {error === "AccessDenied" && contactEmail && (
               <p className="mt-1">
                 <a
                   href={`mailto:${contactEmail}?subject=${encodeURIComponent("Bayana access request")}`}
-                  className="font-medium underline"
+                  className="font-semibold underline"
+                  style={{ color: "var(--grape)" }}
                 >
                   Email the site owner
                 </a>
@@ -83,7 +95,7 @@ export default async function SignInPage({
               throw err;
             }
           }}
-          className="mt-6 flex flex-col gap-3 text-left"
+          className="mt-6 flex flex-col gap-3"
         >
           <input
             type="email"
@@ -91,24 +103,28 @@ export default async function SignInPage({
             required
             autoComplete="email"
             placeholder="you@example.com"
-            className="min-h-12 rounded-lg border border-slate-300 px-3 text-base"
+            className="min-h-12 rounded-[var(--r-md)] border-2 border-[var(--line)] px-4 text-base outline-none focus:border-[var(--magenta)]"
+            style={{ background: "var(--surface)", color: "var(--ink)", fontFamily: "var(--f-body)" }}
           />
-          <button className="min-h-12 rounded-lg bg-slate-900 text-base font-semibold text-white active:bg-slate-700">
-            Send magic link
-          </button>
+          <button className="btn btn-primary btn-lg w-full">Send magic link</button>
         </form>
 
-        {/* Dev-only shortcut: skip the magic link locally (SPEC §11.7). Rendered only when
-            the bypass is actually enabled, so it never appears in production. */}
-        {process.env.NODE_ENV !== "production" && process.env.DEV_AUTH === "1" && (
-          <a
-            href="/api/dev/login"
-            className="mt-4 inline-block text-[13px] font-semibold text-slate-400 underline"
-          >
-            Dev login (skip email)
-          </a>
-        )}
+        <p className="mt-5 text-[12px]" style={{ color: "var(--ink-faint)" }}>
+          Invite-only · a one-time link, no password to remember.
+        </p>
       </div>
+
+      {/* Dev-only shortcut: skip the magic link locally (SPEC §11.7). Rendered only when the
+          bypass is actually enabled, so it never appears in production. */}
+      {process.env.NODE_ENV !== "production" && process.env.DEV_AUTH === "1" && (
+        <a
+          href="/api/dev/login"
+          className="mt-5 inline-block text-[13px] font-semibold underline"
+          style={{ color: "var(--ink-faint)" }}
+        >
+          Dev login (skip email)
+        </a>
+      )}
     </main>
   );
 }
