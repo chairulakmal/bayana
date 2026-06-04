@@ -6,6 +6,7 @@ import { getActiveLevel, getNewCardsPerDay } from "@/lib/profile";
 import { Parrot } from "@/components/parrot";
 import { LevelPicker } from "@/components/level-picker";
 import { InfoBubble } from "@/components/info-bubble";
+import { UserMenu } from "@/components/user-menu";
 
 // The home hub (SPEC §8.5) — the post-login landing for returning users. It's the mode
 // picker (Flashcard / Quiz) plus an inline level selector; deliberately NOT a full dashboard
@@ -35,14 +36,7 @@ export default async function HomePage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <Link href="/browse" className="text-[13px]" style={{ color: "var(--ink-soft)" }}>
-            Browse
-          </Link>
-          <Link href="/stats" className="text-[13px]" style={{ color: "var(--ink-soft)" }}>
-            Stats →
-          </Link>
-        </div>
+        <UserMenu email={session.user?.email ?? ""} />
       </div>
 
       {/* Level — the inline "set your level" control */}

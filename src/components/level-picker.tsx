@@ -17,11 +17,11 @@ import { setActiveLevel } from "@/app/home/actions";
 const LEVELS = ["N1", "N2", "N3", "N4", "N5"] as const;
 
 const LEVEL_LABEL: Record<string, string> = {
-  N1: "達人 · master class",
-  N2: "もうすぐ · almost fluent",
-  N3: "なかなか · getting there",
-  N4: "がんばれ · keep climbing",
-  N5: "はじめよう · day one",
+  N1: "匠 · the artisan",
+  N2: "流暢へ · the expert",
+  N3: "上達 · the journeyman",
+  N4: "頑張れ · the practitioner",
+  N5: "はじめよう · the apprentice",
 };
 
 export function LevelPicker({ current }: { current: string }) {
