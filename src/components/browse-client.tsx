@@ -6,9 +6,7 @@
 // caches (Cache-Control: private, max-age=3600, stale-while-revalidate=86400). Repeat
 // visits within the cache window cost zero network round-trips.
 //
-// All filtering runs in memory per keystroke — no server requests. Changing the `level`
-// prop (via BrowseLevelPicker) causes the parent to remount this component (key=level),
-// resetting all state and triggering a fresh fetch for the new level.
+// All filtering runs in memory per keystroke — no server requests.
 //
 // Results are paginated at PAGE_SIZE per page rather than capped. The editable page-number
 // input lets users jump to any page directly. Tapping a word row lazy-fetches its cached
