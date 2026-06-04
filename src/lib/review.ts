@@ -1,4 +1,4 @@
-// Review services — DB-backed FSRS operations for Anki mode.
+// Review services — DB-backed FSRS operations for Flashcard mode.
 //
 //   reviewWord     – apply a rating, persist the new ReviewState, append a ReviewLog.
 //   undoLastReview – revert the most recent review via ts-fsrs rollback, drop the log.

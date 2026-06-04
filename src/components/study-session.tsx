@@ -1,6 +1,6 @@
 "use client";
 
-// Anki-mode study screen (Phase 1a, JP→EN).
+// Flashcard-mode study screen (Phase 1a, JP→EN).
 //
 // Flow: load the queue once → show one card at a time → tap to flip (reveal reading,
 // meaning, example sentence) → rate Again/Hard/Good/Easy → advance. Undo reverts the

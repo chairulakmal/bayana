@@ -6,7 +6,7 @@ sentences.**
 This is the working design reference for Bayana's UI. The visual source of truth is the
 interactive guide in `notes/bayana/` (gitignored, personal) — `bayana Brand Guide.html` +
 `styles.css` + `brand.js`. This file distills it into something committed and
-build-ready, so the Duolingo-mode UI (SPEC §8.2, §13 Phase 2) can be implemented against
+build-ready, so the Quiz mode UI (SPEC §8.2, §13 Phase 2) can be implemented against
 real tokens. Where this and the HTML disagree, the HTML wins; update this file to match.
 
 It complements **[SPEC.md](SPEC.md)** (the architecture/engineering doc) — SPEC §8.4 owns
@@ -166,7 +166,7 @@ star of its moment. Core set (from `brand.js`): `flame` (streak), `star` (XP), `
 Everything is **chunky, rounded, and pressable**. The signature interaction is the
 **springy "lip"**: primary buttons carry a solid bottom shadow (`0 5px 0 <edge>`) that
 compresses to `0 1px 0` on `:active`, with `translateY(4px)` — it makes the app feel like a
-toy. (Note: in **Duolingo mode** this springiness is the *one* animation we keep; SPEC §8.2
+toy. (Note: in **Quiz mode** this springiness is the *one* animation we keep; SPEC §8.2
 calls for minimal motion otherwise, and we respect `prefers-reduced-motion`.)
 
 | Button | Fill | Text | Lip | Use |

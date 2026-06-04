@@ -7,7 +7,7 @@ import { Parrot } from "@/components/parrot";
 import { LevelPicker } from "@/components/level-picker";
 
 // The home hub (SPEC §8.5) — the post-login landing for returning users. It's the mode
-// picker (Anki / Duolingo) plus an inline level selector; deliberately NOT a full dashboard
+// picker (Flashcard / Quiz) plus an inline level selector; deliberately NOT a full dashboard
 // (stats/streak live there in Phase 4). Login and the public landing both redirect here.
 export default async function HomePage() {
   const session = await auth();
@@ -45,8 +45,8 @@ export default async function HomePage() {
 
       {/* Mode picker */}
       <div className="mt-8 flex flex-1 flex-col justify-center gap-4">
-        <ModeButton href="/study" emoji="🎴" title="Anki mode" subtitle="Spaced-repetition review" />
-        <ModeButton href="/quiz" emoji="⚡" title="Duolingo mode" subtitle="Quick multiple-choice" />
+        <ModeButton href="/study" emoji="🎴" title="Flashcard mode" subtitle="Spaced-repetition review" />
+        <ModeButton href="/quiz" emoji="⚡" title="Quiz mode" subtitle="Quick multiple-choice" />
       </div>
     </main>
   );

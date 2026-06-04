@@ -1,9 +1,9 @@
-// Duolingo-mode question builder (SPEC §8.2, §8.5).
+// Quiz mode question builder (SPEC §8.2, §8.5).
 //
 // MVP: pick N random words from a JLPT level; each becomes a JP→EN question — show the
 // expression (kanji if present) and have the user choose the English meaning — with three
 // random same-level distractors. Non-scheduling: this only *reads* words, it never touches
-// FSRS state (the Anki↔Duolingo "synergy" is deferred; SPEC §8.2, §15).
+// FSRS state (the Flashcard↔Quiz "synergy" is deferred; SPEC §8.2, §15).
 //
 // The interesting seam is `pickDistractors`: today it's random (plus a correctness guard).
 // Swapping in confusability scoring later — shared kanji / similar reading / overlapping

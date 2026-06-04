@@ -1,6 +1,6 @@
 "use client";
 
-// Duolingo-mode quiz screen (SPEC §8.2). One JP→EN multiple-choice question at a time:
+// Quiz mode screen (SPEC §8.2). One JP→EN multiple-choice question at a time:
 // tap an option → instant feedback (correct = green, wrong = coral, correct answer always
 // revealed) + the cached example sentence → Continue → next. A round is a fixed batch
 // (default 10); the summary shows the score. Non-scheduling — nothing here writes FSRS

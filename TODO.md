@@ -6,7 +6,7 @@ state* — what's done and what's next. Keep it current; it's the "where we left
 record across sessions. Decisions do **not** go here — log them in SPEC.md §16.
 
 **Now:** Phases 1a–1c done (live on Railway; all levels seeded). **Current focus: Phase 2 —
-Duolingo mode** (MC quiz; Duolingo-grade UI with minimal animation and no ads). Then
+Quiz mode** (MC quiz; Duolingo-grade UI with minimal animation and no ads). Then
 Phase 3 (admin audit + on-demand generation).
 
 ---
@@ -38,7 +38,7 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
 - [x] `scripts/collect-batch.ts` — collected 2,135 (0 malformed/failed); **N3 fully
   covered: 2,140 / 2,140 words have a sentence**
 
-### Anki mode — review loop (JP→EN)
+### Flashcard mode — review loop (JP→EN)
 - [x] `ts-fsrs` adapter (`src/lib/fsrs.ts`) — Card ⇄ ReviewState, scheduler, log mapping
 - [x] Review services (`src/lib/review.ts`) — `reviewWord` (+ `ReviewLog`),
   `undoLastReview` (ts-fsrs `rollback`), `getStudyQueue` — verified end-to-end
@@ -84,12 +84,12 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
 - On-demand `/api/generate` + fetch-on-flip — **moved to Phase 3** (no longer needed for
   coverage now that every word is seeded; returns as a safety net with the admin tooling).
 
-## Phase 2 — Duolingo mode ◀ current focus
+## Phase 2 — Quiz mode ◀ current focus
 - [x] **Level scope + home hub** — `UserProfile.activeLevel` added (⚠ run `npx prisma
   migrate dev` once the DB is up); `/home` mode picker + inline level chips (`setActiveLevel`
   server action); `/study` & `/quiz` read the active level; login/dev-login/`/` → `/home`
   (SPEC §8.5). Full stats dashboard deferred to Phase 4.
-- [ ] **First-run onboarding** — level choice → 5-question Duolingo warm-up (non-scheduling)
+- [ ] **First-run onboarding** — level choice → 5-question Quiz warm-up (non-scheduling)
   → guided tour; add `UserProfile.onboardedAt` to branch first-time vs. returning (SPEC §8.5)
 - [x] `GET /api/quiz?level=&count=` — batch of JP→EN MC questions; **random** distractors
   with meaning-dedupe guard, non-scheduling; selection isolated in `src/lib/quiz.ts`
@@ -99,7 +99,7 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
 - [x] **Dev login** — `GET /api/dev/login` mints a real session for the seeded user
   (gated by `DEV_AUTH`, 404 in prod); dev button on the sign-in page (SPEC §11.7)
 - [ ] Upgrade distractors to **confusability scoring** (shared kanji / reading / meaning)
-  + the Anki↔Duolingo synergy (FSRS-informed selection / feeding results back) (SPEC §8.2, §15)
+  + the Flashcard↔Quiz synergy (FSRS-informed selection / feeding results back) (SPEC §8.2, §15)
 - [ ] Resolve MC↔FSRS coupling — feed the scheduler or stay a separate practice mode
   (SPEC §8.2, §15)
 - [ ] Light polish (optional): browse/search, daily new-card limit, basic stats
@@ -107,7 +107,7 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
   moved to `/study`; brand foundation (tokens/fonts in globals, `Parrot` component, Pī
   favicon) per BRAND.md
 
-## Phase 3 — Admin audit + on-demand generation (after Duolingo)
+## Phase 3 — Admin audit + on-demand generation (after Quiz mode)
 - [ ] Admin review/audit page — admin-gated (`UserProfile.role`); add a review-status field
   to `ExampleSentence`; accept/reject generated sentences (SPEC §13)
 - [ ] On-demand `/api/generate` + study-UI fetch-on-flip, with §11.4 guardrails

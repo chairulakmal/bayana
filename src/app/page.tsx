@@ -102,13 +102,13 @@ export default async function Home() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Feature
               emoji="🎴"
-              title="Anki mode"
+              title="Flashcard mode"
               body="Proper spaced repetition (FSRS, the algorithm modern Anki uses), with one-step undo."
             />
             <Feature
               emoji="⚡"
-              title="Duolingo mode"
-              body="Quick, gamified multiple-choice for momentum on the go."
+              title="Quiz mode"
+              body="Quick, gamified multiple-choice for momentum — like Duolingo, minus the ads."
               tag="soon"
             />
             <Feature

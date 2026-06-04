@@ -22,8 +22,8 @@ N5–N1 built in.
 
 ## What you get
 
-- 🎴 **Anki mode** — proper spaced repetition (FSRS, the same algorithm modern Anki uses).
-- ⚡ **Duolingo mode** — quick, gamified multiple-choice for momentum.
+- 🎴 **Flashcard mode** — proper spaced repetition (FSRS, the same algorithm modern Anki uses).
+- ⚡ **Quiz mode** — quick, gamified multiple-choice for momentum (like Duolingo, minus the ads).
 - 🤖 **AI example sentences** — every word gets a level-appropriate sentence (written once
   by Claude Haiku, cached forever), because words stick better in context.
 - 📱 **Mobile-first** — designed for your phone, fine on a laptop.

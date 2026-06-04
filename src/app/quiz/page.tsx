@@ -5,7 +5,7 @@ import { getActiveLevel } from "@/lib/profile";
 import { QuizSession } from "@/components/quiz-session";
 import { Level } from "@/generated/prisma/enums";
 
-// Duolingo-mode page (protected). Defaults to the user's active level (§8.5); `?level=`
+// Quiz mode page (protected). Defaults to the user's active level (§8.5); `?level=`
 // still overrides it (handy for testing a specific level).
 export default async function QuizPage({
   searchParams,

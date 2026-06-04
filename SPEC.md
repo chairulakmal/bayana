@@ -17,7 +17,7 @@ Bayana turns an existing ~8,800-word JLPT vocabulary deck (N5–N1, Anki export)
 modern web flashcard app. Cards are scheduled with **FSRS** (the algorithm used by
 current Anki), and each word is paired with **example sentences generated once by
 Claude Haiku and cached permanently** in Postgres. It offers two study modes — a serious
-spaced-repetition **"Anki mode"** and a fast, gamified multiple-choice **"Duolingo mode."**
+spaced-repetition **"Flashcard mode"** and a fast, gamified multiple-choice **"Quiz mode."**
 The app ships as a **single
 full-stack Next.js service** on Railway. It launches single-user with **passwordless
 email magic-link authentication** (Auth.js + Resend, restricted to one allowlisted
@@ -50,7 +50,7 @@ cost — and a study experience tailored to our own data and scheduling.
 - Deliver a **mobile-first** experience optimized for small phone screens (iPhone SE
   baseline) that remains fully usable on desktop.
 - **Minimal-friction start.** Returning users are a single tap from studying: after signing
-  in they pick a **mode** (Anki or Duolingo) for their remembered **active level** and go —
+  in they pick a **mode** (Flashcard or Quiz) for their remembered **active level** and go —
   no decks, note types, or configuration. First-time users complete a one-time level choice
   and a short warm-up first (§8.5). Frictionless entry is a core differentiator from Anki.
 
@@ -113,7 +113,7 @@ Anthropic integration all live in one deployable, backed by a managed Postgres i
 ┌─────────────────────────── Railway ────────────────────────────┐
 │                                                                  │
 │  Next.js (App Router) — single service                          │
-│   ├─ /app                React UI (Anki mode, Duolingo mode, browse)│
+│   ├─ /app                React UI (Flashcard mode, Quiz mode, browse)│
 │   ├─ /app/api/review     POST rating → FSRS → next due date      │
 │   ├─ /app/api/cards      study queue, browse, search             │
 │   ├─ /app/api/quiz       multiple-choice question + distractors  │
@@ -374,26 +374,26 @@ the contextual-sentence benefit is achieved at a near-zero, one-time cost.
 
 ## 8. Study experience
 
-Bayana offers two complementary study modes the user can switch between: **Anki mode**
-(serious spaced-repetition recall) and **Duolingo mode** (fast, low-friction
-multiple-choice practice). Anki mode is the retention engine; Duolingo mode is the
+Bayana offers two complementary study modes the user can switch between: **Flashcard mode**
+(serious spaced-repetition recall) and **Quiz mode** (fast, low-friction
+multiple-choice practice). Flashcard mode is the retention engine; Quiz mode is the
 lightweight on-ramp and warm-up.
 
 **Level scope.** Both modes operate within a **single JLPT level at a time — the user's
 *active level***, chosen once at onboarding (§8.5) and changeable later (stored on
-`UserProfile.activeLevel`, §6). The Anki queue and the Duolingo quiz are both filtered to
+`UserProfile.activeLevel`, §6). The Flashcard queue and the Quiz are both filtered to
 it, so scheduling, new-card selection, and multiple-choice distractors all stay within one
 level's vocabulary. The two modes are thus *separated by level* — you study or quiz one
 level at a time, not the whole deck at once.
 
 **Minimal-friction entry.** A **public marketing homepage** lives at `/` (brand + mascot + a
 single **Sign in** CTA, for logged-out visitors); the authenticated app lives at `/study`. A
-**returning** user signing in lands on a simple **mode picker** (Anki or Duolingo) for their
+**returning** user signing in lands on a simple **mode picker** (Flashcard or Quiz) for their
 active level and starts with one tap — no deck selection or config (§2). A **first-time**
 user is routed through onboarding first (§8.5). The home/landing look-and-feel follows
 **[BRAND.md](BRAND.md)**.
 
-### 8.1 Anki mode — flashcard review (FSRS)
+### 8.1 Flashcard mode — SRS review (FSRS)
 The classic spaced-repetition flashcard loop, modeled on Anki.
 
 - The daily queue selects `ReviewState` rows where `due <= now` for the current user
@@ -418,7 +418,7 @@ The classic spaced-repetition flashcard loop, modeled on Anki.
   (§7) and are therefore direction-independent — the same cached sentence appears on the
   reveal side in either direction.
 
-### 8.2 Duolingo mode — multiple choice
+### 8.2 Quiz mode — multiple choice
 A gamified, tap-to-answer quiz in the spirit of Duolingo: pick the right answer from four
 options, get instant feedback, keep momentum. Optimized for quick mobile sessions. Questions
 are drawn from the user's **active level** (§8.5), and the first-run warm-up is five such
@@ -428,7 +428,7 @@ questions, run as a **non-scheduling** practice (it doesn't affect FSRS state).
 - Variants: show `expression` → choose `meaning`, or `meaning` → choose
   `expression`/`reading`.
 - Instant correct/incorrect feedback with the cached example sentence shown on reveal.
-- Whether Duolingo-mode results feed the FSRS scheduler (correct ≈ Good, wrong ≈ Again) or
+- Whether Quiz mode results feed the FSRS scheduler (correct ≈ Good, wrong ≈ Again) or
   remain a separate, non-scheduling practice mode is deferred to Phase 2 (§15, §16).
 
 #### UI & feel — Duolingo-grade, deliberately restrained
@@ -513,7 +513,7 @@ Two user stories drive entry into the app. Both reach the same two level-scoped 
 (§8.1, §8.2); they differ only in the first-run extras.
 
 - **First-time user (first run).** Sign in via the email magic link (§11.2) → **choose a
-  JLPT level** (N5–N1) → the app drops straight into a short **Duolingo-mode warm-up of 5
+  JLPT level** (N5–N1) → the app drops straight into a short **Quiz mode warm-up of 5
   questions** at that level — low-stakes and **non-scheduling** (it does not touch FSRS
   state) — so the first experience is *doing*, not reading → a brief **onboarding guide**
   then walks through the app's functionality (the two modes, flip/rate, streak, switching
@@ -522,8 +522,8 @@ Two user stories drive entry into the app. Both reach the same two level-scoped 
 - **Returning user.** Sign in → the **home hub** (`/home`) → start. That's it.
 
 **The home hub (`/home`).** The returning-user landing — sign-in, the dev login, and the
-public `/` all redirect here. It is the **mode picker** (two large cards → Anki `/study` /
-Duolingo `/quiz`) plus an **inline level selector** (the five JLPT chips; tapping one
+public `/` all redirect here. It is the **mode picker** (two large cards → Flashcard `/study` /
+Quiz `/quiz`) plus an **inline level selector** (the five JLPT chips; tapping one
 persists `UserProfile.activeLevel` via a server action and re-scopes both engines). The
 level is therefore changed *here*, not on a separate settings page. The hub is deliberately
 **not a full dashboard** — stats, streak, and history live in a richer dashboard in Phase 4
@@ -699,7 +699,7 @@ uses database sessions (§11.3 #6).
 **Phase 1a — Playable slice (run locally, study ASAP) — ✅ done**
 - Postgres schema (incl. `ReviewLog`); seeded default `User` + `UserProfile`.
 - CSV import for **N3**; batch-seed N3 example sentences.
-- **Anki-mode** review (JP→EN) via `ts-fsrs`, with **one-step undo**.
+- **Flashcard mode** review (JP→EN) via `ts-fsrs`, with **one-step undo**.
 - Mobile-first card UI (flip / rate). Runs locally, end-to-end.
 
 **Phase 1b — Shippable (public): auth + deploy — ✅ done**
@@ -713,7 +713,7 @@ uses database sessions (§11.3 #6).
   (§7.5). The on-demand `/api/generate` fallback is **no longer needed for coverage** and
   has moved to Phase 3 (it returns there as a safety net for future additions).
 
-**Phase 2 — Duolingo mode — ◀ current focus**
+**Phase 2 — Quiz mode — ◀ current focus**
 - The active build target. A gamified multiple-choice quiz (§8.2): `GET /api/quiz` with
   confusability-scored distractors, instant feedback, and the cached example sentence on
   reveal.
@@ -721,16 +721,16 @@ uses database sessions (§11.3 #6).
   match Duolingo's quality (clean, satisfying, momentum-driven, mobile-first), but with
   **minimal animation** (snappy and lightweight, not flashy character/transition
   animations) and **zero ads** — the latter a core anti-Duolingo differentiator (§1, §8.2).
-- **Level scope & mode picker:** add `UserProfile.activeLevel`; scope both the Anki queue
-  and the quiz to it; build the returning-user **mode picker** (Anki / Duolingo) as `/study`.
-- **First-run onboarding (§8.5):** level choice → 5-question Duolingo warm-up (non-scheduling)
+- **Level scope & mode picker:** add `UserProfile.activeLevel`; scope both the Flashcard queue
+  and the quiz to it; build the returning-user **mode picker** (Flashcard / Quiz) as `/study`.
+- **First-run onboarding (§8.5):** level choice → 5-question Quiz warm-up (non-scheduling)
   → guided tour; add `UserProfile.onboardedAt` to branch first-time vs. returning.
 - Resolve whether MC results feed the FSRS scheduler or stay a separate practice mode
   (§8.2, §15). To improve students result, there should be some sinergy between the modes.
   More research is still required.
 - Light polish may ride along: browse/search, daily new-card limits, basic stats.
 
-**Phase 3 — Admin audit + on-demand generation — next, after Duolingo**
+**Phase 3 — Admin audit + on-demand generation — next, after Quiz mode**
 - **Admin review/audit page** (admin-gated via `UserProfile.role`): inspect each
   AI-generated example sentence and accept or reject it before it surfaces to learners
   (adds a review-status field to `ExampleSentence`; optionally generate several candidates
@@ -797,12 +797,13 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-06-04 | **Rename study modes**: "Anki mode" → **"Flashcard mode"**; "Duolingo mode" → **"Quiz mode"** across all UI, docs, and code comments. References to the Anki and Duolingo products are retained in descriptive/comparative context (e.g., "FSRS, the algorithm modern Anki uses"; "like Duolingo, minus the ads"). | Using third-party brand names as our own feature labels risks trademark confusion and implies endorsement. Descriptive names ("Flashcard", "Quiz") are clearer to new users and own-able long-term; the product comparison copy in the landing page "Why?" section provides the necessary context. Author decided after trademark review. | Author | §8.1, §8.2 |
 | 2026-06-03 | **Home hub at `/home`** is the post-login landing: a lightweight **mode picker** + **inline level selector** (writes `UserProfile.activeLevel`). No standalone settings/dashboard page; a full **stats dashboard is deferred to Phase 4**. Login / dev-login / public `/` all redirect to `/home`; `/study` and `/quiz` read the active level. | Setting a level and choosing a mode are a chip and two buttons — a dashboard would fight the one-tap, no-config ethos (§2). Keeping level-setting inline on the hub avoids a settings page; stats genuinely warrant a richer screen, but only later. | Author | §8.5, §6 |
-| 2026-06-03 | **Duolingo-mode MVP**: `GET /api/quiz` returns a batch of JP→EN MC questions for a level; **random distractors** with a meaning-dedupe guard, **non-scheduling** (no FSRS writes). Distractor selection isolated so confusability scoring slots in later. **Dev-only `/api/dev/login`** mints a real DB session (gated by `DEV_AUTH`, 404 in prod). | Ship the second mode fast without the Anki↔Duolingo synergy or confusability scoring (deferred, §8.2/§15); the dedupe guard is the one correctness must-have even when random. A real-session dev bypass keeps parity with prod (Credentials provider rejected — needs JWT, we use DB sessions). | Author | §8.2, §8.5, §9, §11.7 |
-| 2026-06-03 | **Both modes are scoped to one active JLPT level** (`UserProfile.activeLevel`); **first-run flow** = pick level → 5-question Duolingo warm-up (non-scheduling) → guided tour; **returning users** get an Anki/Duolingo **mode picker**. Refines the earlier "one-tap start." | Studying/quizzing one level at a time keeps scheduling and MC distractors coherent and the queue focused; a *doing-first* warm-up beats a wall of instructions for a new user; the level is a remembered preference so returning entry stays one tap (just pick a mode). `onboardedAt` distinguishes first-time vs. returning. | Author | §2, §6, §8, §8.5 |
+| 2026-06-03 | **Quiz mode MVP**: `GET /api/quiz` returns a batch of JP→EN MC questions for a level; **random distractors** with a meaning-dedupe guard, **non-scheduling** (no FSRS writes). Distractor selection isolated so confusability scoring slots in later. **Dev-only `/api/dev/login`** mints a real DB session (gated by `DEV_AUTH`, 404 in prod). | Ship the second mode fast without the Flashcard↔Quiz synergy or confusability scoring (deferred, §8.2/§15); the dedupe guard is the one correctness must-have even when random. A real-session dev bypass keeps parity with prod (Credentials provider rejected — needs JWT, we use DB sessions). | Author | §8.2, §8.5, §9, §11.7 |
+| 2026-06-03 | **Both modes are scoped to one active JLPT level** (`UserProfile.activeLevel`); **first-run flow** = pick level → 5-question Quiz warm-up (non-scheduling) → guided tour; **returning users** get a Flashcard/Quiz **mode picker**. Refines the earlier "one-tap start." | Studying/quizzing one level at a time keeps scheduling and MC distractors coherent and the queue focused; a *doing-first* warm-up beats a wall of instructions for a new user; the level is a remembered preference so returning entry stays one tap (just pick a mode). `onboardedAt` distinguishes first-time vs. returning. | Author | §2, §6, §8, §8.5 |
 | 2026-06-03 | **N1 level chip = imperial purple + gold** (murasaki `#3d1452` + kin `#f0c75e`), not flat grape | In Japan purple is the historical highest-rank colour (禁色); gold is the luxury accent. N2 (`mag-600`) and the old N1 (`grape`) were both pinkish-purple and too close — shifting N1 to a deeper, bluer purple with gold text makes the top level read as "special," and is more culturally "premium" than gold alone (which also clashes with the N4 yellow). Author chose imperial-purple+gold over a gradient or solid gold. | Author | BRAND.md §3/§7 |
-| 2026-06-03 | **Public landing page at `/`**; the authenticated study app moves to `/study`. Brand foundation added (tokens + fonts in `globals.css`, reusable `Parrot` component, Pī favicon) per **BRAND.md**, which now states the mobile-first / iPhone-SE (375×667) design target. | A "Sign in" homepage is for logged-out visitors, so `/` can't also be the gated app; signed-in users are redirected `/` → `/study` to preserve one-tap start (§2). Committing the brand as code/tokens lets the landing — and Phase 2's Duolingo UI — build against the real design system. | Author | §8, §8.4 |
-| 2026-06-03 | **Re-prioritize roadmap: Duolingo mode is the current focus**; the **admin audit page + on-demand generation move to Phase 3** (right after Duolingo, ahead of multi-user). Duolingo UI bar set to "Duolingo-grade polish but minimal animation and zero ads." | All content is seeded (Phase 1c done), so the next user-facing value is the second study mode. On-demand generation is no longer needed for coverage, so it rides with the admin tooling as a safety net. Minimal-animation/no-ads is the product thesis (§1) — match Duolingo's quality without its spectacle or monetization. | Author | §8.2, §13 |
+| 2026-06-03 | **Public landing page at `/`**; the authenticated study app moves to `/study`. Brand foundation added (tokens + fonts in `globals.css`, reusable `Parrot` component, Pī favicon) per **BRAND.md**, which now states the mobile-first / iPhone-SE (375×667) design target. | A "Sign in" homepage is for logged-out visitors, so `/` can't also be the gated app; signed-in users are redirected `/` → `/study` to preserve one-tap start (§2). Committing the brand as code/tokens lets the landing — and Phase 2's Quiz mode UI — build against the real design system. | Author | §8, §8.4 |
+| 2026-06-03 | **Re-prioritize roadmap: Quiz mode is the current focus**; the **admin audit page + on-demand generation move to Phase 3** (right after Quiz mode, ahead of multi-user). Quiz mode UI bar set to "Duolingo-grade polish but minimal animation and zero ads." | All content is seeded (Phase 1c done), so the next user-facing value is the second study mode. On-demand generation is no longer needed for coverage, so it rides with the admin tooling as a safety net. Minimal-animation/no-ads is the product thesis (§1) — match Duolingo's quality without its spectacle or monetization. | Author | §8.2, §13 |
 | 2026-06-03 | Security review hardening: **case-insensitive allowlist** comparison; **global sign-in cap tightened 20 → 6**/10min; SPEC §9/§11.4 corrected to mark unbuilt routes "planned" and to require auth + rate-limit + cache-first + token-cap on a future `/api/generate` | Review confirmed no web-reachable Anthropic cost path exists (generate code is scripts-only) and Resend is well contained. The allowlist compare could lock out the legit user on a capitalization mismatch (availability footgun); a tighter global cap further bounds inbox-bombing for a single-user app; doc accuracy prevents assuming protections on routes that don't exist. | Author | §9, §11.3, §11.4 |
 | 2026-06-03 | Sign-in rate limiting uses an **in-memory fixed-window** limiter (per-IP 5/10min + global 20/10min), enforced in `proxy.ts`; session TTL set explicitly to 30 days | Single-user on one Railway Hobby instance, so a process-local counter needs no Redis/DB and zero deps; limits reset on redeploy / aren't shared across replicas (acceptable, swappable later). The global cap is the real inbox-bombing defense since the allowlist means only one inbox can receive a link. Postgres/Upstash stores rejected as over-built for now. | Author | §11.3 |
 | 2026-06-03 | Build on Railway with **Railpack**, not Nixpacks | Nixpacks is deprecated; Railpack is Railway's current default builder. Set `build.builder: "RAILPACK"` in `railway.json`. | Author | §12 |
@@ -827,7 +828,7 @@ whenever a decision is made or reversed — do not edit history in place.
 | 2026-06-03 | MCQ distractors use **confusability scoring** (shared kanji / reading / meaning), scored in app code over a same-level pool; embeddings + pgvector as the scale path | Random distractors are too easy — confusable ones force real recall. Rule-based in-app scoring fits launch scale, stays unit-testable, and keeps SQL a plain pool fetch; trigram/pgvector deferred until needed. A fairness guardrail excludes true synonyms. | Author | §8.2 |
 | 2026-06-03 | Pin the web framework to **Next.js 16** (React 19, Tailwind v4, Turbopack), scaffolded via `create-next-app` | Explicit author preference and the current stable major at project start; App Router + Server Actions + Turbopack are the modern defaults the architecture in §5 already assumes. | Author | §5 |
 | 2026-06-03 | Repo will be open-sourced; allowlist email stays env-only; existing git commit email accepted as public | No PII committed. `AUTH_ALLOWED_EMAIL` value lives only in Railway env; a dedicated alias will back it. Author's commit email is already public, so no history rewrite is warranted. | Author | §11.6 |
-| 2026-06-03 | Two study modes: "Anki mode" (FSRS recall) and "Duolingo mode" (gamified MC) | Serves both serious retention and a low-friction warm-up; MC distractors are a free same-level DB query, so the second mode adds little cost. | Author | §8 |
+| 2026-06-03 | Two study modes: "Flashcard mode" (FSRS recall) and "Quiz mode" (gamified MC) | Serves both serious retention and a low-friction warm-up; MC distractors are a free same-level DB query, so the second mode adds little cost. | Author | §8 |
 | 2026-06-03 | Mobile-first, iPhone SE (375×667) baseline; usable on desktop | Primary usage is on phones; desktop treated as an additive breakpoint rather than the design center. | Author | §8.4 |
 | 2026-06-03 | Authentication: passwordless email magic link (Auth.js + Resend), single-email allowlist | Stores no reusable password, delegates to the stronger inbox security boundary, and the allowlist contains blast radius. Resend already provisioned. Seeded password rejected (§14.2). | Author | §11.2 |
 | 2026-06-03 | Sentence generation: pre-seed via Batch API (N3 first), on-demand only as fallback | Batch API is ≈50% cheaper for the one-time ~8.8k-word fill and seeding has no latency requirement; N3 prioritized per author. On-demand-only rejected as primary (§14.3). | Author | §7 |

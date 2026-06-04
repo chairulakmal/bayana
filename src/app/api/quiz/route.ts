@@ -1,6 +1,6 @@
 // GET /api/quiz?level=N3&count=10
 //
-// Returns a batch of distinct Duolingo-mode questions for a level (JP→EN). Batched so a
+// Returns a batch of distinct Quiz mode questions for a level (JP→EN). Batched so a
 // round has no repeats and no per-question round-trips. **Non-scheduling**: reads words
 // only, writes nothing — quiz results don't touch FSRS state (SPEC §8.2, §8.5).
 //
