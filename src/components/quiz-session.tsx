@@ -45,6 +45,8 @@ export function QuizSession({ level }: { level: string }) {
   }, [level]);
 
   useEffect(() => {
+    // load() is async — setState only runs after awaiting fetch, not synchronously here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
 

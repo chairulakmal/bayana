@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Third-party source files (open-anki-jlpt-decks); not part of the app build.
+    "source/**",
   ]),
 ]);
 

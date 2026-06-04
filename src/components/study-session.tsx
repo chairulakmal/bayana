@@ -81,6 +81,8 @@ export function StudySession({ level }: { level: string }) {
   }, [level]);
 
   useEffect(() => {
+    // loadQueue() is async — setState only runs after awaiting fetch, not synchronously here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadQueue();
   }, [loadQueue]);
 
