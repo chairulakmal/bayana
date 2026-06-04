@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Parrot } from "@/components/parrot";
+import { SessionHeader, SessionHeaderLink, SessionHeaderButton } from "@/components/session-header";
 
 // --- shapes returned by GET /api/cards/queue ---
 type QueueWord = {
@@ -212,41 +213,22 @@ export function StudySession({ level }: { level: string }) {
   return (
     <main className="flex min-h-dvh flex-col">
       {/* Top bar: progress bar + count + undo */}
-      <header className="mx-auto w-full max-w-md px-4 pt-4">
-        <div className="h-2.5 w-full overflow-hidden rounded-full" style={{ background: "var(--cream-100)" }}>
-          <div
-            className="h-full rounded-full transition-[width] duration-300"
-            style={{ width: `${progress}%`, background: "linear-gradient(90deg, var(--magenta), var(--mag-500))" }}
-          />
-        </div>
-        <div className="mt-2 flex items-center text-[13px]" style={{ color: "var(--ink-soft)" }}>
-          <span className="flex-1">
-            <Link href="/home" className="font-semibold underline underline-offset-2" style={{ color: "var(--grape)" }}>
-              Home
-            </Link>
-            <span className="mx-2" style={{ color: "var(--ink-faint)" }}>·</span>
+      <SessionHeader
+        progress={progress}
+        level={level}
+        left={
+          <>
+            <SessionHeaderLink href="/home">Home</SessionHeaderLink>
+            <span className="mx-2">·</span>
             {remaining} left
-          </span>
-          {/* Level chip — centred; uses the brand chip palette at a smaller scale so it
-              reads as context without pulling focus during recall */}
-          <span
-            className={`chip chip-${level.toLowerCase()}`}
-            style={{ fontSize: "10px", padding: "2px 8px" }}
-          >
-            {level}
-          </span>
-          <span className="flex flex-1 justify-end">
-            <button
-              onClick={undo}
-              disabled={busy || reviewed.length === 0}
-              className="font-semibold underline underline-offset-2 disabled:opacity-30"
-              style={{ color: "var(--grape)" }}
-            >
-              Undo
-            </button>
-          </span>
-        </div>
-      </header>
+          </>
+        }
+        right={
+          <SessionHeaderButton onClick={undo} disabled={busy || reviewed.length === 0}>
+            Undo
+          </SessionHeaderButton>
+        }
+      />
 
       {/* Card: tap anywhere to reveal the answer (BRAND.md §7 flashcard) */}
       <section className="flex flex-1 items-center justify-center px-4 py-4">

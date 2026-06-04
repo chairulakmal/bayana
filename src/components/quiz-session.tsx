@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Parrot } from "@/components/parrot";
+import { SessionHeader, SessionHeaderLink } from "@/components/session-header";
 
 type Option = { meaning: string; correct: boolean };
 type Question = {
@@ -122,22 +123,17 @@ export function QuizSession({ level }: { level: string }) {
   return (
     <main className="flex min-h-dvh flex-col">
       {/* Progress + exit to the home hub */}
-      <header className="mx-auto w-full max-w-md px-4 pt-4">
-        <div className="h-2.5 w-full overflow-hidden rounded-full" style={{ background: "var(--cream-100)" }}>
-          <div
-            className="h-full rounded-full transition-[width] duration-300"
-            style={{ width: `${Math.round((index / total) * 100)}%`, background: "linear-gradient(90deg, var(--magenta), var(--mag-500))" }}
-          />
-        </div>
-        <div className="mt-2 flex items-center justify-between text-[13px]" style={{ color: "var(--ink-soft)" }}>
-          <span>
-            {index + 1} / {total}
-          </span>
-          <Link href="/home" className="font-semibold underline underline-offset-2" style={{ color: "var(--grape)" }}>
-            Home
-          </Link>
-        </div>
-      </header>
+      <SessionHeader
+        progress={Math.round((index / total) * 100)}
+        level={level}
+        left={
+          <>
+            <SessionHeaderLink href="/home">Home</SessionHeaderLink>
+            <span className="mx-2">·</span>
+            {total - index} left
+          </>
+        }
+      />
 
       {/* Prompt: the Japanese word (kanji if present); reading + sentence reveal on answer */}
       <section className="flex flex-1 flex-col items-center justify-center px-4 py-4 text-center">
@@ -157,7 +153,10 @@ export function QuizSession({ level }: { level: string }) {
             <p className="jp text-[15px] leading-relaxed" style={{ color: "var(--ink)" }}>
               {current.sentence.japanese}
             </p>
-            <p className="mt-1 text-[13px] italic" style={{ color: "var(--ink-soft)" }}>
+            <p className="jp mt-1 text-[13px]" style={{ color: "var(--ink-faint)" }}>
+              {current.sentence.reading}
+            </p>
+            <p className="mt-2 text-[13px] italic" style={{ color: "var(--ink-soft)" }}>
               {current.sentence.english}
             </p>
           </div>
