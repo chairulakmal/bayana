@@ -1,5 +1,5 @@
 // Auth.js (NextAuth v5) configuration — passwordless email magic-link sign-in,
-// restricted to a single allowlisted address, with database sessions (SPEC §11).
+// restricted to allowlisted addresses, with database sessions (SPEC §11).
 //
 // Security (SPEC §11.3):
 //  - The allowlist is enforced BEFORE any email is sent (in sendVerificationRequest),
@@ -13,13 +13,18 @@ import Resend from "next-auth/providers/resend";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "@/lib/db";
 
-// Normalize the allowlisted address once (trim + lowercase). Auth.js already lowercases
-// the submitted identifier before our checks run, but normalizing BOTH sides makes the
-// comparison robust no matter how the env var happens to be capitalized — a stray
-// uppercase here would lock out the legitimate user (an availability footgun, not a
-// bypass). Email local-parts are technically case-sensitive per RFC 5321, but in practice
-// every real provider treats them case-insensitively, so this is safe.
-const ALLOWED_EMAIL = process.env.AUTH_ALLOWED_EMAIL?.trim().toLowerCase();
+// Parse AUTH_ALLOWED_EMAIL as a comma-separated list (single address still works).
+// Stored as a Set for O(1) lookup. Both sides are lowercased: Auth.js lowercases the
+// submitted identifier before our checks run, and we normalize the env var too so a
+// stray uppercase doesn't accidentally lock someone out (availability footgun, not a
+// bypass). Email local-parts are technically case-sensitive per RFC 5321, but every
+// real provider treats them case-insensitively, so this is safe.
+const ALLOWED_EMAILS: Set<string> = new Set(
+  (process.env.AUTH_ALLOWED_EMAIL ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean),
+);
 const EMAIL_FROM = process.env.AUTH_EMAIL_FROM ?? "onboarding@resend.dev";
 const TOKEN_TTL_SECONDS = 15 * 60; // 15-minute magic links
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30-day database sessions
@@ -44,8 +49,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       maxAge: TOKEN_TTL_SECONDS,
       // Send the magic link ourselves so we can gate on the allowlist FIRST.
       async sendVerificationRequest({ identifier: email, url }) {
-        // Fails CLOSED: if ALLOWED_EMAIL is unset, no email is ever sent.
-        if (!ALLOWED_EMAIL || email.trim().toLowerCase() !== ALLOWED_EMAIL) {
+        // Fails CLOSED: if the set is empty (env var unset/blank), no email is ever sent.
+        if (!ALLOWED_EMAILS.has(email.trim().toLowerCase())) {
           // Reject before any email is sent → no open relay (SPEC §11.3 #4).
           throw new Error("This email address is not allowed to sign in.");
         }
@@ -74,7 +79,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     // Defense in depth: reject any non-allowlisted email at verification time too.
     signIn({ user }) {
-      return !!user.email && user.email.trim().toLowerCase() === ALLOWED_EMAIL;
+      return !!user.email && ALLOWED_EMAILS.has(user.email.trim().toLowerCase());
     },
     // Expose the DB user id on the session so server code can scope queries by user.
     session({ session, user }) {

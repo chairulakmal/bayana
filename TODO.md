@@ -118,13 +118,7 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
   study/quiz screens. Android = true chrome-free fullscreen; iOS falls back to standalone.
   **Offline shell / service worker still deferred** (Phase 5).
 
-## Phase 3 — Admin audit + on-demand generation (after Quiz mode)
-- [ ] Admin review/audit page — admin-gated (`UserProfile.role`); add a review-status field
-  to `ExampleSentence`; accept/reject generated sentences (SPEC §13)
-- [ ] On-demand `/api/generate` + study-UI fetch-on-flip, with §11.4 guardrails
-  (auth + rate-limit + cache-first + bounded `max_tokens`)
-
-## Phase 4 — Multi-user
+## Phase 3 — Multi-user
 - [ ] Widen/remove the email allowlist; real `User` rows; authz scoping all reads/writes
   by `userId`; per-user settings (SPEC §13)
 - [ ] **First-run onboarding** (moved here from Phase 2, 2026-06-04) — level choice →
@@ -132,6 +126,12 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
   `UserProfile.onboardedAt` column to branch first-time vs. returning (SPEC §8.5).
   Deferred because distinguishing first-time vs. returning users only earns its keep once
   there are multiple real users.
+
+## Phase 4 — Admin audit + on-demand generation (after Quiz mode)
+- [ ] Admin review/audit page — admin-gated (`UserProfile.role`); add a review-status field
+  to `ExampleSentence`; accept/reject generated sentences (SPEC §13)
+- [ ] On-demand `/api/generate` + study-UI fetch-on-flip, with §11.4 guardrails
+  (auth + rate-limit + cache-first + bounded `max_tokens`)
 
 ## Phase 5+ (later)
 See SPEC.md §13 — enhancements (audio/TTS, furigana, streak/heatmap, regeneration/voting,
