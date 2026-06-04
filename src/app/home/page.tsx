@@ -35,9 +35,14 @@ export default async function HomePage() {
             </p>
           </div>
         </div>
-        <Link href="/stats" className="text-[13px]" style={{ color: "var(--ink-soft)" }}>
-          Stats →
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/browse" className="text-[13px]" style={{ color: "var(--ink-soft)" }}>
+            Browse
+          </Link>
+          <Link href="/stats" className="text-[13px]" style={{ color: "var(--ink-soft)" }}>
+            Stats →
+          </Link>
+        </div>
       </div>
 
       {/* Level — the inline "set your level" control */}

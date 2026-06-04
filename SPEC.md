@@ -6,7 +6,7 @@
 |---|---|
 | **Status** | Draft |
 | **Author** | Chairul Akmal |
-| **Last updated** | 2026-06-04 |
+| **Last updated** | 2026-06-04 (Phase 2 complete) |
 | **Target platform** | Mobile-first responsive web (Next.js 16, deployed on Railway) |
 
 ---
@@ -477,8 +477,18 @@ one-time pass of `meaning` embeddings (true semantic similarity). None are requi
 launch scale.
 
 ### 8.3 Browse / search
-- A paginated, level-filtered list of all words with their cached example sentences, useful
-  for review and for spot-checking generated content.
+A whole-deck lookup tool scoped to the active level. The user can search by kanji,
+reading, or English meaning; tapping any word reveals its cached example sentence.
+
+**Implementation.** `GET /api/browse?level=` returns the level's full word list (id,
+expression, reading, meaning — **no sentences**) with `Cache-Control: private,
+max-age=3600, stale-while-revalidate=86400`. The browser caches this response; repeat
+visits within the hour cost zero server round-trips. The client (`BrowseClient`) filters
+in memory per keystroke — no server request per search. A **render cap of 50** results
+prevents mounting thousands of DOM nodes (N1 has 2,699 words); an overflow hint prompts
+the user to narrow their search. Sentences are lazy-loaded per word via `GET /api/words/
+[id]/sentence` (cached 24 h) when a row is tapped, keeping the initial payload small.
+Rows expand/collapse in an accordion (one open at a time).
 
 ### 8.4 Responsive / mobile-first design
 The product is **designed for the phone first** and progressively enhanced for larger
@@ -550,9 +560,10 @@ is intentionally no web-reachable, cost-incurring Anthropic route at present (se
 | POST | `/api/review` | Submit a rating → FSRS update | required | **Implemented** |
 | POST | `/api/review/undo` | Revert the most recent review (one-step undo) | required | **Implemented** |
 | `*` | `/api/auth/*` | Auth.js (sign-in request, callback, session) | public (rate-limited) | **Implemented** |
-| GET | `/api/quiz?level=&count=` | Batch of JP→EN multiple-choice questions (non-scheduling) | required | **Implemented** (random distractors; confusability scoring deferred, §8.2) |
+| GET | `/api/quiz?level=&count=` | Batch of JP→EN multiple-choice questions (non-scheduling) | required | **Implemented** — confusability-scored distractors (shared kanji + reading similarity, §8.2) |
 | GET | `/api/dev/login` | **Dev-only**: mint a session for the seeded user (skip the magic link) | none (dev-only) | **Implemented** — 404 in prod; gated by `DEV_AUTH` (§11.7) |
-| GET | `/api/cards?level=&q=&page=` | Browse / search | required | Planned (Phase 2) |
+| GET | `/api/browse?level=` | Word list for one level (id, expression, reading, meaning — no sentences); browser-cached | required | **Implemented** — `Cache-Control: private, max-age=3600, stale-while-revalidate=86400` |
+| GET | `/api/words/[id]/sentence` | Lazy-load one word's cached example sentence | required | **Implemented** — `Cache-Control: private, max-age=86400, stale-while-revalidate=604800` |
 | POST | `/api/generate` | On-demand single-sentence fallback | required + rate-limited | Planned (Phase 1c, optional — see §11.4) |
 | POST | `/api/batch/submit` | Submit a generation batch | admin | Not planned (scripts only) |
 | GET | `/api/batch/:id` | Poll batch status / collect | admin | Not planned (scripts only) |
@@ -566,8 +577,12 @@ is intentionally no web-reachable, cost-incurring Anthropic route at present (se
    user. Cache key = word; a miss triggers on-demand generation (§7.4).
 2. **Anthropic prompt caching** — the shared system prompt is cached across batch and
    on-demand requests to reduce input-token cost.
-3. **HTTP/data caching** — largely static reads (browse, word data) use Next.js route
-   caching / `revalidate`; the study queue and review writes are dynamic and uncached.
+3. **HTTP browser caching** — the browse word list (`GET /api/browse`) is served with
+   `Cache-Control: private, max-age=3600, stale-while-revalidate=86400`; lazy-loaded
+   sentences (`GET /api/words/[id]/sentence`) with 24 h max-age / 7-day stale window.
+   Both datasets change ~never (seeded once), so the browser avoids repeat fetches within
+   the cache window entirely. The study queue and review writes are `force-dynamic` and
+   never cached.
 
 ---
 
@@ -719,20 +734,19 @@ uses database sessions (§11.3 #6).
   (§7.5). The on-demand `/api/generate` fallback is **no longer needed for coverage** and
   has moved to Phase 3 (it returns there as a safety net for future additions).
 
-**Phase 2 — Quiz mode — ◀ current focus**
-- The active build target. A gamified multiple-choice quiz (§8.2): `GET /api/quiz` with
-  confusability-scored distractors, instant feedback, and the cached example sentence on
-  reveal.
-- **UI bar — Duolingo-grade polish, deliberately restrained:** the look-and-feel should
-  match Duolingo's quality (clean, satisfying, momentum-driven, mobile-first), but with
-  **minimal animation** (snappy and lightweight, not flashy character/transition
-  animations) and **zero ads** — the latter a core anti-Duolingo differentiator (§1, §8.2).
-- **Level scope & mode picker:** add `UserProfile.activeLevel`; scope both the Flashcard queue
-  and the quiz to it; build the returning-user **mode picker** (Flashcard / Quiz) as `/study`.
-- Resolve whether MC results feed the FSRS scheduler or stay a separate practice mode
-  (§8.2, §15). To improve students result, there should be some sinergy between the modes.
-  More research is still required.
-- Light polish may ride along: browse/search, daily new-card limits, basic stats.
+**Phase 2 — Quiz mode — ✅ functionally complete**
+- Gamified multiple-choice quiz (§8.2): `GET /api/quiz` with confusability-scored
+  distractors (shared kanji + reading similarity, §8.2), instant feedback, cached example
+  sentence on reveal. Duolingo-grade UI, minimal animation, zero ads.
+- Level scope + home hub (`/home`): `UserProfile.activeLevel`, returning-user mode picker
+  (Flashcard / Quiz), inline level selector.
+- Light polish shipped: **browse/search** (`/browse`, browser-cached word list, lazy
+  sentence per tap, §8.3), **basic stats** (`/stats` — started/total, due, recall rate),
+  **default `newCardsPerDay` lowered 20 → 10** with a tap-to-open `InfoBubble` explanation
+  on the landing and home hub, **installable PWA** (pulled forward from Phase 5, §8.4).
+- MC↔FSRS coupling and Flashcard↔Quiz synergy **deferred by choice** (§15, §16) — revisit
+  once there is usage data to reason about.
+- First-run onboarding deferred → Phase 4 (§16).
 
 **Phase 3 — Admin audit + on-demand generation — next, after Quiz mode**
 - **Admin review/audit page** (admin-gated via `UserProfile.role`): inspect each
@@ -821,6 +835,7 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-06-04 | **Browse/search shipped as Phase 2 light polish.** `/browse` (whole-deck lookup for the active level) + `GET /api/browse?level=` (browser-cached word list, no sentences) + `GET /api/words/[id]/sentence` (lazy sentence per tap, 24 h cache). Client-side filtering in memory with a render cap of 50. Linked from `/home`. The "soon" tag removed from the Quiz feature card on the landing page — Quiz is live. | Whole-deck browse chosen over "seen cards only" (a collection/history view); the latter belongs in stats. Browser `Cache-Control` headers (rather than server-side Next.js revalidation) were chosen because they eliminate repeat round-trips to Railway for data that changes ~never, and because the client-side filter means zero requests per keystroke. Render cap avoids 2,699-node DOM without requiring a virtualization library. | Author | §8.3, §9, §10 |
 | 2026-06-04 | **`newCardsPerDay` is a per-queue-build pace, not a rolling per-calendar-day ceiling** — deliberately *not* tracking new cards introduced per day. After finishing a session a user can build another queue and get up to `newCardsPerDay` more new words, repeatedly. The proposed "rolling daily cap" is a **non-goal**. | Intentional: let motivated users challenge themselves *on their own terms* rather than be hard-blocked at an arbitrary daily number. The cap still shapes the gentle **default single-session pace**, and reviews-first scheduling means anyone who overreaches simply inherits the review load they created — a self-correcting feedback loop, not a paternalistic lock. | Author | §6, §8.1 |
 | 2026-06-04 | **Default `newCardsPerDay` lowered 20 → 10** (migration also brings existing profiles still on the old default down). A "ten words a day" pace note with a tap-to-open rationale (`InfoBubble`) added to the landing hero and the home hub. | Research + community consensus put the sustainable JLPT pace at ~10–15 new/day; *review debt* (reviews compounding faster than they can be cleared) is the top reason learners abandon SRS, and the retention→workload curve is exponential (each new card ≈ 10 lifetime reviews, so 10/day ≈ a humane ~100 reviews/day at steady state vs ~200 at 20/day). 10 also matches the "ten words at a time" product promise. Desired retention stays 0.9 (the data-backed sweet spot). Sources: FSRS optimal-retention wiki; Cepeda et al. 2006 (spacing meta-analysis); JLPT/Anki community pacing guides. | Author | §6, §8.5 |
 | 2026-06-04 | **First-run onboarding deferred from Phase 2 → Phase 4 (multi-user).** The `UserProfile.onboardedAt` column (already migrated) stays; only the flow (level → 5-question warm-up → guided tour) is postponed. Phase 2 is now considered functionally complete once **confusability-scored distractors** land. | A first-run/onboarding experience exists to convert *new* users; with a single author-user who is already fluent in the app, building it now is effort spent on a path no one walks yet. It naturally belongs with Phase 4, where the allowlist widens and real new users appear. No schema cost to defer (the column is harmless if unused). | Author | §8.5, §13 |

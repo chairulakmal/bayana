@@ -108,9 +108,10 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
 - [x] **Basic stats** (light, not the Phase-4 dashboard) — `/stats` page + `src/lib/stats.ts`;
   per active level: words started/total + mature, due now, 30-day recall rate; linked from
   `/home`. Day streak deferred (timezone/rollover) to a follow-up.
-- [ ] **Browse/search** ◀ next — whole-deck lookup for the active level (search by
-  kanji/reading/meaning, sentence on tap); search-first with a render cap; browser-cached
-  word list (no sentences up front)
+- [x] **Browse/search** — `/browse` + `GET /api/browse?level=` (browser-cached word list,
+  `Cache-Control: private, max-age=3600, stale-while-revalidate=86400`) + `GET /api/words/
+  [id]/sentence` (lazy sentence on tap, cached 24h); client-side filtering in memory;
+  render cap of 50; accordion sentence reveal. Linked from `/home`.
 - [ ] Light polish (optional): daily new-card-limit UI control (limit already enforced
   server-side in `getStudyQueue`)
 - [x] Public homepage at `/` (brand + Pī mascot + Sign-in CTA + MIT/GitHub); study app

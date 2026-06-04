@@ -122,7 +122,6 @@ export default async function Home() {
               emoji="⚡"
               title="Quiz mode"
               body="Fast multiple-choice rounds for when you want momentum, not a marathon. Like Duolingo — minus the ads and the guilt-trips."
-              tag="soon"
             />
             <Feature
               emoji="🤖"
