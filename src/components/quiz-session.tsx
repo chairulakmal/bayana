@@ -121,10 +121,6 @@ export function QuizSession({ level }: { level: string }) {
   };
 
   return (
-    // h-svh (not min-h-dvh): pins the layout to the "chrome-visible" small viewport height
-    // so the footer is never hidden under the browser tab bar. When chrome hides, extra
-    // blank space appears below the footer — harmless. dvh would grow to fill the gap and
-    // cause layout shifts.
     <main className="flex h-svh flex-col pt-safe">
       {/* Progress + exit to the home hub */}
       <SessionHeader
@@ -139,17 +135,16 @@ export function QuizSession({ level }: { level: string }) {
         }
       />
 
-      {/* Prompt: the Japanese word (kanji if present); reading + sentence reveal on answer.
-          overflow-y-auto: section scrolls internally if the revealed sentence is too tall
-          for the viewport. my-auto on the inner div centers the content when it fits, and
-          collapses to top-align when it overflows — the correct Safari behaviour (justify-center
-          + overflow clips the top of overflowing content and makes it unreachable). */}
+      {/* Prompt: word in the top section; sentence revealed here after answering.
+          "What does this mean?" is hidden once answered — no longer relevant. */}
       <section className="flex flex-1 flex-col overflow-y-auto px-4 py-4">
         <div className="my-auto flex w-full flex-col items-center text-center">
-          <p className="text-[13px]" style={{ color: "var(--ink-faint)" }}>
-            What does this mean?
-          </p>
-          <div className="jp mt-3 text-6xl" style={{ fontWeight: 800, color: "var(--ink)", lineHeight: 1.1 }}>
+          {!answered && (
+            <p className="text-[13px]" style={{ color: "var(--ink-faint)" }}>
+              What does this mean?
+            </p>
+          )}
+          <div className={answered ? "jp text-6xl" : "jp mt-3 text-6xl"} style={{ fontWeight: 800, color: "var(--ink)", lineHeight: 1.1 }}>
             {current.expression}
           </div>
           {answered && (
@@ -173,9 +168,7 @@ export function QuizSession({ level }: { level: string }) {
         </div>
       </section>
 
-      {/* Options + Continue. shrink-0 prevents the footer from being squeezed.
-          max(0.75rem, env(safe-area-inset-bottom)) = at least 12px, plus home indicator
-          safe area on notched devices — covers both browser and PWA modes. */}
+      {/* Options + Continue */}
       <footer
         className="mx-auto w-full max-w-md shrink-0 px-3 pt-2"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
