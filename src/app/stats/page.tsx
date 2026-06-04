@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { getCurrentUserId } from "@/lib/current-user";
 import { getActiveLevel } from "@/lib/profile";
 import { getLevelStats } from "@/lib/stats";
-import { Parrot } from "@/components/parrot";
+import { HomeLink } from "@/components/home-link";
 
 // Light stats page (SPEC §13 "basic stats"; full dashboard is Phase 4, §16). Shows a few
 // per-active-level numbers — progress, due, recall — linked from the home hub. Server
@@ -25,18 +25,13 @@ export default async function StatsPage() {
     <main className="mx-auto flex min-h-svh w-full max-w-md flex-col px-5 py-8">
       {/* Header: back to the hub + the active level chip */}
       <div className="flex items-center justify-between">
-        <Link href="/home" className="text-[13px]" style={{ color: "var(--ink-soft)" }}>
-          ← Home
-        </Link>
+        <HomeLink />
         <span className={`chip chip-${level.toLowerCase()}`}>{level}</span>
       </div>
 
-      <div className="mt-6 flex items-center gap-3">
-        <Parrot expr="happy" style={{ width: 44, height: 49 }} />
-        <h1 className="text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
-          Your progress
-        </h1>
-      </div>
+      <h1 className="mt-6 text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
+        Your progress
+      </h1>
 
       {/* Progress: words started / total, with the brand magenta fill */}
       <section

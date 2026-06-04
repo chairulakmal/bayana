@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getCurrentUserId } from "@/lib/current-user";
 import { getActiveLevel } from "@/lib/profile";
 import { BrowseClient } from "@/components/browse-client";
 import { BrowseLevelPicker } from "@/components/browse-level-picker";
+import { HomeLink } from "@/components/home-link";
 import { Level } from "@/generated/prisma/enums";
 
 // Browse/search page (SPEC §13 Phase 2 light polish). Whole-deck lookup for the active
@@ -31,9 +31,7 @@ export default async function BrowsePage({
   return (
     <main className="mx-auto flex min-h-svh w-full max-w-md flex-col px-5 py-8">
       <div className="flex items-center justify-between">
-        <Link href="/home" className="text-[13px]" style={{ color: "var(--ink-soft)" }}>
-          ← Home
-        </Link>
+        <HomeLink />
       </div>
 
       <h1
