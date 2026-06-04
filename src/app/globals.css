@@ -141,3 +141,12 @@ body {
   .btn, .rate, .opt { transition: none; }
   .btn:active, .rate:active, .opt:active { transform: none; }
 }
+
+/* Hide native number-input spinners globally — we provide Prev/Next + JS clamping instead.
+   Keeping type="number" so mobile browsers show a numeric keyboard. */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] { -moz-appearance: textfield; }

@@ -14,4 +14,5 @@ export async function setActiveLevel(level: Level): Promise<void> {
   if (!(level in Level)) throw new Error(`Invalid level: ${String(level)}`);
   await db.userProfile.update({ where: { userId }, data: { activeLevel: level } });
   revalidatePath("/home");
+  revalidatePath("/browse"); // browse reads activeLevel too
 }
