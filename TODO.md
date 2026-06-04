@@ -71,7 +71,7 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
   - [x] Push to GitHub; transfer N3 cache via `pg_dump` pipe
   - [x] Set env vars (fresh `AUTH_SECRET`, `AUTH_URL`, Resend/anthropic, `DATABASE_URL` ref); deploy
   - [x] Generate domain → set `AUTH_URL` → redeploy; smoke-test sign-in — **live, working**
-  - [ ] Take first manual `pg_dump` backup of **local** (the source of the paid sentence
+  - [x] Take first manual `pg_dump` backup of **local** (the source of the paid sentence
     cache — see `notes/deploy.md` §6). Prod is intentionally not backed up (Hobby egress);
     prod-only study history is an accepted loss-risk (SPEC §12, §16).
 
@@ -85,21 +85,20 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
   coverage now that every word is seeded; returns as a safety net with the admin tooling).
 
 ## Phase 2 — Quiz mode ◀ current focus
-- [x] **Level scope + home hub** — `UserProfile.activeLevel` added (⚠ run `npx prisma
-  migrate dev` once the DB is up); `/home` mode picker + inline level chips (`setActiveLevel`
-  server action); `/study` & `/quiz` read the active level; login/dev-login/`/` → `/home`
-  (SPEC §8.5). Full stats dashboard deferred to Phase 4.
-- [ ] **First-run onboarding** — level choice → 5-question Quiz warm-up (non-scheduling)
-  → guided tour; add `UserProfile.onboardedAt` to branch first-time vs. returning (SPEC §8.5)
+- [x] **Level scope + home hub** — `UserProfile.activeLevel` added (migration
+  `20260604003054_add_user_active_level`); `/home` mode picker + inline level chips
+  (`setActiveLevel` server action); `/study` & `/quiz` read the active level;
+  login/dev-login/`/` → `/home` (SPEC §8.5). Full stats dashboard deferred to Phase 4.
 - [x] `GET /api/quiz?level=&count=` — batch of JP→EN MC questions; **random** distractors
   with meaning-dedupe guard, non-scheduling; selection isolated in `src/lib/quiz.ts`
-  (confusability scoring — shared kanji / reading similarity — still TODO, SPEC §8.2)
+- [ ] **Confusability-scored distractors** ◀ in progress — replace random picks with
+  shared-kanji / reading-similarity scoring in `pickDistractors` (SPEC §8.2)
 - [x] MC quiz UI (`/quiz` + `src/components/quiz-session.tsx`) — brand-styled, instant
   feedback, score summary with Pī; `prefers-reduced-motion`-aware; mobile-first
 - [x] **Dev login** — `GET /api/dev/login` mints a real session for the seeded user
   (gated by `DEV_AUTH`, 404 in prod); dev button on the sign-in page (SPEC §11.7)
-- [ ] Upgrade distractors to **confusability scoring** (shared kanji / reading / meaning)
-  + the Flashcard↔Quiz synergy (FSRS-informed selection / feeding results back) (SPEC §8.2, §15)
+- [ ] Flashcard↔Quiz synergy (FSRS-informed distractor/target selection; feeding results
+  back) — depends on resolving the MC↔FSRS coupling below (SPEC §8.2, §15)
 - [ ] Resolve MC↔FSRS coupling — feed the scheduler or stay a separate practice mode
   (SPEC §8.2, §15)
 - [ ] Light polish (optional): browse/search, daily new-card limit, basic stats
@@ -118,10 +117,19 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
 - [ ] On-demand `/api/generate` + study-UI fetch-on-flip, with §11.4 guardrails
   (auth + rate-limit + cache-first + bounded `max_tokens`)
 
-## Phase 4+ (later)
-See SPEC.md §13 — multi-user; enhancements (audio/TTS, furigana, streak/heatmap,
-regeneration/voting, export to Anki, **PWA offline shell / service worker** — install +
-fullscreen basics already done, see Phase 2).
+## Phase 4 — Multi-user
+- [ ] Widen/remove the email allowlist; real `User` rows; authz scoping all reads/writes
+  by `userId`; per-user settings (SPEC §13)
+- [ ] **First-run onboarding** (moved here from Phase 2, 2026-06-04) — level choice →
+  5-question Quiz warm-up (non-scheduling) → guided tour; uses the existing
+  `UserProfile.onboardedAt` column to branch first-time vs. returning (SPEC §8.5).
+  Deferred because distinguishing first-time vs. returning users only earns its keep once
+  there are multiple real users.
+
+## Phase 5+ (later)
+See SPEC.md §13 — enhancements (audio/TTS, furigana, streak/heatmap, regeneration/voting,
+export to Anki, **PWA offline shell / service worker** — install + fullscreen basics
+already done, see Phase 2).
 
 ## Open questions
 Tracked in SPEC.md §15.

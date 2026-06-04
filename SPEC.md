@@ -729,8 +729,6 @@ uses database sessions (§11.3 #6).
   animations) and **zero ads** — the latter a core anti-Duolingo differentiator (§1, §8.2).
 - **Level scope & mode picker:** add `UserProfile.activeLevel`; scope both the Flashcard queue
   and the quiz to it; build the returning-user **mode picker** (Flashcard / Quiz) as `/study`.
-- **First-run onboarding (§8.5):** level choice → 5-question Quiz warm-up (non-scheduling)
-  → guided tour; add `UserProfile.onboardedAt` to branch first-time vs. returning.
 - Resolve whether MC results feed the FSRS scheduler or stay a separate practice mode
   (§8.2, §15). To improve students result, there should be some sinergy between the modes.
   More research is still required.
@@ -748,6 +746,10 @@ uses database sessions (§11.3 #6).
 - Widen/remove the email allowlist; real `User` rows; authorization checks scoping all
   reads/writes by `userId`.
 - Per-user settings (directions, daily limits, level focus).
+- **First-run onboarding (§8.5)** — moved here from Phase 2: level choice → 5-question Quiz
+  warm-up (non-scheduling) → guided tour; uses the existing `UserProfile.onboardedAt` column
+  to branch first-time vs. returning. Deferred because a first-run experience only earns its
+  keep once there are multiple real users to onboard (the sole author is already past it).
 
 **Phase 5 — Further enhancements**
 - Audio (TTS) for sentences, furigana rendering, streak/heatmap, sentence
@@ -819,6 +821,7 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-06-04 | **First-run onboarding deferred from Phase 2 → Phase 4 (multi-user).** The `UserProfile.onboardedAt` column (already migrated) stays; only the flow (level → 5-question warm-up → guided tour) is postponed. Phase 2 is now considered functionally complete once **confusability-scored distractors** land. | A first-run/onboarding experience exists to convert *new* users; with a single author-user who is already fluent in the app, building it now is effort spent on a path no one walks yet. It naturally belongs with Phase 4, where the allowlist widens and real new users appear. No schema cost to defer (the column is harmless if unused). | Author | §8.5, §13 |
 | 2026-06-04 | **Installable-PWA basics pulled forward** from Phase 5: Web App Manifest (`app/manifest.ts`) + PNG icons (192/512/maskable, via `scripts/gen-pwa-icons.mjs`), `display: "fullscreen"`, `orientation: "portrait"`, `viewport-fit=cover` + `env(safe-area-inset-*)` on the session screens. **Offline shell / service worker stays deferred.** Two sub-calls: (a) iOS keeps `apple-mobile-web-app-status-bar-style: "default"`, *not* `black-translucent`; (b) the maskable icon uses the **yellow** tile, not BRAND's "canonical magenta." | The author **primarily uses Android**, where `display: fullscreen` delivers the goal — a chrome-free, edge-to-edge study session like Duolingo; iOS Safari ignores `fullscreen` (falls back to `standalone`, status bar stays), accepted rather than engineered around. No service worker is needed for install or fullscreen, so offline was deferred to avoid cache-invalidation complexity on an always-online single-user app (§14.4). `black-translucent` was rejected because it draws **white** status-bar text over the light paper UI (invisible); magenta tile rejected because Pī's magenta body on magenta is muddy (the very reason the favicon is yellow, BRAND §6). | Author | §8.4, §13, §14.4 |
 | 2026-06-04 | **Rename study modes**: "Anki mode" → **"Flashcard mode"**; "Duolingo mode" → **"Quiz mode"** across all UI, docs, and code comments. References to the Anki and Duolingo products are retained in descriptive/comparative context (e.g., "FSRS, the algorithm modern Anki uses"; "like Duolingo, minus the ads"). | Using third-party brand names as our own feature labels risks trademark confusion and implies endorsement. Descriptive names ("Flashcard", "Quiz") are clearer to new users and own-able long-term; the product comparison copy in the landing page "Why?" section provides the necessary context. Author decided after trademark review. | Author | §8.1, §8.2 |
 | 2026-06-03 | **Home hub at `/home`** is the post-login landing: a lightweight **mode picker** + **inline level selector** (writes `UserProfile.activeLevel`). No standalone settings/dashboard page; a full **stats dashboard is deferred to Phase 4**. Login / dev-login / public `/` all redirect to `/home`; `/study` and `/quiz` read the active level. | Setting a level and choosing a mode are a chip and two buttons — a dashboard would fight the one-tap, no-config ethos (§2). Keeping level-setting inline on the hub avoids a settings page; stats genuinely warrant a richer screen, but only later. | Author | §8.5, §6 |
