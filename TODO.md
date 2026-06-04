@@ -111,9 +111,9 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
 - [x] **Default `newCardsPerDay` 20 → 10** (migration `20260604163321_lower_new_cards_default`,
   existing rows brought down too) + a "ten words a day" pace note with a tap-to-open
   rationale (`InfoBubble`) on the landing hero and home hub (SPEC §16).
-- [ ] Light polish (optional): daily new-card-limit UI control (limit already enforced
-  server-side in `getStudyQueue`); a true rolling per-calendar-day cap (vs. the current
-  per-queue-build cap) would pair well with the lower default
+- [ ] Light polish (optional): new-card-pace UI control to change `newCardsPerDay` (the
+  per-build cap is enforced in `getStudyQueue`). NOTE: a rolling per-calendar-day ceiling
+  is a **deliberate non-goal** — users may exceed the pace by choice (SPEC §16, 2026-06-04).
 - [x] Public homepage at `/` (brand + Pī mascot + Sign-in CTA + MIT/GitHub); study app
   moved to `/study`; brand foundation (tokens/fonts in globals, `Parrot` component, Pī
   favicon) per BRAND.md

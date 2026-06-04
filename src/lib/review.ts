@@ -71,7 +71,11 @@ export async function undoLastReview(userId: string, wordId: string) {
  *   1. due cards — anything already in learning/review whose `due` has passed, prioritised
  *      first and capped to `sessionLimit`;
  *   2. new words — never-seen words that fill the remaining session slots, further capped
- *      by `profile.newCardsPerDay` so the daily new-word limit is still respected.
+ *      by `profile.newCardsPerDay`. NOTE: this cap applies *per queue build*, not as a
+ *      rolling per-calendar-day ceiling — a user who finishes a session can build another
+ *      and get up to `newCardsPerDay` more new words. That is intentional (let motivated
+ *      users push at their own pace; reviews-first scheduling self-corrects any overreach).
+ *      See SPEC §16 (2026-06-04).
  *  `level` scopes the new words; due cards are returned regardless of level so nothing
  *  already in progress gets stranded.
  *  Returns `totalDue` (pre-cap count) so callers can tell the user how many are waiting. */
@@ -97,7 +101,8 @@ export async function getStudyQueue(
   const due = allDue.slice(0, sessionLimit);
 
   // How many slots remain for new words, honouring both the session cap and the
-  // per-day new-card preference (whichever is smaller wins).
+  // new-card pace preference (whichever is smaller wins). This is a *per-build* pace, not
+  // a hard daily ceiling — see the function doc and SPEC §16.
   const newSlots = Math.min(
     Math.max(0, sessionLimit - due.length),
     profile.newCardsPerDay,
