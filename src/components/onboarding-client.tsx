@@ -5,17 +5,30 @@
 // State machine: no level selected → level selected (chips highlight, button enables)
 // → submitting (pending, everything dims) → redirect to /quiz (server action).
 //
-// One deliberate choice: N5 → N1 order (easiest first). New users skew to lower levels
-// and shouldn't have to scroll past N1/N2 to reach their level.
+// Layout: N1 alone on top (hardest/rarest), N4/N5 on the bottom row closest to the
+// thumb (most common starting point). Explicit rows keep the pyramid stable across
+// all screen widths without relying on flex-wrap behaviour.
 
 import { useState, useTransition } from "react";
 import { Parrot } from "@/components/parrot";
 import { completeOnboarding } from "@/app/onboarding/actions";
 import type { Level } from "@/generated/prisma/enums";
 
-const LEVELS = ["N5", "N4", "N3", "N2", "N1"] as const;
+// Row order: N1 top → N4/N5 bottom.
+const LEVEL_ROWS = [["N1"], ["N2", "N3"], ["N4", "N5"]] as const;
+type LevelStr = "N1" | "N2" | "N3" | "N4" | "N5";
 
-const LEVEL_LABEL: Record<string, string> = {
+// N5 and N2 have white text (color: #fff), so currentColor outline is invisible on the
+// cream background. Override those two to ink; all others use currentColor fine.
+const RING_COLOR: Record<LevelStr, string> = {
+  N5: "var(--ink)",
+  N4: "currentColor",
+  N3: "currentColor",
+  N2: "var(--ink)",
+  N1: "currentColor",
+};
+
+const LEVEL_LABEL: Record<LevelStr, string> = {
   N5: "Absolute beginner",
   N4: "Elementary",
   N3: "Intermediate",
@@ -24,7 +37,7 @@ const LEVEL_LABEL: Record<string, string> = {
 };
 
 export function OnboardingClient() {
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<LevelStr | null>(null);
   const [pending, startTransition] = useTransition();
 
   function submit() {
@@ -48,32 +61,36 @@ export function OnboardingClient() {
         You can change this any time on the home screen.
       </p>
 
-      {/* Level chips — N5 first (easiest) so beginners don't scroll */}
-      <div className="mt-8 flex flex-wrap justify-center gap-3">
-        {LEVELS.map((lvl) => {
-          const active = lvl === selected;
-          return (
-            <button
-              key={lvl}
-              type="button"
-              onClick={() => setSelected(lvl)}
-              disabled={pending}
-              aria-pressed={active}
-              className={`chip chip-${lvl.toLowerCase()}`}
-              style={{
-                padding: "9px 22px",
-                fontSize: 16,
-                opacity: pending ? 0.4 : 1,
-                outline: active ? "2px solid currentColor" : "none",
-                outlineOffset: 3,
-                cursor: active ? "default" : "pointer",
-                transition: "opacity .15s",
-              }}
-            >
-              {lvl}
-            </button>
-          );
-        })}
+      <div className="mt-8 flex flex-col items-center gap-3">
+        {LEVEL_ROWS.map((row) => (
+          <div key={row.join()} className="flex gap-3">
+            {row.map((lvl) => {
+              const active = lvl === selected;
+              return (
+                <button
+                  key={lvl}
+                  type="button"
+                  onClick={() => setSelected(lvl)}
+                  disabled={pending}
+                  aria-pressed={active}
+                  className={`chip chip-${lvl.toLowerCase()}`}
+                  style={{
+                    padding: "9px 22px",
+                    fontSize: 16,
+                    opacity: pending ? 0.4 : 1,
+                    outline: active ? `2px solid ${RING_COLOR[lvl]}` : "none",
+                    outlineOffset: 3,
+                    transform: active ? "scale(1.06)" : undefined,
+                    cursor: active ? "default" : "pointer",
+                    transition: "opacity .15s, transform .15s",
+                  }}
+                >
+                  {lvl}
+                </button>
+              );
+            })}
+          </div>
+        ))}
       </div>
 
       {/* Hint text fades in once a level is chosen */}
@@ -81,7 +98,7 @@ export function OnboardingClient() {
         className="mt-3 text-[13px]"
         style={{
           color: "var(--ink-faint)",
-          minHeight: "1.4em", // reserves space so the button doesn't hop
+          minHeight: "1.4em",
           opacity: selected ? 1 : 0,
           transition: "opacity .2s",
         }}

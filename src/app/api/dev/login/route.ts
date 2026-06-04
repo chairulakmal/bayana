@@ -45,12 +45,13 @@ export async function GET(request: Request) {
     user = await db.user.create({ data: { email } });
   }
 
-  // Ensure a profile exists with onboardedAt set so the home hub is the landing page
-  // (not the onboarding screen — dev users don't need to go through first-run flow).
+  // Ensure a profile row exists. onboardedAt is intentionally left null on creation so
+  // dev users go through the onboarding flow just like real users — the home hub gate
+  // (home/page.tsx) will redirect them to /onboarding on first visit.
   await db.userProfile.upsert({
     where: { userId: user.id },
     update: {},
-    create: { userId: user.id, activeLevel: "N5", onboardedAt: new Date() },
+    create: { userId: user.id },
   });
 
   // Create a real DB session (the exact shape Auth.js's Prisma adapter uses) …
