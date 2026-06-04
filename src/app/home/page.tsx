@@ -46,8 +46,12 @@ export default async function HomePage() {
         </div>
       </div>
 
-      {/* Mode picker */}
-      <div className="mt-8 flex flex-1 flex-col justify-center gap-4">
+      {/* Mode picker — top-anchored (normal flow), NOT vertically centred. Centring made
+          the buttons' offset depend on the viewport height, so they hopped when Android's
+          gesture bar toggled in the installed PWA (svh/dvh resolve inconsistently inside a
+          fullscreen PWA). Anchored from the top, their position is fixed by the content
+          above; any height change just adds/removes empty space at the bottom. */}
+      <div className="mt-8 flex flex-col gap-4">
         <ModeButton href="/study" emoji="🎴" title="Flashcard mode" subtitle="Spaced-repetition review" />
         <ModeButton href="/quiz" emoji="⚡" title="Quiz mode" subtitle="Quick multiple-choice" />
       </div>
