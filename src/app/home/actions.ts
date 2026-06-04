@@ -22,7 +22,12 @@ export async function signOutAction(): Promise<void> {
 export async function setActiveLevel(level: Level): Promise<void> {
   const userId = await getCurrentUserId(); // throws → action errors if unauthenticated
   if (!(level in Level)) throw new Error(`Invalid level: ${String(level)}`);
-  await db.userProfile.update({ where: { userId }, data: { activeLevel: level } });
+  // upsert: a new user may not have a UserProfile row yet (it's created lazily).
+  await db.userProfile.upsert({
+    where: { userId },
+    update: { activeLevel: level },
+    create: { userId, activeLevel: level },
+  });
   revalidatePath("/home");
   revalidatePath("/browse"); // browse reads activeLevel too
 }

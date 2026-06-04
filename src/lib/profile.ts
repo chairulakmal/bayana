@@ -16,6 +16,18 @@ export async function getActiveLevel(userId: string): Promise<Level> {
 }
 
 /**
+ * True once the user has completed first-run onboarding (chosen their starting level).
+ * `onboardedAt` is null for a brand-new account. Used to gate the home hub redirect.
+ */
+export async function hasOnboarded(userId: string): Promise<boolean> {
+  const profile = await db.userProfile.findUnique({
+    where: { userId },
+    select: { onboardedAt: true },
+  });
+  return !!profile?.onboardedAt;
+}
+
+/**
  * The user's daily new-card cap (`UserProfile.newCardsPerDay`). Surfaced on the home hub
  * next to an explanation of the "ten words a day" pace. Falls back to the schema default
  * (10) if the profile is somehow missing.

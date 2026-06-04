@@ -12,6 +12,11 @@ import { schedulerFor, toCard, fromCard, fromLog, toLog } from "@/lib/fsrs";
 import type { Grade } from "ts-fsrs";
 import type { Level } from "@/generated/prisma/client";
 
+// Fallback used when no UserProfile row exists yet (e.g. a new user who reaches study
+// before completing onboarding). Matches schema defaults so behaviour is identical to a
+// freshly-created profile row.
+const DEFAULT_PROFILE = { desiredRetention: 0.9, fsrsParams: [] as number[], newCardsPerDay: 10 };
+
 /** Apply a rating (1=Again, 2=Hard, 3=Good, 4=Easy) to a (user, word).
  *  Persists the updated scheduling state and appends an immutable review-log row. */
 export async function reviewWord(userId: string, wordId: string, rating: number) {
@@ -19,10 +24,11 @@ export async function reviewWord(userId: string, wordId: string, rating: number)
 
   // The profile holds the user's FSRS tuning; `existing` is the card's current state
   // (null the very first time this word is seen).
-  const [profile, existing] = await Promise.all([
-    db.userProfile.findUniqueOrThrow({ where: { userId } }),
+  const [rawProfile, existing] = await Promise.all([
+    db.userProfile.findUnique({ where: { userId } }),
     db.reviewState.findUnique({ where: { userId_wordId: { userId, wordId } } }),
   ]);
+  const profile = rawProfile ?? DEFAULT_PROFILE;
 
   const scheduler = schedulerFor(profile);
   const { card: next, log } = scheduler.next(toCard(existing, now), now, rating as Grade);
@@ -43,14 +49,15 @@ export async function reviewWord(userId: string, wordId: string, rating: number)
 /** Undo the most recent review for a (user, word): roll the card back to its prior
  *  state and delete that log row. Returns null if there is nothing to undo. */
 export async function undoLastReview(userId: string, wordId: string) {
-  const [profile, current, lastLog] = await Promise.all([
-    db.userProfile.findUniqueOrThrow({ where: { userId } }),
+  const [rawProfile, current, lastLog] = await Promise.all([
+    db.userProfile.findUnique({ where: { userId } }),
     db.reviewState.findUnique({ where: { userId_wordId: { userId, wordId } } }),
     db.reviewLog.findFirst({
       where: { userId, wordId },
       orderBy: { reviewedAt: "desc" },
     }),
   ]);
+  const profile = rawProfile ?? DEFAULT_PROFILE;
   if (!current || !lastLog) return null;
 
   // rollback(currentCard, log) reconstructs the card as it was before that review.
@@ -87,7 +94,7 @@ export async function getStudyQueue(
   // Default 20 matches the Anki community norm for a focused daily session.
   const sessionLimit = opts.sessionLimit ?? 20;
   const now = opts.now ?? new Date();
-  const profile = await db.userProfile.findUniqueOrThrow({ where: { userId } });
+  const profile = (await db.userProfile.findUnique({ where: { userId } })) ?? DEFAULT_PROFILE;
 
   const allDue = await db.reviewState.findMany({
     where: { userId, due: { lte: now } },

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getCurrentUserId } from "@/lib/current-user";
-import { getActiveLevel, getNewCardsPerDay } from "@/lib/profile";
+import { getActiveLevel, getNewCardsPerDay, hasOnboarded } from "@/lib/profile";
 import { Parrot } from "@/components/parrot";
 import { LevelPicker } from "@/components/level-picker";
 import { InfoBubble } from "@/components/info-bubble";
@@ -15,6 +15,7 @@ export default async function HomePage() {
   const session = await auth();
   if (!session) redirect("/auth/signin");
   const userId = await getCurrentUserId();
+  if (!(await hasOnboarded(userId))) redirect("/onboarding");
   const level = await getActiveLevel(userId);
   const newPerDay = await getNewCardsPerDay(userId);
 
