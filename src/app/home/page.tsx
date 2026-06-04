@@ -59,7 +59,7 @@ export default async function HomePage() {
           fullscreen PWA). Anchored from the top, their position is fixed by the content
           above; any height change just adds/removes empty space at the bottom. */}
       <div className="mt-8 flex flex-col gap-4">
-        <ModeButton href="/study" emoji="🎴" title="Flashcard mode" subtitle="Spaced-repetition review" />
+        <ModeButton href="/study" emoji="🎴" title="Flashcards" subtitle="Spaced-repetition review" />
         <ModeButton href="/quiz" emoji="⚡" title="Quiz mode" subtitle="Quick multiple-choice" />
       </div>
 

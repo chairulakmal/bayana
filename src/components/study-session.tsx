@@ -211,7 +211,9 @@ export function StudySession({ level }: { level: string }) {
   const progress = cards.length ? Math.round((index / cards.length) * 100) : 0;
 
   return (
-    <main className="flex min-h-dvh flex-col pt-safe pb-safe">
+    // h-svh: same fix as quiz-session — pins to chrome-visible viewport so the footer
+    // rating buttons are never hidden under the browser tab bar. See quiz-session.tsx.
+    <main className="flex h-svh flex-col pt-safe">
       {/* Top bar: progress bar + count + undo */}
       <SessionHeader
         progress={progress}
@@ -230,17 +232,20 @@ export function StudySession({ level }: { level: string }) {
         }
       />
 
-      {/* Card: tap anywhere to reveal the answer (BRAND.md §7 flashcard) */}
-      <section className="flex flex-1 items-center justify-center px-4 py-4">
+      {/* Card: tap anywhere to reveal the answer (BRAND.md §7 flashcard).
+          Section is overflow-y-auto so long revealed sentences scroll within the section
+          rather than pushing the footer off-screen. my-auto centers the card when it fits;
+          collapses to top when it overflows (avoids the Safari justify-center clip bug). */}
+      <section className="flex flex-1 flex-col overflow-y-auto px-4 py-4">
         <button
           type="button"
           onClick={() => !flipped && setFlipped(true)}
-          className="flex w-full max-w-md flex-col items-center justify-center gap-5 rounded-[var(--r-lg)] px-6 py-10 text-center"
+          className="my-auto flex w-full max-w-md flex-col items-center justify-center gap-5 rounded-[var(--r-lg)] px-6 py-10 text-center"
           style={{
             background: "var(--surface)",
             border: "1px solid var(--line)",
             boxShadow: "var(--shadow)",
-            minHeight: "58dvh",
+            minHeight: "55svh",
             cursor: flipped ? "default" : "pointer",
           }}
         >
@@ -282,13 +287,17 @@ export function StudySession({ level }: { level: string }) {
       </section>
 
       {error && (
-        <p className="px-4 pb-2 text-center text-sm" style={{ color: "var(--bad)" }}>
+        <p className="px-4 pb-1 text-center text-sm" style={{ color: "var(--bad)" }}>
           {error}
         </p>
       )}
 
-      {/* Footer: rating buttons appear once flipped */}
-      <footer className="mx-auto w-full max-w-md p-3">
+      {/* Footer: rating buttons appear once flipped. shrink-0 + safe-area padding — same
+          reasoning as quiz-session footer. */}
+      <footer
+        className="mx-auto w-full max-w-md shrink-0 px-3 pt-2"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
+      >
         {flipped ? (
           <div className="grid grid-cols-4 gap-2">
             {RATINGS.map((r) => (
@@ -310,7 +319,7 @@ export function StudySession({ level }: { level: string }) {
 // Full-screen centered container for loading / empty / done states (paper + ink).
 function Centered({ children }: { children: React.ReactNode }) {
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center px-6 text-center pt-safe pb-safe">
+    <main className="flex min-h-svh flex-col items-center justify-center px-6 text-center pt-safe pb-safe">
       {children}
     </main>
   );

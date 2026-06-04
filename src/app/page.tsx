@@ -115,7 +115,7 @@ export default async function Home() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Feature
               emoji="🎴"
-              title="Flashcard mode"
+              title="Flashcards"
               body="Real spaced repetition — FSRS, the same engine modern Anki runs on. Cards come back right as you're about to forget them."
             />
             <Feature

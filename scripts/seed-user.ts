@@ -33,10 +33,11 @@ async function main() {
     user = (await db.user.findFirst()) ?? (await db.user.create({ data: {} }));
   }
 
-  // 2) Link this user to the allowlisted email so magic-link sign-in attaches to it
+  // 2) Link this user to the first allowlisted email so magic-link sign-in attaches to it
   //    (the Auth.js adapter matches users by email) — preserving existing study progress
-  //    instead of creating a brand-new user on first login.
-  const allowedEmail = process.env.AUTH_ALLOWED_EMAIL || null;
+  //    instead of creating a brand-new user on first login. First address = primary/author.
+  const allowedEmail =
+    (process.env.AUTH_ALLOWED_EMAIL ?? "").split(",")[0]?.trim().toLowerCase() || null;
   if (allowedEmail && user.email !== allowedEmail) {
     user = await db.user.update({ where: { id: user.id }, data: { email: allowedEmail } });
     console.log(`Linked email → ${allowedEmail}`);

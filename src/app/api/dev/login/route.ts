@@ -30,15 +30,28 @@ export async function GET(request: Request) {
     return new NextResponse("Not found", { status: 404 });
   }
 
-  // Log in as the allowlisted/seeded user (case-insensitive, mirroring src/auth.ts).
-  const email = process.env.AUTH_ALLOWED_EMAIL?.trim().toLowerCase();
-  const user = email ? await db.user.findUnique({ where: { email } }) : null;
-  if (!user) {
-    return new NextResponse(
-      "Dev login: no seeded user found for AUTH_ALLOWED_EMAIL. Run `npx tsx scripts/seed-user.ts` first.",
-      { status: 500 },
-    );
+  // Log in as the first (primary) allowlisted user — same comma-split as auth.ts.
+  const email = (process.env.AUTH_ALLOWED_EMAIL ?? "")
+    .split(",")[0]
+    ?.trim()
+    .toLowerCase();
+  if (!email) {
+    return new NextResponse("Dev login: AUTH_ALLOWED_EMAIL is not set.", { status: 500 });
   }
+
+  // Find or create the user — self-seeding so no separate seed script is needed.
+  let user = await db.user.findUnique({ where: { email } });
+  if (!user) {
+    user = await db.user.create({ data: { email } });
+  }
+
+  // Ensure a profile exists with onboardedAt set so the home hub is the landing page
+  // (not the onboarding screen — dev users don't need to go through first-run flow).
+  await db.userProfile.upsert({
+    where: { userId: user.id },
+    update: {},
+    create: { userId: user.id, activeLevel: "N5", onboardedAt: new Date() },
+  });
 
   // Create a real DB session (the exact shape Auth.js's Prisma adapter uses) …
   const sessionToken = randomUUID();

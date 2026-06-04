@@ -121,7 +121,11 @@ export function QuizSession({ level }: { level: string }) {
   };
 
   return (
-    <main className="flex min-h-dvh flex-col pt-safe pb-safe">
+    // h-svh (not min-h-dvh): pins the layout to the "chrome-visible" small viewport height
+    // so the footer is never hidden under the browser tab bar. When chrome hides, extra
+    // blank space appears below the footer — harmless. dvh would grow to fill the gap and
+    // cause layout shifts.
+    <main className="flex h-svh flex-col pt-safe">
       {/* Progress + exit to the home hub */}
       <SessionHeader
         progress={Math.round((index / total) * 100)}
@@ -135,36 +139,47 @@ export function QuizSession({ level }: { level: string }) {
         }
       />
 
-      {/* Prompt: the Japanese word (kanji if present); reading + sentence reveal on answer */}
-      <section className="flex flex-1 flex-col items-center justify-center px-4 py-4 text-center">
-        <p className="text-[13px]" style={{ color: "var(--ink-faint)" }}>
-          What does this mean?
-        </p>
-        <div className="jp mt-3 text-6xl" style={{ fontWeight: 800, color: "var(--ink)", lineHeight: 1.1 }}>
-          {current.expression}
+      {/* Prompt: the Japanese word (kanji if present); reading + sentence reveal on answer.
+          overflow-y-auto: section scrolls internally if the revealed sentence is too tall
+          for the viewport. my-auto on the inner div centers the content when it fits, and
+          collapses to top-align when it overflows — the correct Safari behaviour (justify-center
+          + overflow clips the top of overflowing content and makes it unreachable). */}
+      <section className="flex flex-1 flex-col overflow-y-auto px-4 py-4">
+        <div className="my-auto flex w-full flex-col items-center text-center">
+          <p className="text-[13px]" style={{ color: "var(--ink-faint)" }}>
+            What does this mean?
+          </p>
+          <div className="jp mt-3 text-6xl" style={{ fontWeight: 800, color: "var(--ink)", lineHeight: 1.1 }}>
+            {current.expression}
+          </div>
+          {answered && (
+            <div className="jp mt-2 text-xl" style={{ color: "var(--mag-600)", fontWeight: 700 }}>
+              {current.reading}
+            </div>
+          )}
+          {answered && current.sentence && (
+            <div className="mt-4 w-full max-w-md rounded-[var(--r-md)] p-3 text-left" style={{ background: "var(--surface-cream)" }}>
+              <p className="jp text-[15px] leading-relaxed" style={{ color: "var(--ink)" }}>
+                {current.sentence.japanese}
+              </p>
+              <p className="jp mt-1 text-[13px]" style={{ color: "var(--ink-faint)" }}>
+                {current.sentence.reading}
+              </p>
+              <p className="mt-2 text-[13px] italic" style={{ color: "var(--ink-soft)" }}>
+                {current.sentence.english}
+              </p>
+            </div>
+          )}
         </div>
-        {answered && (
-          <div className="jp mt-2 text-xl" style={{ color: "var(--mag-600)", fontWeight: 700 }}>
-            {current.reading}
-          </div>
-        )}
-        {answered && current.sentence && (
-          <div className="mt-4 w-full max-w-md rounded-[var(--r-md)] p-3 text-left" style={{ background: "var(--surface-cream)" }}>
-            <p className="jp text-[15px] leading-relaxed" style={{ color: "var(--ink)" }}>
-              {current.sentence.japanese}
-            </p>
-            <p className="jp mt-1 text-[13px]" style={{ color: "var(--ink-faint)" }}>
-              {current.sentence.reading}
-            </p>
-            <p className="mt-2 text-[13px] italic" style={{ color: "var(--ink-soft)" }}>
-              {current.sentence.english}
-            </p>
-          </div>
-        )}
       </section>
 
-      {/* Options + Continue */}
-      <footer className="mx-auto w-full max-w-md p-3">
+      {/* Options + Continue. shrink-0 prevents the footer from being squeezed.
+          max(0.75rem, env(safe-area-inset-bottom)) = at least 12px, plus home indicator
+          safe area on notched devices — covers both browser and PWA modes. */}
+      <footer
+        className="mx-auto w-full max-w-md shrink-0 px-3 pt-2"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
+      >
         <div className="flex flex-col gap-2">
           {current.options.map((o, i) => {
             let cls = "opt";
@@ -192,7 +207,7 @@ export function QuizSession({ level }: { level: string }) {
 // Full-screen centered container for loading / empty / summary states (paper + ink).
 function Centered({ children }: { children: React.ReactNode }) {
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center px-6 text-center pt-safe pb-safe">
+    <main className="flex min-h-svh flex-col items-center justify-center px-6 text-center pt-safe pb-safe">
       {children}
     </main>
   );
