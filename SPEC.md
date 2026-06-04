@@ -740,8 +740,9 @@ uses database sessions (§11.3 #6).
   sentence on reveal. Duolingo-grade UI, minimal animation, zero ads.
 - Level scope + home hub (`/home`): `UserProfile.activeLevel`, returning-user mode picker
   (Flashcard / Quiz), inline level selector.
-- Light polish shipped: **browse/search** (`/browse`, browser-cached word list, lazy
-  sentence per tap, §8.3), **basic stats** (`/stats` — started/total, due, recall rate),
+- Light polish shipped: **browse/search** (`/browse`, browser-cached word list, 50/page
+  pagination, started-words-first, inline level switcher, lazy sentence per tap, §8.3),
+  **basic stats** (`/stats` — started/total, due, recall rate),
   **default `newCardsPerDay` lowered 20 → 10** with a tap-to-open `InfoBubble` explanation
   on the landing and home hub, **installable PWA** (pulled forward from Phase 5, §8.4).
 - MC↔FSRS coupling and Flashcard↔Quiz synergy **deferred by choice** (§15, §16) — revisit
@@ -759,7 +760,10 @@ uses database sessions (§11.3 #6).
 **Phase 4 — Multi-user**
 - Widen/remove the email allowlist; real `User` rows; authorization checks scoping all
   reads/writes by `userId`.
-- Per-user settings (directions, daily limits, level focus).
+- Per-user settings are **intentionally minimal** (see §16); multi-user does not imply a
+  settings page. The active level (already inline on `/home`) is the only planned user-facing
+  control; all other parameters (`newCardsPerDay`, FSRS retention target, study direction)
+  remain author-set defaults.
 - **First-run onboarding (§8.5)** — moved here from Phase 2: level choice → 5-question Quiz
   warm-up (non-scheduling) → guided tour; uses the existing `UserProfile.onboardedAt` column
   to branch first-time vs. returning. Deferred because a first-run experience only earns its
@@ -835,6 +839,8 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-06-04 | **Phase 2 complete. User-defined settings are intentionally minimal** — no settings page, no user-tweakable knobs beyond active level. Parameters (`newCardsPerDay`, FSRS retention target, study direction) remain author-set opinionated defaults. | Bayana's thesis (§2) is "one-tap, no-config." A settings page contradicts this and adds maintenance surface for each parameter exposed. The one control that belongs in the user's hands — which level they're studying — is already inline on the home hub and not a dedicated settings screen. Adding UI for `newCardsPerDay` or retention target would let users work against the research-backed defaults without a clear benefit; the self-correcting feedback loop (overreach → review debt → natural pacing) is the intended mechanism. | Author | §2, §8.5, §13 |
+| 2026-06-04 | **Browse iterated:** render cap of 50 replaced with true 50/page pagination; started-words-first sort (reviewed words surface first, with a magenta dot indicator); inline `BrowseLevelPicker` chip row (calls `setActiveLevel` + `router.push('/browse')` to clear stale URL params); editable page-number `type="number"` input with JS clamping on blur/Enter. | The initial render cap was a DOM-size guard masquerading as pagination — users on page 5 had no way to reach page 6. True pagination with `safePage = Math.min(currentPage, totalPages)` handles results shrinking mid-session. Started-first ordering makes the first page immediately useful (shows what the user is actively studying). The level switcher navigates without a `?level=` param because `router.refresh()` would have left a stale URL override; `key={lvl}` on `BrowseClient` triggers a clean remount. | Author | §8.3 |
 | 2026-06-04 | **Browse/search shipped as Phase 2 light polish.** `/browse` (whole-deck lookup for the active level) + `GET /api/browse?level=` (browser-cached word list, no sentences) + `GET /api/words/[id]/sentence` (lazy sentence per tap, 24 h cache). Client-side filtering in memory with a render cap of 50. Linked from `/home`. The "soon" tag removed from the Quiz feature card on the landing page — Quiz is live. | Whole-deck browse chosen over "seen cards only" (a collection/history view); the latter belongs in stats. Browser `Cache-Control` headers (rather than server-side Next.js revalidation) were chosen because they eliminate repeat round-trips to Railway for data that changes ~never, and because the client-side filter means zero requests per keystroke. Render cap avoids 2,699-node DOM without requiring a virtualization library. | Author | §8.3, §9, §10 |
 | 2026-06-04 | **`newCardsPerDay` is a per-queue-build pace, not a rolling per-calendar-day ceiling** — deliberately *not* tracking new cards introduced per day. After finishing a session a user can build another queue and get up to `newCardsPerDay` more new words, repeatedly. The proposed "rolling daily cap" is a **non-goal**. | Intentional: let motivated users challenge themselves *on their own terms* rather than be hard-blocked at an arbitrary daily number. The cap still shapes the gentle **default single-session pace**, and reviews-first scheduling means anyone who overreaches simply inherits the review load they created — a self-correcting feedback loop, not a paternalistic lock. | Author | §6, §8.1 |
 | 2026-06-04 | **Default `newCardsPerDay` lowered 20 → 10** (migration also brings existing profiles still on the old default down). A "ten words a day" pace note with a tap-to-open rationale (`InfoBubble`) added to the landing hero and the home hub. | Research + community consensus put the sustainable JLPT pace at ~10–15 new/day; *review debt* (reviews compounding faster than they can be cleared) is the top reason learners abandon SRS, and the retention→workload curve is exponential (each new card ≈ 10 lifetime reviews, so 10/day ≈ a humane ~100 reviews/day at steady state vs ~200 at 20/day). 10 also matches the "ten words at a time" product promise. Desired retention stays 0.9 (the data-backed sweet spot). Sources: FSRS optimal-retention wiki; Cepeda et al. 2006 (spacing meta-analysis); JLPT/Anki community pacing guides. | Author | §6, §8.5 |

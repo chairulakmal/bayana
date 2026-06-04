@@ -5,12 +5,8 @@ Execution checklist and progress tracker. **Plan and rationale live in
 state* — what's done and what's next. Keep it current; it's the "where we left off"
 record across sessions. Decisions do **not** go here — log them in SPEC.md §16.
 
-**Now:** Phases 1a–1c done (live on Railway; all 8,101 words seeded). **Phase 2 — Quiz mode
-is functionally complete**: MC quiz with confusability-scored distractors, level-scoped home
-hub, light `/stats`, installable PWA, and a sustainable 10-new-words/day pace. **Next:
-browse/search** — the last concrete Phase 2 build. The MC↔FSRS coupling and Flashcard↔Quiz
-synergy are deferred *by choice* (revisit after browse). Then
-Phase 3 (admin audit + on-demand generation).
+**Now:** Phases 1a–2 done (live on Railway; all 8,101 words seeded; Phase 2 complete).
+**Next: Phase 3** (admin sentence-audit + on-demand generation).
 
 ---
 
@@ -87,7 +83,7 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
 - On-demand `/api/generate` + fetch-on-flip — **moved to Phase 3** (no longer needed for
   coverage now that every word is seeded; returns as a safety net with the admin tooling).
 
-## Phase 2 — Quiz mode ◀ current focus
+## Phase 2 — Quiz mode ✅ done
 - [x] **Level scope + home hub** — `UserProfile.activeLevel` added (migration
   `20260604003054_add_user_active_level`); `/home` mode picker + inline level chips
   (`setActiveLevel` server action); `/study` & `/quiz` read the active level;
@@ -101,19 +97,18 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
   feedback, score summary with Pī; `prefers-reduced-motion`-aware; mobile-first
 - [x] **Dev login** — `GET /api/dev/login` mints a real session for the seeded user
   (gated by `DEV_AUTH`, 404 in prod); dev button on the sign-in page (SPEC §11.7)
-- [ ] Flashcard↔Quiz synergy (FSRS-informed distractor/target selection; feeding results
-  back) — depends on resolving the MC↔FSRS coupling below (SPEC §8.2, §15)
-- [ ] Resolve MC↔FSRS coupling — feed the scheduler or stay a separate practice mode
-  (SPEC §8.2, §15)
+- Flashcard↔Quiz synergy and MC↔FSRS coupling — **deferred by choice**; revisit with
+  usage data (SPEC §8.2, §15, §16)
 - [x] **Basic stats** (light, not the Phase-4 dashboard) — `/stats` page + `src/lib/stats.ts`;
   per active level: words started/total + mature, due now, 30-day recall rate; linked from
   `/home`. Day streak deferred (timezone/rollover) to a follow-up.
 - [x] **Browse/search** — `/browse` + `GET /api/browse?level=` (browser-cached word list,
   `Cache-Control: private, max-age=3600, stale-while-revalidate=86400`) + `GET /api/words/
   [id]/sentence` (lazy sentence on tap, cached 24h); client-side filtering in memory;
-  render cap of 50; accordion sentence reveal. Linked from `/home`.
-- [ ] Light polish (optional): daily new-card-limit UI control (limit already enforced
-  server-side in `getStudyQueue`)
+  paginated 50/page; started-words-first ordering; inline level switcher (`BrowseLevelPicker`);
+  accordion sentence reveal. Linked from `/home`.
+- User-adjustable settings UI — **intentional non-goal** (SPEC §16); Bayana is opinionated
+  by design; the active level is the sole user-facing control and lives inline on `/home`
 - [x] Public homepage at `/` (brand + Pī mascot + Sign-in CTA + MIT/GitHub); study app
   moved to `/study`; brand foundation (tokens/fonts in globals, `Parrot` component, Pī
   favicon) per BRAND.md
