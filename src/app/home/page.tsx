@@ -70,10 +70,14 @@ export default async function HomePage() {
         style={{ color: "var(--ink-faint)" }}
       >
         <span>🌱 {newPerDay} new words a day</span>
-        <InfoBubble label="Why ten new words a day?">
-          <strong style={{ color: "var(--ink)" }}>Why ten a day?</strong> It&apos;s a pace you
-          can keep. Spaced repetition rewards showing up daily over cramming, and capping new
-          words stops tomorrow&apos;s reviews from piling up — the main reason people quit.
+        <InfoBubble label="How the study pace works">
+          <strong style={{ color: "var(--ink)" }}>Two bite-sized paces.</strong>
+          <br />
+          🎴 <strong style={{ color: "var(--ink)" }}>Flashcard</strong> — {newPerDay}{" "} new words a
+          day. A pace you can keep, so reviews don&apos;t pile up (the #1 reason people quit).
+          <br />
+          ⚡ <strong style={{ color: "var(--ink)" }}>Quiz</strong> — 10 cards a session. A quick
+          round whenever you want momentum.
           <br />
           <span className="jp">毎日ちょっとずつ</span> — a little every day.
         </InfoBubble>

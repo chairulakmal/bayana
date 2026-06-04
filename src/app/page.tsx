@@ -55,17 +55,20 @@ export default async function Home() {
             </h1>
 
             <p className="mx-auto mt-4 max-w-md text-[17px] md:mx-0" style={{ color: "var(--ink-soft)" }}>
-              Ten words at a time, two minutes a day.{" "}
-              <InfoBubble label="Why ten words a day?">
-                <strong style={{ color: "var(--ink)" }}>Why ten a day?</strong> It&apos;s a
-                pace you can keep. Spaced repetition rewards showing up daily over cramming,
-                and capping new words stops the daily review pile from snowballing — the
-                main reason people abandon flashcards.
+              Ten words at a time, two minutes a day.
+              Real spaced repetition with an AI example sentence for every word — no decks to
+              build, no ads to dodge, open it anytime.{" "}
+              <InfoBubble label="How the study pace works">
+                <strong style={{ color: "var(--ink)" }}>Two bite-sized paces.</strong>
+                <br />
+                🎴 <strong style={{ color: "var(--ink)" }}>Flashcard</strong> — 10 new words a
+                day. A pace you can keep, so reviews don&apos;t snowball.
+                <br />
+                ⚡ <strong style={{ color: "var(--ink)" }}>Quiz</strong> — 10 cards a session. A
+                quick round for momentum.
                 <br />
                 <span className="jp">毎日ちょっとずつ</span> — a little every day.
-              </InfoBubble>{" "}
-              Real spaced repetition with an AI example sentence for every word — no decks to
-              build, no ads to dodge, open it anytime.
+              </InfoBubble>
             </p>
 
             {/* Primary CTA — the one thing this page is for. Both buttons share btn-lg so
