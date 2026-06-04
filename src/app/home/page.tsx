@@ -2,9 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getCurrentUserId } from "@/lib/current-user";
-import { getActiveLevel } from "@/lib/profile";
+import { getActiveLevel, getNewCardsPerDay } from "@/lib/profile";
 import { Parrot } from "@/components/parrot";
 import { LevelPicker } from "@/components/level-picker";
+import { InfoBubble } from "@/components/info-bubble";
 
 // The home hub (SPEC §8.5) — the post-login landing for returning users. It's the mode
 // picker (Flashcard / Quiz) plus an inline level selector; deliberately NOT a full dashboard
@@ -14,6 +15,7 @@ export default async function HomePage() {
   if (!session) redirect("/auth/signin");
   const userId = await getCurrentUserId();
   const level = await getActiveLevel(userId);
+  const newPerDay = await getNewCardsPerDay(userId);
 
   return (
     // min-h-svh (not dvh): the "small" viewport height is fixed at the bar-visible size,
@@ -60,6 +62,22 @@ export default async function HomePage() {
         <ModeButton href="/study" emoji="🎴" title="Flashcard mode" subtitle="Spaced-repetition review" />
         <ModeButton href="/quiz" emoji="⚡" title="Quiz mode" subtitle="Quick multiple-choice" />
       </div>
+
+      {/* Daily-pace note: shows the user's actual new-card cap, with the "why ten?" rationale
+          a tap away. New words enter via Flashcard mode's queue (Quiz mode is non-scheduling). */}
+      <p
+        className="mt-5 flex items-center justify-center gap-1.5 text-[13px]"
+        style={{ color: "var(--ink-faint)" }}
+      >
+        <span>🌱 {newPerDay} new words a day</span>
+        <InfoBubble label="Why ten new words a day?">
+          <strong style={{ color: "var(--ink)" }}>Why ten a day?</strong> It&apos;s a pace you
+          can keep. Spaced repetition rewards showing up daily over cramming, and capping new
+          words stops tomorrow&apos;s reviews from piling up — the main reason people quit.
+          <br />
+          <span className="jp">毎日ちょっとずつ</span> — a little every day.
+        </InfoBubble>
+      </p>
     </main>
   );
 }

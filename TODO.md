@@ -108,8 +108,12 @@ Goal: a locally-running app you can actually study N3 with. No auth, no deploy y
 - [ ] **Browse/search** ◀ next — whole-deck lookup for the active level (search by
   kanji/reading/meaning, sentence on tap); search-first with a render cap; browser-cached
   word list (no sentences up front)
+- [x] **Default `newCardsPerDay` 20 → 10** (migration `20260604163321_lower_new_cards_default`,
+  existing rows brought down too) + a "ten words a day" pace note with a tap-to-open
+  rationale (`InfoBubble`) on the landing hero and home hub (SPEC §16).
 - [ ] Light polish (optional): daily new-card-limit UI control (limit already enforced
-  server-side in `getStudyQueue`)
+  server-side in `getStudyQueue`); a true rolling per-calendar-day cap (vs. the current
+  per-queue-build cap) would pair well with the lower default
 - [x] Public homepage at `/` (brand + Pī mascot + Sign-in CTA + MIT/GitHub); study app
   moved to `/study`; brand foundation (tokens/fonts in globals, `Parrot` component, Pī
   favicon) per BRAND.md

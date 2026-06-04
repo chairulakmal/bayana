@@ -14,3 +14,16 @@ export async function getActiveLevel(userId: string): Promise<Level> {
   });
   return profile?.activeLevel ?? Level.N5;
 }
+
+/**
+ * The user's daily new-card cap (`UserProfile.newCardsPerDay`). Surfaced on the home hub
+ * next to an explanation of the "ten words a day" pace. Falls back to the schema default
+ * (10) if the profile is somehow missing.
+ */
+export async function getNewCardsPerDay(userId: string): Promise<number> {
+  const profile = await db.userProfile.findUnique({
+    where: { userId },
+    select: { newCardsPerDay: true },
+  });
+  return profile?.newCardsPerDay ?? 10;
+}

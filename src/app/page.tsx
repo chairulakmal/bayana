@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { Parrot } from "@/components/parrot";
+import { InfoBubble } from "@/components/info-bubble";
 
 // Public marketing homepage (BRAND.md). The primary CTA is "Sign in" — so this page is for
 // logged-out visitors. Already signed in? Go straight to the study queue (one-tap start,
@@ -54,9 +55,17 @@ export default async function Home() {
             </h1>
 
             <p className="mx-auto mt-4 max-w-md text-[17px] md:mx-0" style={{ color: "var(--ink-soft)" }}>
-              Ten words at a time, two minutes a day. Real spaced repetition with an
-              AI example sentence for every word — no decks to build, no ads to dodge,
-              open it anytime.
+              Ten words at a time, two minutes a day.{" "}
+              <InfoBubble label="Why ten words a day?">
+                <strong style={{ color: "var(--ink)" }}>Why ten a day?</strong> It&apos;s a
+                pace you can keep. Spaced repetition rewards showing up daily over cramming,
+                and capping new words stops the daily review pile from snowballing — the
+                main reason people abandon flashcards.
+                <br />
+                <span className="jp">毎日ちょっとずつ</span> — a little every day.
+              </InfoBubble>{" "}
+              Real spaced repetition with an AI example sentence for every word — no decks to
+              build, no ads to dodge, open it anytime.
             </p>
 
             {/* Primary CTA — the one thing this page is for. Both buttons share btn-lg so
