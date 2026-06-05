@@ -1,6 +1,4 @@
-import { redirect } from "next/navigation";
-import { auth } from "@/auth";
-import { getCurrentUserId } from "@/lib/current-user";
+import { requireAuth } from "@/lib/current-user";
 import { getActiveLevel } from "@/lib/profile";
 import { QuizSession } from "@/components/quiz-session";
 import { Level } from "@/generated/prisma/enums";
@@ -12,10 +10,7 @@ export default async function QuizPage({
 }: {
   searchParams: Promise<{ level?: string }>;
 }) {
-  const session = await auth();
-  if (!session) redirect("/auth/signin");
-
-  const userId = await getCurrentUserId();
+  const { userId } = await requireAuth();
   const { level } = await searchParams;
   // Object.hasOwn, not `in`: `in` accepts prototype keys ("constructor", …); we only want
   // real enum members before trusting the URL param over the user's stored level.

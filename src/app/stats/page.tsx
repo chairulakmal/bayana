@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { auth } from "@/auth";
-import { getCurrentUserId } from "@/lib/current-user";
+import { requireAuth } from "@/lib/current-user";
 import { getActiveLevel } from "@/lib/profile";
 import { getLevelStats } from "@/lib/stats";
 import { HomeLink } from "@/components/home-link";
@@ -10,9 +8,7 @@ import { HomeLink } from "@/components/home-link";
 // per-active-level numbers — progress, due, recall — linked from the home hub. Server
 // component: it reads the DB directly, so the numbers are always fresh on navigation.
 export default async function StatsPage() {
-  const session = await auth();
-  if (!session) redirect("/auth/signin");
-  const userId = await getCurrentUserId();
+  const { userId } = await requireAuth();
   const level = await getActiveLevel(userId);
   const stats = await getLevelStats(userId, level);
 

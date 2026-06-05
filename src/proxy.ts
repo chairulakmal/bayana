@@ -50,15 +50,20 @@ export function proxy(req: NextRequest) {
     }
   }
 
-  // Public: the marketing homepage, the sign-in page, and all Auth.js endpoints. The
-  // dev-login bypass is reachable without a session (it creates one) — but only outside
-  // production; the route itself also 404s in prod (SPEC §11.7).
+  // Public: the marketing homepage, the sign-in page, all Auth.js endpoints, and the
+  // demo login route (it creates the session, so it must be reachable without one).
+  // The dev-login bypass is only outside production (SPEC §11.7).
   const isPublic =
     pathname === "/" ||
     pathname.startsWith("/auth") ||
     pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/demo") ||
     (process.env.NODE_ENV !== "production" && pathname.startsWith("/api/dev"));
-  const hasSession = SESSION_COOKIES.some((name) => req.cookies.has(name));
+  // Demo cookie is the second valid session type — no Auth.js Session row.
+  // Proxy only checks presence here; HMAC verification happens in getCurrentUserId().
+  const hasSession =
+    SESSION_COOKIES.some((name) => req.cookies.has(name)) ||
+    req.cookies.has("bayana-demo-token");
 
   if (!isPublic && !hasSession) {
     return NextResponse.redirect(new URL("/auth/signin", req.url));

@@ -1,16 +1,11 @@
-import { redirect } from "next/navigation";
-import { auth } from "@/auth";
-import { getCurrentUserId } from "@/lib/current-user";
+import { requireAuth } from "@/lib/current-user";
 import { getActiveLevel } from "@/lib/profile";
 import { StudySession } from "@/components/study-session";
 
-// The study app — Flashcard mode, scoped to the user's active level (§8.5). Server-side auth
-// gate: unauthenticated visitors go to sign-in (also catches expired sessions the
-// cookie-only proxy guard would let through). The home hub lives at `/home`.
+// Flashcard mode, scoped to the user's active level (§8.5). `requireAuth` handles both
+// real sessions and demo cookies, and redirects to sign-in if neither is present.
 export default async function StudyPage() {
-  const session = await auth();
-  if (!session) redirect("/auth/signin");
-  const userId = await getCurrentUserId();
+  const { userId } = await requireAuth();
   const level = await getActiveLevel(userId);
   return <StudySession level={level} />;
 }

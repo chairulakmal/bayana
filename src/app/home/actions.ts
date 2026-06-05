@@ -4,8 +4,11 @@
 // is a server action callable from client components — keep them auth-checked and
 // input-validated, since the client is untrusted.
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { signOut } from "@/auth";
 import { getCurrentUserId } from "@/lib/current-user";
+import { DEMO_COOKIE_NAME } from "@/lib/current-user";
 import { db } from "@/lib/db";
 import { Level } from "@/generated/prisma/enums";
 
@@ -16,6 +19,16 @@ import { Level } from "@/generated/prisma/enums";
  */
 export async function signOutAction(): Promise<void> {
   await signOut({ redirectTo: "/" });
+}
+
+/**
+ * End a demo session. Deletes the demo cookie (no DB Session row to clear) and
+ * redirects to the sign-in page. Called from UserMenu when `isDemo` is true.
+ */
+export async function demoSignOutAction(): Promise<void> {
+  const jar = await cookies();
+  jar.delete(DEMO_COOKIE_NAME);
+  redirect("/auth/signin");
 }
 
 /** Persist the user's active JLPT level (the level both modes operate on). */

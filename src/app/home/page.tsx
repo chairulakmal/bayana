@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
-import { getCurrentUserId } from "@/lib/current-user";
+import { requireAuth } from "@/lib/current-user";
 import { getActiveLevel, getNewCardsPerDay, hasOnboarded } from "@/lib/profile";
 import { Parrot } from "@/components/parrot";
 import { LevelPicker } from "@/components/level-picker";
@@ -12,19 +11,20 @@ import { UserMenu } from "@/components/user-menu";
 // picker (Flashcard / Quiz) plus an inline level selector; deliberately NOT a full dashboard
 // (stats/streak live there in Phase 4). Login and the public landing both redirect here.
 export default async function HomePage() {
-  const session = await auth();
-  if (!session) redirect("/auth/signin");
-  const userId = await getCurrentUserId();
+  const { userId, email, isDemo } = await requireAuth();
   if (!(await hasOnboarded(userId))) redirect("/onboarding");
   const level = await getActiveLevel(userId);
   const newPerDay = await getNewCardsPerDay(userId);
+  // Server-only env var (not NEXT_PUBLIC_) — address appears only in rendered HTML,
+  // never in the client bundle or source control.
+  const contactEmail = process.env.OWNER_CONTACT_EMAIL;
 
   return (
     // min-h-svh (not dvh): the "small" viewport height is fixed at the bar-visible size,
     // so the centred mode buttons don't hop when Android's gesture/nav bar shows or hides
     // in the installed PWA. dvh recomputes live and shifts the vertical centre.
     <main className="mx-auto flex min-h-svh w-full max-w-md flex-col px-5 py-8">
-      {/* Greeting + quiet link to the stats page */}
+      {/* Greeting + account menu */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Parrot expr="happy" style={{ width: 48, height: 54 }} />
@@ -37,8 +37,30 @@ export default async function HomePage() {
             </p>
           </div>
         </div>
-        <UserMenu email={session.user?.email ?? ""} />
+        <UserMenu email={email ?? ""} isDemo={isDemo} />
       </div>
+
+      {/* Demo banner — only shown to demo users. Subdued but persistent so they know
+          their progress is cookie-bound. Includes a contact link to request real access. */}
+      {isDemo && (
+        <p className="mt-4 text-[12px]" style={{ color: "var(--ink-faint)" }}>
+          Demo mode · your progress lives in this browser only.{" "}
+          {contactEmail ? (
+            <>
+              Want to keep it?{" "}
+              <a
+                href={`mailto:${contactEmail}?subject=${encodeURIComponent("Bayana access request")}`}
+                className="font-semibold underline"
+                style={{ color: "var(--ink-soft)" }}
+              >
+                Contact the owner to sign up →
+              </a>
+            </>
+          ) : (
+            "Sign up to keep it."
+          )}
+        </p>
+      )}
 
       {/* Level — the inline "set your level" control */}
       <div className="mt-8">

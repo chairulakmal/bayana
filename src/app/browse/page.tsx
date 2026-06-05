@@ -1,6 +1,4 @@
-import { redirect } from "next/navigation";
-import { auth } from "@/auth";
-import { getCurrentUserId } from "@/lib/current-user";
+import { requireAuth } from "@/lib/current-user";
 import { getActiveLevel } from "@/lib/profile";
 import { BrowseClient } from "@/components/browse-client";
 import { HomeLink } from "@/components/home-link";
@@ -13,10 +11,7 @@ import { HomeLink } from "@/components/home-link";
 export const metadata = { title: "Browse" };
 
 export default async function BrowsePage() {
-  const session = await auth();
-  if (!session) redirect("/auth/signin");
-
-  const userId = await getCurrentUserId();
+  const { userId } = await requireAuth();
   const level = await getActiveLevel(userId);
 
   return (
