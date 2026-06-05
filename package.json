@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3887",
+    "dev": "docker compose up -d && next dev -p 3887",
     "build": "next build",
     "start": "next start -p 3887",
     "start:prod": "prisma migrate deploy && next start -p ${PORT:-3887}",

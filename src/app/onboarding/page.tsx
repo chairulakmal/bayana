@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
-import { getCurrentUserId } from "@/lib/current-user";
+import { requireAuth } from "@/lib/current-user";
 import { hasOnboarded } from "@/lib/profile";
 import { OnboardingClient } from "@/components/onboarding-client";
 
@@ -10,10 +9,7 @@ import { OnboardingClient } from "@/components/onboarding-client";
 // Deliberately minimal: one question (level), one button, straight into quiz mode.
 // No skip — a level choice is required for any part of the app to work.
 export default async function OnboardingPage() {
-  const session = await auth();
-  if (!session) redirect("/auth/signin");
-
-  const userId = await getCurrentUserId();
+  const { userId } = await requireAuth();
   if (await hasOnboarded(userId)) redirect("/home");
 
   return (
