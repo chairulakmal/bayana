@@ -15,6 +15,8 @@ data model, generation pipeline, security, milestones, and the rationale behind 
 major decision. Read it before proposing or implementing anything, and **keep it
 updated** when a decision changes (it is a living design doc, not a frozen artifact).
 
+**[BRAND.md](BRAND.md) is the single source of truth** for the styles and brand voice.
+
 ## Primary goal: this is a learning project
 
 **The point of Bayana is to improve the author's development skills, not just to ship

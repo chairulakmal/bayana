@@ -21,7 +21,9 @@ export async function signOutAction(): Promise<void> {
 /** Persist the user's active JLPT level (the level both modes operate on). */
 export async function setActiveLevel(level: Level): Promise<void> {
   const userId = await getCurrentUserId(); // throws → action errors if unauthenticated
-  if (!(level in Level)) throw new Error(`Invalid level: ${String(level)}`);
+  // Object.hasOwn, not `in`: the arg is untrusted (server action), and `in` would accept
+  // prototype keys like "constructor".
+  if (!Object.hasOwn(Level, level)) throw new Error(`Invalid level: ${String(level)}`);
   // upsert: a new user may not have a UserProfile row yet (it's created lazily).
   await db.userProfile.upsert({
     where: { userId },

@@ -96,16 +96,23 @@ export async function getStudyQueue(
   const now = opts.now ?? new Date();
   const profile = (await db.userProfile.findUnique({ where: { userId } })) ?? DEFAULT_PROFILE;
 
-  const allDue = await db.reviewState.findMany({
-    where: { userId, due: { lte: now } },
-    orderBy: { due: "asc" },
-    include: { word: { include: { sentences: { take: 1 } } } },
-  });
-
-  // totalDue is the raw count before capping — returned to the client so it can show
-  // "N more waiting" on the session-complete screen.
-  const totalDue = allDue.length;
-  const due = allDue.slice(0, sessionLimit);
+  // Two narrow queries instead of one fat one. We need both the slice we'll show AND the
+  // total-waiting count, but materializing every due row (with its word + sentence joined)
+  // just to slice 20 and call `.length` is O(backlog): a user who lapses for weeks could
+  // pull hundreds of joined rows into memory on every queue build (the route is
+  // force-dynamic, so nothing caches it). Instead:
+  //   - count() — touches no joins, just the [userId, due] index;
+  //   - findMany(take: sessionLimit) — bounds the expensive join to the cards we render.
+  // Both run in parallel and both hit @@index([userId, due]).
+  const [totalDue, due] = await Promise.all([
+    db.reviewState.count({ where: { userId, due: { lte: now } } }),
+    db.reviewState.findMany({
+      where: { userId, due: { lte: now } },
+      orderBy: { due: "asc" },
+      take: sessionLimit,
+      include: { word: { include: { sentences: { take: 1 } } } },
+    }),
+  ]);
 
   // How many slots remain for new words, honouring both the session cap and the
   // new-card pace preference (whichever is smaller wins). This is a *per-build* pace, not

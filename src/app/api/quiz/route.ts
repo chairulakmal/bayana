@@ -27,8 +27,10 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
 
   // Validate the level against the enum so a bad query string can't reach the DB.
+  // Object.hasOwn (not the `in` operator): `in` walks the prototype chain, so keys like
+  // "constructor"/"toString" would pass and reach Prisma as an invalid enum (→ 500).
   const levelParam = params.get("level") ?? "N3";
-  if (!(levelParam in Level)) {
+  if (!Object.hasOwn(Level, levelParam)) {
     return NextResponse.json({ error: `Unknown level "${levelParam}"` }, { status: 400 });
   }
 

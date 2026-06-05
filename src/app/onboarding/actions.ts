@@ -15,7 +15,9 @@ import { Level } from "@/generated/prisma/enums";
  */
 export async function completeOnboarding(level: Level): Promise<void> {
   const userId = await getCurrentUserId();
-  if (!(level in Level)) throw new Error(`Invalid level: ${String(level)}`);
+  // Object.hasOwn, not `in`: the arg is untrusted (server action), and `in` would accept
+  // prototype keys like "constructor".
+  if (!Object.hasOwn(Level, level)) throw new Error(`Invalid level: ${String(level)}`);
   await db.userProfile.upsert({
     where: { userId },
     update: { activeLevel: level, onboardedAt: new Date() },

@@ -17,6 +17,8 @@ export default async function QuizPage({
 
   const userId = await getCurrentUserId();
   const { level } = await searchParams;
-  const lvl = level && level in Level ? level : await getActiveLevel(userId);
+  // Object.hasOwn, not `in`: `in` accepts prototype keys ("constructor", …); we only want
+  // real enum members before trusting the URL param over the user's stored level.
+  const lvl = level && Object.hasOwn(Level, level) ? level : await getActiveLevel(userId);
   return <QuizSession level={lvl} />;
 }

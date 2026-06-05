@@ -33,8 +33,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Object.hasOwn, not `in`: `in` walks the prototype chain, so "constructor"/"toString"
+  // would pass and reach Prisma as an invalid enum value.
   const levelParam = new URL(request.url).searchParams.get("level") ?? "N3";
-  if (!(levelParam in Level)) {
+  if (!Object.hasOwn(Level, levelParam)) {
     return NextResponse.json({ error: `Unknown level "${levelParam}"` }, { status: 400 });
   }
 
