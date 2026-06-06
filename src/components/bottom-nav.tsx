@@ -33,12 +33,12 @@ export function BottomNav() {
             <Link
               key={href}
               href={href}
-              className="flex flex-1 flex-col items-center justify-center gap-1 py-2.5"
+              className="flex flex-1 flex-col items-center justify-center gap-1.5 py-4"
               style={{ color: active ? "var(--grape)" : "var(--ink-faint)" }}
             >
               <Icon active={active} />
               <span
-                className="text-[10px]"
+                className="text-[11px]"
                 style={{
                   fontFamily: "var(--f-display)",
                   fontWeight: active ? 700 : 500,
@@ -61,8 +61,8 @@ export function BottomNav() {
 function HomeIcon({ active }: { active: boolean }) {
   return (
     <svg
-      width="22"
-      height="22"
+      width="26"
+      height="26"
       viewBox="0 0 24 24"
       fill={active ? "var(--grape)" : "none"}
       stroke={active ? "var(--grape)" : "currentColor"}
@@ -80,8 +80,8 @@ function HomeIcon({ active }: { active: boolean }) {
 function StatsIcon({ active }: { active: boolean }) {
   return (
     <svg
-      width="22"
-      height="22"
+      width="26"
+      height="26"
       viewBox="0 0 24 24"
       fill="none"
       stroke={active ? "var(--grape)" : "currentColor"}
@@ -99,8 +99,8 @@ function StatsIcon({ active }: { active: boolean }) {
 function BrowseIcon({ active }: { active: boolean }) {
   return (
     <svg
-      width="22"
-      height="22"
+      width="26"
+      height="26"
       viewBox="0 0 24 24"
       fill="none"
       stroke={active ? "var(--grape)" : "currentColor"}
