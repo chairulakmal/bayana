@@ -54,7 +54,7 @@ export function InfoBubble({
       {open && (
         <span
           role="tooltip"
-          className="absolute top-full left-1/2 z-20 mt-2 -translate-x-1/2 rounded-[var(--r-md)] p-3 text-left text-[12px] leading-relaxed"
+          className="absolute top-full left-1/2 z-50 mt-2 -translate-x-1/2 rounded-[var(--r-md)] p-3 text-left text-[12px] leading-relaxed"
           style={{
             width: "min(16rem, calc(100vw - 2rem))",
             background: "var(--surface)",
