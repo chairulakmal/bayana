@@ -36,7 +36,13 @@ export async function GET(request: Request) {
   const cookieValue = `${user.id}:${signDemoUserId(user.id)}`;
   const expires = new Date(Date.now() + DEMO_COOKIE_TTL_MS);
 
-  const res = NextResponse.redirect(new URL("/onboarding", request.url));
+  // Use AUTH_URL for the redirect base. In Railway, `request.url` reflects the
+  // internal host (localhost:8080), not the public domain — AUTH_URL is the
+  // reliable source of the public origin in both dev and prod.
+  const origin = process.env.AUTH_URL
+    ? new URL(process.env.AUTH_URL).origin
+    : new URL(request.url).origin;
+  const res = NextResponse.redirect(new URL("/onboarding", origin));
   res.cookies.set(DEMO_COOKIE_NAME, cookieValue, {
     httpOnly: true,
     sameSite: "lax",
