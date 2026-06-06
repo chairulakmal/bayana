@@ -61,7 +61,8 @@ function cleanWord(word: Word): Word {
 }
 
 function splitByLevel(words: Word[]): Record<Level, Word[]> {
-    const result = Object.fromEntries(LEVELS.map(l => [l, []])) as Record<Level, Word[]>
+    const result = {} as Record<Level, Word[]>
+    for (const l of LEVELS) result[l] = []
     for (const word of words) {
         if (!LEVELS.includes(word.level)) {
             console.warn(`⚠️  Unknown level "${word.level}" for word "${word.expression}" — skipping`)
