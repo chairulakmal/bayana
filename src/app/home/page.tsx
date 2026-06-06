@@ -6,6 +6,7 @@ import { Parrot } from "@/components/parrot";
 import { LevelPicker } from "@/components/level-picker";
 import { InfoBubble } from "@/components/info-bubble";
 import { UserMenu } from "@/components/user-menu";
+import { BottomNav } from "@/components/bottom-nav";
 
 // The home hub (SPEC §8.5) — the post-login landing for returning users. It's the mode
 // picker (Flashcard / Quiz) plus an inline level selector; deliberately NOT a full dashboard
@@ -23,7 +24,7 @@ export default async function HomePage() {
     // min-h-svh (not dvh): the "small" viewport height is fixed at the bar-visible size,
     // so the centred mode buttons don't hop when Android's gesture/nav bar shows or hides
     // in the installed PWA. dvh recomputes live and shifts the vertical centre.
-    <main className="mx-auto flex min-h-svh w-full max-w-md flex-col px-5 py-8">
+    <main className="mx-auto flex min-h-svh w-full max-w-md flex-col px-5 py-8 pb-24">
       {/* Greeting + account menu */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -83,6 +84,7 @@ export default async function HomePage() {
       <div className="mt-8 flex flex-col gap-4">
         <ModeButton href="/study" emoji="🎴" title="Flashcards" subtitle="Spaced-repetition review" />
         <ModeButton href="/quiz" emoji="⚡" title="Quiz mode" subtitle="Quick multiple-choice" />
+        <ModeButton href="/exam" emoji="📝" title="Exam mode" subtitle="Test-style kanji reading & writing" />
       </div>
 
       {/* Daily-pace note: shows the user's actual new-card cap, with the "why ten?" rationale
@@ -104,6 +106,7 @@ export default async function HomePage() {
           <span className="jp">毎日ちょっとずつ</span> — a little every day.
         </InfoBubble>
       </p>
+      <BottomNav />
     </main>
   );
 }

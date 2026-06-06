@@ -3,12 +3,14 @@ import { requireAuth } from "@/lib/current-user";
 import { getActiveLevel } from "@/lib/profile";
 import { getLevelStats } from "@/lib/stats";
 import { HomeLink } from "@/components/home-link";
+import { UserMenu } from "@/components/user-menu";
+import { BottomNav } from "@/components/bottom-nav";
 
 // Light stats page (SPEC §13 "basic stats"; full dashboard is Phase 4, §16). Shows a few
 // per-active-level numbers — progress, due, recall — linked from the home hub. Server
 // component: it reads the DB directly, so the numbers are always fresh on navigation.
 export default async function StatsPage() {
-  const { userId } = await requireAuth();
+  const { userId, email, isDemo } = await requireAuth();
   const level = await getActiveLevel(userId);
   const stats = await getLevelStats(userId, level);
 
@@ -18,11 +20,12 @@ export default async function StatsPage() {
   // min-h-svh (not dvh): same reasoning as the home hub — keep the layout stable when the
   // Android nav/gesture bar toggles in the installed PWA. Content flows from the top.
   return (
-    <main className="mx-auto flex min-h-svh w-full max-w-md flex-col px-5 py-8">
-      {/* Header: back to the hub + the active level chip */}
-      <div className="flex items-center justify-between">
-        <HomeLink />
+    <main className="mx-auto flex min-h-svh w-full max-w-md flex-col px-5 py-8 pb-24">
+      {/* Header: back link left, level chip centred, avatar right */}
+      <div className="relative flex h-9 items-center justify-center">
+        <div className="absolute left-0"><HomeLink /></div>
         <span className={`chip chip-${level.toLowerCase()}`}>{level}</span>
+        <div className="absolute right-0"><UserMenu email={email ?? ""} isDemo={isDemo} /></div>
       </div>
 
       <h1 className="mt-6 text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
@@ -83,6 +86,7 @@ export default async function StatsPage() {
       <Link href="/study" className="btn btn-primary mt-8 w-full">
         Study now
       </Link>
+      <BottomNav />
     </main>
   );
 }

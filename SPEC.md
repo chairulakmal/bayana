@@ -6,7 +6,7 @@
 |---|---|
 | **Status** | Draft |
 | **Author** | Chairul Akmal |
-| **Last updated** | 2026-06-05 (security review run) |
+| **Last updated** | 2026-06-07 (Exam mode added) |
 | **Target platform** | Mobile-first responsive web (Next.js 16, deployed on Railway) |
 
 ---
@@ -374,10 +374,10 @@ the contextual-sentence benefit is achieved at a near-zero, one-time cost.
 
 ## 8. Study experience
 
-Bayana offers two complementary study modes the user can switch between: **Flashcard mode**
-(serious spaced-repetition recall) and **Quiz mode** (fast, low-friction
-multiple-choice practice). Flashcard mode is the retention engine; Quiz mode is the
-lightweight on-ramp and warm-up.
+Bayana offers three complementary study modes: **Flashcard mode** (serious
+spaced-repetition recall), **Quiz mode** (fast, gamified JP→EN multiple choice), and
+**Exam mode** (JLPT-style reading/writing questions). Flashcard mode is the retention
+engine; Quiz mode is the lightweight warm-up; Exam mode is the benchmark.
 
 **Level scope.** Both modes operate within a **single JLPT level at a time — the user's
 *active level***, chosen once at onboarding (§8.5) and changeable later (stored on
@@ -538,12 +538,54 @@ Two user stories drive entry into the app. Both reach the same two level-scoped 
 - **Returning user.** Sign in → the **home hub** (`/home`) → start. That's it.
 
 **The home hub (`/home`).** The returning-user landing — sign-in, the dev login, and the
-public `/` all redirect here. It is the **mode picker** (two large cards → Flashcard `/study` /
-Quiz `/quiz`) plus an **inline level selector** (the five JLPT chips; tapping one
-persists `UserProfile.activeLevel` via a server action and re-scopes both engines). The
-level is therefore changed *here*, not on a separate settings page. The hub is deliberately
-**not a full dashboard** — stats, streak, and history live in a richer dashboard in Phase 4
-(§13). `/study` and `/quiz` each read the active level and link back to the hub.
+public `/` all redirect here. It is the **mode picker** (three large cards → Flashcard
+`/study`, Quiz `/quiz`, Exam `/exam`) plus an **inline level selector** (the five JLPT
+chips; tapping one persists `UserProfile.activeLevel` via a server action and re-scopes all
+three engines). The level is therefore changed *here*, not on a separate settings page. The
+hub is deliberately **not a full dashboard** — stats, streak, and history live in a richer
+dashboard in Phase 4 (§13). `/study`, `/quiz`, and `/exam` each read the active level and
+link back to the hub.
+
+### 8.6 Exam mode — JLPT-style reading & writing
+
+A timed benchmark mode that presents 20 questions in two sections mirroring the
+vocabulary sub-problems of the JLPT Reading section:
+
+- **問題１ — 漢字の読み方 (kanji reading):** An example sentence is shown with the
+  target word underlined in its kanji form. The student picks its kana reading from four
+  options. Correct answer = `Word.reading`; distractors are readings of orthographically
+  and phonetically confusable same-level words (kanji Jaccard + reading similarity,
+  matching Quiz mode's distractor strategy applied to the `reading` field).
+
+- **問題２ — 漢字の書き方 (kanji writing):** The example sentence is shown with the
+  target word's kanji replaced by its kana reading (the first occurrence in the sentence
+  is substituted). The student picks the correct kanji form from four options. Correct
+  answer = `Word.expression`; distractors are expressions of words whose readings sound
+  similar to the target (reading similarity as the primary axis; shared kanji as a bonus).
+
+**Question count.** Default 20 (10 + 10); the endpoint accepts `?count=` up to 40.
+
+**Section structure.** Questions 1–10 are 問題１; questions 11–20 are 問題２. A
+lightweight **section-break screen** appears between them (showing the 問題１ score before
+the student proceeds), mirroring the experience of turning a page in a real JLPT paper.
+
+**Immediate feedback.** Unlike a real exam's submit-all-at-end model, Exam mode reveals
+the correct answer after each question. This is optimal for a study tool: the student
+connects the correction to the question immediately rather than after a full 20-question
+delay.
+
+**Independence from FSRS.** Exam mode neither reads from nor writes to `ReviewState`.
+Questions are drawn at random from the active level's word pool — not from the FSRS due
+queue. The mode is a pure benchmark; its results do not schedule or unschedule anything.
+All three modes (Flashcard, Quiz, Exam) are independent by design; FSRS coupling is a
+deliberate non-goal for Exam mode (§16 decision log).
+
+**Sentence substitution edge case.** For 問題２, the kana replacement uses `String.replace`
+on the first occurrence of `Word.expression` in the sentence. If the sentence uses a
+conjugated or inflected form of the word rather than the bare `expression`, the replacement
+finds no match and the sentence is displayed unmodified (the underline target is then the
+kana reading standing alone — functionally still a valid question). This occurs rarely and
+is accepted as-is.
 
 ---
 
@@ -561,6 +603,7 @@ is intentionally no web-reachable, cost-incurring Anthropic route at present (se
 | POST | `/api/review/undo` | Revert the most recent review (one-step undo) | required | **Implemented** |
 | `*` | `/api/auth/*` | Auth.js (sign-in request, callback, session) | public (rate-limited) | **Implemented** |
 | GET | `/api/quiz?level=&count=` | Batch of JP→EN multiple-choice questions (non-scheduling) | required | **Implemented** — confusability-scored distractors (shared kanji + reading similarity, §8.2) |
+| GET | `/api/exam?level=&count=` | JLPT-style exam round: 問題１ (kanji reading) + 問題２ (kanji writing), non-scheduling | required | **Implemented** — 10+10 questions, two-section with break screen (§8.6) |
 | GET | `/api/dev/login` | **Dev-only**: mint a session for the seeded user (skip the magic link) | none (dev-only) | **Implemented** — 404 in prod; gated by `DEV_AUTH` (§11.7) |
 | GET | `/api/browse?level=` | Word list for one level (id, expression, reading, meaning — no sentences); browser-cached | required | **Implemented** — `Cache-Control: private, max-age=3600, stale-while-revalidate=86400` |
 | GET | `/api/words/[id]/sentence` | Lazy-load one word's cached example sentence | required | **Implemented** — `Cache-Control: private, max-age=86400, stale-while-revalidate=604800` |
@@ -749,6 +792,15 @@ uses database sessions (§11.3 #6).
   once there is usage data to reason about.
 - First-run onboarding deferred → Phase 4 (§16).
 
+**Phase 2 addendum — Exam mode — ✅ done (2026-06-07)**
+- JLPT-style benchmark mode (§8.6): `GET /api/exam` with 10 × 問題１ (kanji reading in
+  sentence context) + 10 × 問題２ (kanji writing from kana in sentence context). Sequential
+  with immediate feedback; section-break screen between 問題１ and 問題２; split score
+  summary.
+- Exam mode is **independent of FSRS** by design — neither reads from nor writes to
+  `ReviewState`. All three modes (Flashcard, Quiz, Exam) are standalone (§16 decision log).
+- Home hub updated to a three-tile mode picker (Flashcard / Quiz / Exam).
+
 **Phase 3 — Admin audit + on-demand generation — next, after Quiz mode**
 - **Admin review/audit page** (admin-gated via `UserProfile.role`): inspect each
   AI-generated example sentence and accept or reject it before it surfaces to learners
@@ -839,6 +891,7 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-06-07 | **Exam mode added as a third, fully independent study mode.** JLPT-style two-section benchmark: 問題１ (pick the kana reading for an underlined kanji word in a sentence) and 問題２ (pick the kanji form for an underlined kana word in a sentence). 20 questions per round (10 per section); sequential with immediate feedback; section-break screen between sections. **No FSRS coupling by design** — Exam is a benchmark, not a study scheduler. All three modes (Flashcard, Quiz, Exam) are independent: they operate on the same word pool but do not share scheduling state. | Two key decisions: (a) *Modes are independent* — when designing Exam mode the question arose whether Exam correct/wrong answers should feed FSRS (like the planned Quiz↔FSRS Phase 3 coupling). The author chose not to: Exam is a benchmark, and coupling would mean Exam sessions bias the user's SRS schedule in ways that are hard to reason about. The three modes solve distinct problems (retention, warm-up/engagement, benchmarking) and are cleaner as independent tools. This also simplifies the scope of Phase 3 (MC↔FSRS coupling for Quiz only). (b) *Immediate feedback over submit-all-at-end* — a real JLPT exam withholds feedback until submission, but Bayana is a study tool: connecting a correction to the moment of error is the primary teaching mechanism; deferring it wastes the learning window. | Author | §8.6, §13 |
 | 2026-06-05 | **Security review run — resource-exhaustion + input-validation hardening.** Two fixes. (a) `getStudyQueue` no longer fetches the entire due-card backlog (each row joined to its `word` + first `sentence`) only to slice 20 and read `.length` for `totalDue`; it now issues a parallel `count()` + `findMany({ take: sessionLimit })`, both served by `@@index([userId, due])`. (b) Enum validation switched from `levelParam in Level` to `Object.hasOwn(Level, levelParam)` at all six call sites (the `/api/quiz`, `/api/browse`, `/api/cards/queue` routes; the `setActiveLevel` and `completeOnboarding` server actions; the `/quiz` page). Also relocated `proxy.ts` → `src/proxy.ts` (best-practice colocation under the `src/` dir). | The due-card query was **O(backlog)**: a user returning after a lapse with hundreds of overdue cards would materialize every joined row into app memory on each queue build — and the route is `force-dynamic` and auto-refetched between sessions — to use only 20 rows plus a count. That is an availability / resource-exhaustion vector (§11.1, "endpoint scanning / cost-abuse"); the count+take split makes the work proportional to what is rendered. The `in` operator walks the prototype chain, so `?level=constructor` (or `toString`, `hasOwnProperty`, …) passed the guard and reached Prisma as an invalid enum, yielding a 500 instead of a clean 400 — a latent robustness bug whose code comments falsely claimed bad input "can't reach the DB"; `Object.hasOwn` tests own properties only. The wider audit found the auth model sound — allowlist fails closed, sign-in is rate-limited (per-IP + global), every user-scoped query is keyed by the session `userId` (no IDOR), and no web-reachable route spends Anthropic tokens — and found **no classic N+1** (the heavy read paths are each a single over-fetching query, not a per-row loop). Deferred follow-up: per-user rate limiting on the authenticated read endpoints (notably `/api/quiz`, which scans the full level pool per request) when the allowlist widens in Phase 4. | Author | §11.1, §6, §8.1 |
 | 2026-06-04 | **Phase 2 complete. User-defined settings are intentionally minimal** — no settings page, no user-tweakable knobs beyond active level. Parameters (`newCardsPerDay`, FSRS retention target, study direction) remain author-set opinionated defaults. | Bayana's thesis (§2) is "one-tap, no-config." A settings page contradicts this and adds maintenance surface for each parameter exposed. The one control that belongs in the user's hands — which level they're studying — is already inline on the home hub and not a dedicated settings screen. Adding UI for `newCardsPerDay` or retention target would let users work against the research-backed defaults without a clear benefit; the self-correcting feedback loop (overreach → review debt → natural pacing) is the intended mechanism. | Author | §2, §8.5, §13 |
 | 2026-06-04 | **Browse iterated:** render cap of 50 replaced with true 50/page pagination; started-words-first sort (reviewed words surface first, with a magenta dot indicator); inline `BrowseLevelPicker` chip row (calls `setActiveLevel` + `router.push('/browse')` to clear stale URL params); editable page-number `type="number"` input with JS clamping on blur/Enter. | The initial render cap was a DOM-size guard masquerading as pagination — users on page 5 had no way to reach page 6. True pagination with `safePage = Math.min(currentPage, totalPages)` handles results shrinking mid-session. Started-first ordering makes the first page immediately useful (shows what the user is actively studying). The level switcher navigates without a `?level=` param because `router.refresh()` would have left a stale URL override; `key={lvl}` on `BrowseClient` triggers a clean remount. | Author | §8.3 |

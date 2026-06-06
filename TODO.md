@@ -5,7 +5,7 @@ Execution checklist and progress tracker. **Plan and rationale live in
 state* — what's done and what's next. Keep it current; it's the "where we left off"
 record across sessions. Decisions do **not** go here — log them in SPEC.md §16.
 
-**Now: Phase 3** — MC↔FSRS coupling (planned, not started) + multi-user prep underway.
+**Now: Phase 3** — MC↔FSRS coupling for Quiz mode (planned, not started).
 **Next: Phase 4** — Admin sentence audit + on-demand generation.
 
 ---
@@ -84,6 +84,24 @@ existing POST `/api/review` endpoint.
     when env var is unset.
   - [x] All app pages (`study`, `quiz`, `stats`, `browse`) — swapped `auth()` + redirect
     for `requireAuth()` so demo sessions are accepted everywhere.
+
+---
+
+---
+
+## ✅ Phase 2 addendum — Exam mode (2026-06-07)
+
+- [x] `src/lib/exam.ts` — `buildExam(level, readingCount, writingCount)`: random word
+  selection, 問題１ reading distractors (kanji+reading confusability), 問題２ writing
+  distractors (reading-similarity-primary), kana substitution in sentences for 問題２.
+- [x] `src/app/api/exam/route.ts` — `GET /api/exam?level=&count=` (default 20, max 40).
+  Auth required; non-scheduling (no FSRS reads or writes).
+- [x] `src/app/exam/page.tsx` — page shell (mirrors quiz/page.tsx pattern).
+- [x] `src/components/exam-session.tsx` — two-section sequential UI with immediate
+  feedback, section-break screen (shows 問題１ score), split summary (問題１/問題２ scores).
+  `HighlightedSentence` renders the target word underlined in the sentence.
+- [x] `src/app/home/page.tsx` — Exam tile added to mode picker (three tiles: Flashcard /
+  Quiz / Exam). Modes are independent — no FSRS coupling by design (SPEC §8.6, §16).
 
 ---
 
