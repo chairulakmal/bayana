@@ -6,9 +6,12 @@
     "dev": "docker compose up -d && next dev -p 3887",
     "build": "next build",
     "start": "next start -p 3887",
-    "start:prod": "prisma migrate deploy && node .next/standalone/server.js",
+    "start:prod": "prisma migrate deploy && NODE_OPTIONS=--max-old-space-size=256 node .next/standalone/server.js",
     "lint": "eslint",
     "postinstall": "prisma generate"
+  },
+  "engines": {
+    "node": ">=24"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
