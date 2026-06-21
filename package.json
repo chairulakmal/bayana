@@ -6,7 +6,7 @@
     "dev": "docker compose up -d && next dev -p 3887",
     "build": "next build",
     "start": "next start -p 3887",
-    "start:prod": "prisma migrate deploy && next start -p ${PORT:-3887}",
+    "start:prod": "prisma migrate deploy && node .next/standalone/server.js",
     "lint": "eslint",
     "postinstall": "prisma generate"
   },

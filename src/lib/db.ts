@@ -14,6 +14,7 @@
 // generated output (`src/generated/prisma`) directly — so every caller shares the
 // same connection pool.
 
+import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/client";
 
@@ -28,7 +29,11 @@ function createPrismaClient(): PrismaClient {
     // Fail fast with a clear message rather than a confusing driver error later.
     throw new Error("DATABASE_URL is not set — check your .env (see .env.example).");
   }
-  const adapter = new PrismaPg({ connectionString });
+  // Pass an explicit pg.Pool so we can cap max connections.
+  // The default is 10; 2 is sufficient for a single-user, single-instance app
+  // and avoids holding 8 idle TCP connections open on Railway.
+  const pool = new Pool({ connectionString, max: 2 });
+  const adapter = new PrismaPg(pool);
   return new PrismaClient({ adapter });
 }
 
