@@ -7,7 +7,7 @@
     "build": "next build",
     "postbuild": "rm -rf .next/standalone/.next/static .next/standalone/public && cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public",
     "start": "next start -p 3887",
-    "start:prod": "prisma migrate deploy && NODE_OPTIONS=--max-old-space-size=512 node .next/standalone/server.js",
+    "start:prod": "prisma migrate deploy && HOSTNAME=0.0.0.0 NODE_OPTIONS=--max-old-space-size=512 node .next/standalone/server.js",
     "lint": "eslint",
     "postinstall": "prisma generate"
   },
