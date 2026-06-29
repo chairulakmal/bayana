@@ -29,13 +29,14 @@ datasource db {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model User {
-  id            String        @id @default(cuid())
-  email         String?       @unique // null only for the seeded pre-auth user
+  id            String            @id @default(cuid())
+  email         String?           @unique // null only for the seeded pre-auth user
   emailVerified DateTime? // set by Auth.js when a magic link is confirmed
   image         String?
-  createdAt     DateTime      @default(now())
+  createdAt     DateTime          @default(now())
   profile       UserProfile? // 1:1 — app-specific data
   reviews       ReviewState[]
+  grammarProgress GrammarProgress[]
   accounts      Account[] // Auth.js — unused with email-only, but the adapter expects it
   sessions      Session[] // Auth.js database sessions (SPEC §11.3)
 }
@@ -219,4 +220,56 @@ enum FsrsState {
   LEARNING
   REVIEW
   RELEARNING
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Grammar points — separate from vocabulary, separate FSRS queue.
+//
+// `GrammarPoint` holds the static content parsed from decks/grammar-*.md.
+// The `level` field is a plain String (not the Level enum) so the same table
+// accepts N5–N1 grammar decks as they are added later without a schema change.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A JLPT grammar point imported from decks/grammar-*.md.
+model GrammarPoint {
+  id        String   @id @default(cuid())
+  level     String   // "N3", "N2", etc. — plain string so new levels need no migration
+  lesson    Int      // lesson number within the level
+  position  Int      // 1-indexed position within the lesson (e.g. 1 for "1/23")
+  pattern   String   // display form, e.g. "ばいい"
+  reading   String   // kana reading, e.g. "ばいい" (may differ from pattern)
+  meanings  String[] // English meanings, e.g. ["Can", "Should", "It'd be good if"]
+  exampleJp String   // example sentence in Japanese
+  exampleEn String   // English translation of the example
+
+  progress GrammarProgress[]
+
+  @@unique([level, lesson, position]) // natural idempotency key for upserts
+  @@index([level])
+}
+
+/// FSRS scheduling state for one (user, grammar point) pair.
+/// Field names and types mirror ReviewState exactly so the same fsrs.ts adapter
+/// functions work for both vocab and grammar without modification.
+model GrammarProgress {
+  id             String       @id @default(cuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grammarPointId String
+  grammarPoint   GrammarPoint @relation(fields: [grammarPointId], references: [id], onDelete: Cascade)
+
+  // FSRS fields — same shape as ReviewState
+  stability     Float?
+  difficulty    Float?
+  due           DateTime  @default(now())
+  lastReview    DateTime?
+  elapsedDays   Int       @default(0)
+  scheduledDays Int       @default(0)
+  learningSteps Int       @default(0)
+  reps          Int       @default(0)
+  lapses        Int       @default(0)
+  state         FsrsState @default(NEW)
+
+  @@unique([userId, grammarPointId])
+  @@index([userId, due])
 }
