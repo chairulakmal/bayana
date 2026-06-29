@@ -20,6 +20,8 @@ export function InfoBubble({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  // "up" when there isn't enough room below the trigger to show the popover.
+  const [direction, setDirection] = useState<"down" | "up">("down");
   const ref = useRef<HTMLSpanElement>(null);
 
   // Dismiss on click outside the widget or on Escape — standard popover ergonomics.
@@ -45,7 +47,14 @@ export function InfoBubble({
         type="button"
         aria-label={label}
         aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (!open && ref.current) {
+            const rect = ref.current.getBoundingClientRect();
+            // Popover is ~160px tall at minimum; flip up if less than that below the trigger.
+            setDirection(window.innerHeight - rect.bottom < 160 ? "up" : "down");
+          }
+          setOpen((o) => !o);
+        }}
         className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold leading-none"
         style={{ border: "1px solid var(--line)", color: "var(--ink-faint)", background: "var(--surface)" }}
       >
@@ -54,8 +63,9 @@ export function InfoBubble({
       {open && (
         <span
           role="tooltip"
-          className="absolute top-full left-1/2 z-50 mt-2 -translate-x-1/2 rounded-[var(--r-md)] p-3 text-left text-[12px] leading-relaxed"
+          className="absolute left-1/2 z-50 -translate-x-1/2 rounded-[var(--r-md)] p-3 text-left text-[12px] leading-relaxed"
           style={{
+            ...(direction === "down" ? { top: "100%", marginTop: "0.5rem" } : { bottom: "100%", marginBottom: "0.5rem" }),
             width: "min(16rem, calc(100vw - 2rem))",
             background: "var(--surface)",
             border: "1px solid var(--line)",
