@@ -7,6 +7,7 @@ record across sessions. Decisions do **not** go here — log them in SPEC.md §1
 
 **Now: Phase 3** — MC↔FSRS coupling for Quiz mode (planned, not started).
 **Next: Phase 4** — Admin sentence audit + on-demand generation.
+**✅ Phase 3.5 complete** — Grammar point study (N3 v1, separate FSRS queue + page).
 
 ---
 
@@ -102,6 +103,57 @@ existing POST `/api/review` endpoint.
   `HighlightedSentence` renders the target word underlined in the sentence.
 - [x] `src/app/home/page.tsx` — Exam tile added to mode picker (three tiles: Flashcard /
   Quiz / Exam). Modes are independent — no FSRS coupling by design (SPEC §8.6, §16).
+
+---
+
+## Phase 3.5 — Grammar point study
+
+Separate FSRS study queue for JLPT grammar points. Source data: `decks/grammar-n3.md`
+(N3 v1; schema designed to accept N5–N1 later). Completely separate from vocab FSRS —
+different page, different models, different API routes. Card shape: pattern (JP) front →
+meanings + example sentence + translation back.
+
+### Part A — Schema + migration
+- [x] Add `GrammarPoint` model to `prisma/schema.prisma`: `id`, `level` (String — "N3"
+  etc.), `lesson` (Int), `position` (Int), `pattern` (String), `reading` (String),
+  `meanings` (String[]), `exampleJp` (String), `exampleEn` (String). Composite unique on
+  `[level, lesson, position]`.
+- [x] Add `GrammarProgress` model: `id`, `userId`, `grammarPointId`, FSRS state fields
+  (same shape as `ReviewState` — `due`, `stability`, `difficulty`, `elapsed_days`,
+  `scheduled_days`, `reps`, `lapses`, `state`, `last_review`). Unique on
+  `[userId, grammarPointId]`. FK → `User` and `GrammarPoint`.
+- [x] Run `prisma migrate dev --name grammar-points`.
+
+### Part B — Seed script
+- [x] `scripts/seed-grammar.ts` — parse `decks/grammar-n3.md` (regex on `###` headings
+  for pattern/reading/lesson/position, meanings line, `**例文:**` for exampleJp, next
+  line for exampleEn); upsert each row keyed on `(level, lesson, position)`. Idempotent.
+- [x] Run script locally; verified 220 N3 points seeded across 10 lessons.
+
+### Part C — Shared FSRS util refactor
+- [x] Exported `CardLike` interface from `src/lib/fsrs.ts`; `toCard` now accepts
+  `CardLike | null` instead of `ReviewState | null`. Both vocab and grammar share the
+  same adapter functions with no copy-paste. No behavior change for existing vocab flow.
+
+### Part D — API routes
+- [x] `GET /api/grammar/queue` — returns N grammar points due for the current user at
+  their active level, ordered by `due asc`; new points fill remaining slots.
+- [x] `POST /api/grammar/review` — accepts `{ grammarPointId, rating }`; applies FSRS
+  scheduling via shared util; writes updated `GrammarProgress`. Auth required.
+
+### Part E — Grammar page + UI
+- [x] `src/app/grammar/page.tsx` — server component; requires auth; inline stats panel
+  (total, started, mature, due now); "Study Grammar" CTA links to `/grammar/study`.
+  Vocab stats stay on `/stats` — no grammar data there.
+- [x] `src/app/grammar/study/page.tsx` — session page shell (mirrors /study).
+- [x] `src/components/grammar-session.tsx` — client component; flip-and-rate loop for
+  grammar cards. Front: pattern (large JP). Back: reading (if differs) + meanings + example.
+- [x] Grammar tab added to `BottomNav` (pencil icon, between Home and Stats).
+
+### Part F — SPEC + TODO housekeeping
+- [x] SPEC §13 — add Phase 3.5 milestone entry.
+- [x] SPEC §16 — log decisions: separate grammar FSRS queue, dedicated `/grammar` page,
+  N3-first with level-agnostic schema, card direction (pattern→meaning+example).
 
 ---
 

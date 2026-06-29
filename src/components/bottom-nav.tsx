@@ -10,6 +10,7 @@ import { usePathname } from "next/navigation";
 
 const TABS = [
   { label: "Home", href: "/home", icon: HomeIcon },
+  { label: "Grammar", href: "/grammar", icon: GrammarIcon },
   { label: "Stats", href: "/stats", icon: StatsIcon },
   { label: "Browse", href: "/browse", icon: BrowseIcon },
 ] as const;
@@ -92,6 +93,25 @@ function StatsIcon({ active }: { active: boolean }) {
       <line x1="6" y1="20" x2="6" y2="14" />
       <line x1="12" y1="20" x2="12" y2="4" />
       <line x1="18" y1="20" x2="18" y2="10" />
+    </svg>
+  );
+}
+
+function GrammarIcon({ active }: { active: boolean }) {
+  return (
+    <svg
+      width="26"
+      height="26"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={active ? "var(--grape)" : "currentColor"}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
     </svg>
   );
 }

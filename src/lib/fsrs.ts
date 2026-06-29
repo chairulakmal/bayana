@@ -23,7 +23,7 @@ import {
   type Grade,
   type Rating,
 } from "ts-fsrs";
-import type { ReviewState, UserProfile, FsrsState } from "@/generated/prisma/client";
+import type { UserProfile, FsrsState } from "@/generated/prisma/client";
 
 // --- enum mapping: our FsrsState (string) ⇄ ts-fsrs State (numeric) ---
 
@@ -57,9 +57,24 @@ export function schedulerFor(
   );
 }
 
+// Minimal shape shared by both ReviewState and GrammarProgress. toCard accepts
+// either model so vocab and grammar can share the same FSRS adapter functions.
+export type CardLike = {
+  due: Date;
+  stability: number | null;
+  difficulty: number | null;
+  elapsedDays: number;
+  scheduledDays: number;
+  learningSteps: number;
+  reps: number;
+  lapses: number;
+  state: FsrsState;
+  lastReview: Date | null;
+};
+
 /** Our stored scheduling row → a ts-fsrs Card.
- *  A word that was never reviewed (no row) becomes a fresh empty card. */
-export function toCard(state: ReviewState | null, now: Date = new Date()): Card {
+ *  A row that was never reviewed (null) becomes a fresh empty card. */
+export function toCard(state: CardLike | null, now: Date = new Date()): Card {
   if (!state) return createEmptyCard(now);
   return {
     due: state.due,
