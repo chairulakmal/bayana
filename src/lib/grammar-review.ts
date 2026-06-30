@@ -101,15 +101,19 @@ export async function getGrammarQueue(
 
 /**
  * Stats for the inline panel on /grammar:
- *   total — all GrammarPoints at this level
- *   started — points with at least one GrammarProgress row
- *   mature — points with scheduledDays ≥ 21 (stable long-term memory, same threshold as vocab)
- *   dueNow — GrammarProgress rows whose due date has passed
+ *   total        — all GrammarPoints at this level
+ *   started      — points with at least one GrammarProgress row
+ *   mature       — points with scheduledDays ≥ 21 (stable long-term memory)
+ *   dueNow       — GrammarProgress rows whose due date has passed
+ *   studiedToday — true if any grammar point at this level was reviewed today
+ *                  (derived from lastReview; no review-event log needed)
  */
 export async function getGrammarStats(userId: string, level: string) {
   const now = new Date();
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
 
-  const [total, started, mature, dueNow] = await Promise.all([
+  const [total, started, mature, dueNow, studiedTodayCount] = await Promise.all([
     db.grammarPoint.count({ where: { level } }),
     db.grammarProgress.count({ where: { userId, grammarPoint: { level } } }),
     db.grammarProgress.count({
@@ -118,9 +122,12 @@ export async function getGrammarStats(userId: string, level: string) {
     db.grammarProgress.count({
       where: { userId, grammarPoint: { level }, due: { lte: now } },
     }),
+    db.grammarProgress.count({
+      where: { userId, grammarPoint: { level }, lastReview: { gte: startOfToday } },
+    }),
   ]);
 
-  return { total, started, mature, dueNow };
+  return { total, started, mature, dueNow, studiedToday: studiedTodayCount > 0 };
 }
 
 function shuffle<T>(arr: T[]): T[] {
