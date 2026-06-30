@@ -6,7 +6,7 @@
 |---|---|
 | **Status** | Draft |
 | **Author** | Chairul Akmal |
-| **Last updated** | 2026-06-29 (Grammar point study added) |
+| **Last updated** | 2026-06-30 (Spec audit: grammar schema, demo session, onboarding, proxy.ts, browse pagination) |
 | **Target platform** | Mobile-first responsive web (Next.js 16, deployed on Railway) |
 
 ---
@@ -113,13 +113,15 @@ Anthropic integration all live in one deployable, backed by a managed Postgres i
 ┌─────────────────────────── Railway ────────────────────────────┐
 │                                                                  │
 │  Next.js (App Router) — single service                          │
-│   ├─ /app                React UI (Flashcard mode, Quiz mode, browse)│
+│   ├─ /app                React UI (Flashcard, Quiz, Exam, Grammar) │
 │   ├─ /app/api/review     POST rating → FSRS → next due date      │
 │   ├─ /app/api/cards      study queue, browse, search             │
 │   ├─ /app/api/quiz       multiple-choice question + distractors  │
-│   ├─ /app/api/generate   on-demand fallback (single sentence)    │
+│   ├─ /app/api/exam       JLPT-style kanji reading/writing round  │
+│   ├─ /app/api/grammar/*  grammar queue + FSRS review             │
+│   ├─ /app/api/demo/*     ephemeral demo session (prod-available) │
 │   ├─ /app/api/auth/*     Auth.js (Email provider via Resend)     │
-│   └─ /app/api/batch/*    submit + poll Anthropic Batch jobs      │
+│   └─ /app/api/dev/*      dev-only session bypass (404 in prod)   │
 │        │                                                         │
 │        ├── Prisma ───────────────►  Postgres (Railway plugin)    │
 │        ├── @anthropic-ai/sdk ────►  Claude Haiku (Messages/Batch)│
@@ -128,7 +130,9 @@ Anthropic integration all live in one deployable, backed by a managed Postgres i
 │  scripts/ (run via `railway run` or locally)                    │
 │   ├─ import-csv.ts       seed Word rows from decks/*.csv          │
 │   ├─ seed-sentences.ts   build & submit Batch jobs (N3 first)    │
-│   └─ collect-batch.ts    poll + write results into ExampleSentence│
+│   ├─ collect-batch.ts    poll + write results into ExampleSentence│
+│   ├─ seed-grammar.ts     seed GrammarPoint rows from decks/grammar-*.md │
+│   └─ batch-status.ts / cost.ts / export-words.ts / split-words.ts (utilities)│
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -194,12 +198,16 @@ live.
 
 ```prisma
 model User {
-  id        String        @id @default(cuid())
-  email     String?       @unique        // null for the default local user
-  createdAt DateTime      @default(now())
-  profile   UserProfile?                 // 1:1 — app-specific data (see below)
-  reviews   ReviewState[]
-  // Auth.js adapter will add: emailVerified, image, accounts[], sessions[]
+  id            String            @id @default(cuid())
+  email         String?           @unique        // null only for the seeded pre-auth user
+  emailVerified DateTime?                        // set by Auth.js when a magic link is confirmed
+  image         String?
+  createdAt     DateTime          @default(now())
+  profile       UserProfile?                     // 1:1 — app-specific data (see below)
+  reviews       ReviewState[]
+  grammarProgress GrammarProgress[]
+  accounts      Account[]                        // Auth.js — unused with email-only provider
+  sessions      Session[]                        // Auth.js database sessions (§11.3)
 }
 
 // App-specific per-user data, one-to-one with User. Kept separate from the
@@ -225,6 +233,42 @@ model UserProfile {
 }
 
 enum Role { MEMBER ADMIN }
+
+// Auth.js adapter models — owned by @auth/prisma-adapter; do not modify field names.
+// `Account` is populated only by OAuth providers (none yet but adapter requires it).
+// `Session` stores server-side database sessions (§11.3). `VerificationToken` holds
+// the hashed magic-link token (single-use, short TTL — §11.3 hardening requirements).
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+  @@id([identifier, token])
+}
 
 model Word {
   id         String   @id @default(cuid())
@@ -302,6 +346,51 @@ model ReviewLog {
 }
 
 enum FsrsState { NEW LEARNING REVIEW RELEARNING }
+
+// Grammar points — separate from vocabulary, with their own FSRS queue.
+//
+// `GrammarPoint` holds static content parsed from decks/grammar-*.md.
+// `level` is a plain String (not the Level enum) so the same table accepts
+// N5–N1 grammar decks as they are added later, without a schema migration.
+
+model GrammarPoint {
+  id        String   @id @default(cuid())
+  level     String   // "N3", "N2", etc. — plain string so new levels need no migration
+  lesson    Int      // lesson number within the level
+  position  Int      // 1-indexed position within the lesson
+  pattern   String   // display form, e.g. "ばいい"
+  reading   String   // kana reading (may equal pattern; stored separately to allow differ)
+  meanings  String[] // English meanings, e.g. ["Can", "Should", "It'd be good if"]
+  exampleJp String   // example sentence in Japanese
+  exampleEn String   // English translation of the example
+  progress  GrammarProgress[]
+  @@unique([level, lesson, position]) // natural idempotency key for upserts
+  @@index([level])
+}
+
+// FSRS scheduling state for one (user, grammar point) pair.
+// Field names and types mirror ReviewState exactly so the CardLike interface
+// (src/lib/fsrs.ts) lets the same FSRS adapter functions serve both queues.
+model GrammarProgress {
+  id             String       @id @default(cuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grammarPointId String
+  grammarPoint   GrammarPoint @relation(fields: [grammarPointId], references: [id], onDelete: Cascade)
+  // FSRS fields — same shape as ReviewState
+  stability     Float?
+  difficulty    Float?
+  due           DateTime  @default(now())
+  lastReview    DateTime?
+  elapsedDays   Int       @default(0)
+  scheduledDays Int       @default(0)
+  learningSteps Int       @default(0)
+  reps          Int       @default(0)
+  lapses        Int       @default(0)
+  state         FsrsState @default(NEW)
+  @@unique([userId, grammarPointId])
+  @@index([userId, due])
+}
 ```
 
 `ExampleSentence` is the **cache**: once a word has rows here, no API call is made.
@@ -484,11 +573,13 @@ reading, or English meaning; tapping any word reveals its cached example sentenc
 expression, reading, meaning — **no sentences**) with `Cache-Control: private,
 max-age=3600, stale-while-revalidate=86400`. The browser caches this response; repeat
 visits within the hour cost zero server round-trips. The client (`BrowseClient`) filters
-in memory per keystroke — no server request per search. A **render cap of 50** results
-prevents mounting thousands of DOM nodes (N1 has 2,699 words); an overflow hint prompts
-the user to narrow their search. Sentences are lazy-loaded per word via `GET /api/words/
-[id]/sentence` (cached 24 h) when a row is tapped, keeping the initial payload small.
-Rows expand/collapse in an accordion (one open at a time).
+in memory per keystroke — no server request per search. Results are **paginated at 50 per
+page** with previous/next controls and an editable page-number input (clamped to
+`totalPages` so shrinking results mid-session never leaves the user on a phantom page);
+this replaces an earlier render cap that had no way to reach later pages. Sentences are
+lazy-loaded per word via `GET /api/words/[id]/sentence` (cached 24 h) when a row is
+tapped, keeping the initial payload small. Rows expand/collapse in an accordion (one open
+at a time).
 
 ### 8.4 Responsive / mobile-first design
 The product is **designed for the phone first** and progressively enhanced for larger
@@ -528,13 +619,14 @@ screens; the bulk of study happens on mobile.
 Two user stories drive entry into the app. Both reach the same two level-scoped engines
 (§8.1, §8.2); they differ only in the first-run extras.
 
-- **First-time user (first run).** Sign in via the email magic link (§11.2) → **choose a
-  JLPT level** (N5–N1) → the app drops straight into a short **Quiz mode warm-up of 5
-  questions** at that level — low-stakes and **non-scheduling** (it does not touch FSRS
-  state) — so the first experience is *doing*, not reading → a brief **onboarding guide**
-  then walks through the app's functionality (the two modes, flip/rate, streak, switching
-  level). Completing the flow persists `UserProfile.activeLevel` and stamps `onboardedAt`
-  (§6), which is what distinguishes a first-time from a returning user.
+- **First-time user (first run).** Sign in via the email magic link (§11.2) *or* start a
+  demo session (`GET /api/demo/login`, §11.8) → routed to `/onboarding` (gated on
+  `UserProfile.onboardedAt` being unset) → **choose a JLPT level** (N5–N1) → the app
+  then drops straight into the home hub. The `/onboarding` level-choice screen is
+  **implemented** (Phase 3.5). The follow-on **Quiz mode warm-up** (5 non-scheduling
+  questions) and **guided tour** remain deferred to Phase 4 (§13). Completing the level
+  choice persists `UserProfile.activeLevel` and stamps `onboardedAt` (§6), which is what
+  distinguishes a first-time from a returning user thereafter.
 - **Returning user.** Sign in → the **home hub** (`/home`) → start. That's it.
 
 **The home hub (`/home`).** The returning-user landing — sign-in, the dev login, and the
@@ -604,6 +696,9 @@ is intentionally no web-reachable, cost-incurring Anthropic route at present (se
 | `*` | `/api/auth/*` | Auth.js (sign-in request, callback, session) | public (rate-limited) | **Implemented** |
 | GET | `/api/quiz?level=&count=` | Batch of JP→EN multiple-choice questions (non-scheduling) | required | **Implemented** — confusability-scored distractors (shared kanji + reading similarity, §8.2) |
 | GET | `/api/exam?level=&count=` | JLPT-style exam round: 問題１ (kanji reading) + 問題２ (kanji writing), non-scheduling | required | **Implemented** — 10+10 questions, two-section with break screen (§8.6) |
+| GET | `/api/grammar/queue` | Grammar FSRS study queue (due + new `GrammarProgress` rows) | required | **Implemented** |
+| POST | `/api/grammar/review` | Submit a grammar rating → FSRS update (`GrammarProgress` upsert) | required | **Implemented** |
+| GET | `/api/demo/login` | Start an ephemeral demo session: create `User` + `UserProfile`, sign with HMAC, redirect to `/onboarding` | public | **Implemented** — production-available; session identity is the HMAC-signed cookie (§11.8) |
 | GET | `/api/dev/login` | **Dev-only**: mint a session for the seeded user (skip the magic link) | none (dev-only) | **Implemented** — 404 in prod; gated by `DEV_AUTH` (§11.7) |
 | GET | `/api/browse?level=` | Word list for one level (id, expression, reading, meaning — no sentences); browser-cached | required | **Implemented** — `Cache-Control: private, max-age=3600, stale-while-revalidate=86400` |
 | GET | `/api/words/[id]/sentence` | Lazy-load one word's cached example sentence | required | **Implemented** — `Cache-Control: private, max-age=86400, stale-while-revalidate=604800` |
@@ -720,6 +815,29 @@ treats `/api/dev/*` as public only outside production. We deliberately did **not
 Auth.js Credentials provider for this: it requires the JWT session strategy, whereas Bayana
 uses database sessions (§11.3 #6).
 
+### 11.8 Demo session (ephemeral, production-available)
+`GET /api/demo/login` (§9) is a **production-available** path that lets visitors try the app
+without an email address. It is fundamentally different from the dev bypass above:
+
+- **What it does:** creates a fresh `User` row (no email) and a `UserProfile` (no
+  `onboardedAt`) in the database, then signs the `userId` with **HMAC-SHA256** keyed by
+  `AUTH_SECRET`, and writes the result as a 7-day `httpOnly` cookie. The user is then
+  redirected to `/onboarding`.
+- **Session identity.** No Auth.js `Session` row is created. `getCurrentUserId()` in
+  `src/lib/current-user.ts` detects the demo cookie, verifies the HMAC, and returns the
+  `userId` — all authenticated routes work transparently.
+- **Ephemerality by design.** Each click to the demo route creates a new `User`; the previous
+  session's rows are orphaned (no cookie → unreachable). Losing the cookie means losing all
+  data. This is intentional: demo data is cheap to create and users are expected to sign up
+  via magic link if they want persistence.
+- **`/api/demo/*` is public in `proxy.ts`** (no session check) so the route is reachable
+  before authentication — this is the correct, intentional behaviour. It is distinct from
+  `/api/dev/*`, which is public **only outside production**.
+- **Threat model.** The HMAC prevents a user from forging a cookie to impersonate another
+  `userId`. Each demo session is isolated by the cuid primary key. The accepted risk is DB
+  row accumulation from abandoned demo sessions; a future cleanup job can prune rows older
+  than the cookie TTL.
+
 ---
 
 ## 12. Deployment (Railway)
@@ -818,6 +936,12 @@ uses database sessions (§11.3 #6).
   translation. No undo in v1.
 - **`/grammar` hub page:** inline FSRS stats (total/started/mature/due); single "Grammar
   Points" CTA; dedicated tab in `BottomNav`. Vocab stats remain on `/stats`.
+- **`/onboarding` page:** level-choice screen shown to any user whose `UserProfile.onboardedAt`
+  is unset (both magic-link sign-ups and demo visitors). Pulled forward from Phase 4 to
+  support the demo flow. The follow-on Quiz warm-up and guided tour remain Phase 4 (below).
+- **Demo session (`GET /api/demo/login`):** ephemeral try-without-signup path; creates a new
+  `User` + `UserProfile`, signs the userId with HMAC-SHA256, sets a 7-day cookie, and
+  redirects to `/onboarding`. Production-available (§11.8).
 
 **Phase 3 — Admin audit + on-demand generation — next, after Quiz mode**
 - **Admin review/audit page** (admin-gated via `UserProfile.role`): inspect each
@@ -834,10 +958,11 @@ uses database sessions (§11.3 #6).
   settings page. The active level (already inline on `/home`) is the only planned user-facing
   control; all other parameters (`newCardsPerDay`, FSRS retention target, study direction)
   remain author-set defaults.
-- **First-run onboarding (§8.5)** — moved here from Phase 2: level choice → 5-question Quiz
-  warm-up (non-scheduling) → guided tour; uses the existing `UserProfile.onboardedAt` column
-  to branch first-time vs. returning. Deferred because a first-run experience only earns its
-  keep once there are multiple real users to onboard (the sole author is already past it).
+- **First-run onboarding completion (§8.5)** — the `/onboarding` level-choice screen already
+  exists (Phase 3.5); what remains here is the follow-on: a **5-question Quiz warm-up**
+  (non-scheduling) and a **guided tour** of the app. Uses the existing `UserProfile.onboardedAt`
+  column to branch first-time vs. returning. Deferred because the warm-up and tour only earn
+  their keep once there are multiple real users to onboard (the sole author is already past it).
 
 **Phase 5 — Further enhancements**
 - Audio (TTS) for sentences, furigana rendering, streak/heatmap, sentence
@@ -912,7 +1037,7 @@ whenever a decision is made or reversed — do not edit history in place.
 | 2026-06-29 | **Grammar point study added as Phase 3.5.** Separate FSRS queue and dedicated `/grammar` page for JLPT grammar points. N3 is the v1 source (220 points); the feature is designed to accept N5–N1 grammar decks later. Four key design decisions: (a) *Separate queue* — grammar and vocabulary are categorically different study objects; mixing them in one queue would obscure progress and complicate scheduling. A second, independent queue (separate models, separate API routes, separate page) keeps the two concerns cleanly isolated and lets each grow independently. (b) *Dedicated `/grammar` page* (not merged into the home hub) — the home hub is the vocabulary mode-picker; adding grammar tiles there would make it a compound navigation screen. A sibling page (with its own `BottomNav` tab) keeps the hub focused and gives grammar room to surface its own stats and CTA. (c) *Level stored as plain `String`* on `GrammarPoint`, not the `Level` enum — the `Level` enum covers vocab levels N5–N1; re-using it for grammar would couple grammar level expansion to enum migrations. A bare string ("N3", etc.) accepts any future level without a schema change. (d) *Card direction: pattern (JP) front → meanings + example sentence back* — the grammar-point object to learn is the pattern itself (e.g. 〜ために); recognition of the form and its meaning is the primary goal, matching how grammar is tested on the JLPT. The example sentence on the back reinforces usage in context; the pattern is bolded in grape so the learner can see exactly where it appears. | Author | §13 |
 | 2026-06-29 | **`CardLike` interface extracted from `src/lib/fsrs.ts`; `toCard` now accepts `CardLike | null`.** Previously `toCard` was typed to `ReviewState | null` (the Prisma vocab model). Introducing grammar scheduling required the same adapter logic for `GrammarProgress`, which has the same FSRS field shape. Rather than duplicating the function or creating a union type tied to two Prisma models, a `CardLike` interface was extracted that both `ReviewState` and `GrammarProgress` satisfy structurally. The vocab flow required no behavior change. | Author | §13 |
 | 2026-06-07 | **Exam mode added as a third, fully independent study mode.** JLPT-style two-section benchmark: 問題１ (pick the kana reading for an underlined kanji word in a sentence) and 問題２ (pick the kanji form for an underlined kana word in a sentence). 20 questions per round (10 per section); sequential with immediate feedback; section-break screen between sections. **No FSRS coupling by design** — Exam is a benchmark, not a study scheduler. All three modes (Flashcard, Quiz, Exam) are independent: they operate on the same word pool but do not share scheduling state. | Two key decisions: (a) *Modes are independent* — when designing Exam mode the question arose whether Exam correct/wrong answers should feed FSRS (like the planned Quiz↔FSRS Phase 3 coupling). The author chose not to: Exam is a benchmark, and coupling would mean Exam sessions bias the user's SRS schedule in ways that are hard to reason about. The three modes solve distinct problems (retention, warm-up/engagement, benchmarking) and are cleaner as independent tools. This also simplifies the scope of Phase 3 (MC↔FSRS coupling for Quiz only). (b) *Immediate feedback over submit-all-at-end* — a real JLPT exam withholds feedback until submission, but Bayana is a study tool: connecting a correction to the moment of error is the primary teaching mechanism; deferring it wastes the learning window. | Author | §8.6, §13 |
-| 2026-06-05 | **Security review run — resource-exhaustion + input-validation hardening.** Two fixes. (a) `getStudyQueue` no longer fetches the entire due-card backlog (each row joined to its `word` + first `sentence`) only to slice 20 and read `.length` for `totalDue`; it now issues a parallel `count()` + `findMany({ take: sessionLimit })`, both served by `@@index([userId, due])`. (b) Enum validation switched from `levelParam in Level` to `Object.hasOwn(Level, levelParam)` at all six call sites (the `/api/quiz`, `/api/browse`, `/api/cards/queue` routes; the `setActiveLevel` and `completeOnboarding` server actions; the `/quiz` page). Also relocated `proxy.ts` → `src/proxy.ts` (best-practice colocation under the `src/` dir). | The due-card query was **O(backlog)**: a user returning after a lapse with hundreds of overdue cards would materialize every joined row into app memory on each queue build — and the route is `force-dynamic` and auto-refetched between sessions — to use only 20 rows plus a count. That is an availability / resource-exhaustion vector (§11.1, "endpoint scanning / cost-abuse"); the count+take split makes the work proportional to what is rendered. The `in` operator walks the prototype chain, so `?level=constructor` (or `toString`, `hasOwnProperty`, …) passed the guard and reached Prisma as an invalid enum, yielding a 500 instead of a clean 400 — a latent robustness bug whose code comments falsely claimed bad input "can't reach the DB"; `Object.hasOwn` tests own properties only. The wider audit found the auth model sound — allowlist fails closed, sign-in is rate-limited (per-IP + global), every user-scoped query is keyed by the session `userId` (no IDOR), and no web-reachable route spends Anthropic tokens — and found **no classic N+1** (the heavy read paths are each a single over-fetching query, not a per-row loop). Deferred follow-up: per-user rate limiting on the authenticated read endpoints (notably `/api/quiz`, which scans the full level pool per request) when the allowlist widens in Phase 4. | Author | §11.1, §6, §8.1 |
+| 2026-06-05 | **Security review run — resource-exhaustion + input-validation hardening.** Two fixes. (a) `getStudyQueue` no longer fetches the entire due-card backlog (each row joined to its `word` + first `sentence`) only to slice 20 and read `.length` for `totalDue`; it now issues a parallel `count()` + `findMany({ take: sessionLimit })`, both served by `@@index([userId, due])`. (b) Enum validation switched from `levelParam in Level` to `Object.hasOwn(Level, levelParam)` at all six call sites (the `/api/quiz`, `/api/browse`, `/api/cards/queue` routes; the `setActiveLevel` and `completeOnboarding` server actions; the `/quiz` page). Also confirmed `proxy.ts` lives at the **project root** (not under `src/`) — Next.js 16 requires it there for the framework to pick it up. | The due-card query was **O(backlog)**: a user returning after a lapse with hundreds of overdue cards would materialize every joined row into app memory on each queue build — and the route is `force-dynamic` and auto-refetched between sessions — to use only 20 rows plus a count. That is an availability / resource-exhaustion vector (§11.1, "endpoint scanning / cost-abuse"); the count+take split makes the work proportional to what is rendered. The `in` operator walks the prototype chain, so `?level=constructor` (or `toString`, `hasOwnProperty`, …) passed the guard and reached Prisma as an invalid enum, yielding a 500 instead of a clean 400 — a latent robustness bug whose code comments falsely claimed bad input "can't reach the DB"; `Object.hasOwn` tests own properties only. The wider audit found the auth model sound — allowlist fails closed, sign-in is rate-limited (per-IP + global), every user-scoped query is keyed by the session `userId` (no IDOR), and no web-reachable route spends Anthropic tokens — and found **no classic N+1** (the heavy read paths are each a single over-fetching query, not a per-row loop). Deferred follow-up: per-user rate limiting on the authenticated read endpoints (notably `/api/quiz`, which scans the full level pool per request) when the allowlist widens in Phase 4. | Author | §11.1, §6, §8.1 |
 | 2026-06-04 | **Phase 2 complete. User-defined settings are intentionally minimal** — no settings page, no user-tweakable knobs beyond active level. Parameters (`newCardsPerDay`, FSRS retention target, study direction) remain author-set opinionated defaults. | Bayana's thesis (§2) is "one-tap, no-config." A settings page contradicts this and adds maintenance surface for each parameter exposed. The one control that belongs in the user's hands — which level they're studying — is already inline on the home hub and not a dedicated settings screen. Adding UI for `newCardsPerDay` or retention target would let users work against the research-backed defaults without a clear benefit; the self-correcting feedback loop (overreach → review debt → natural pacing) is the intended mechanism. | Author | §2, §8.5, §13 |
 | 2026-06-04 | **Browse iterated:** render cap of 50 replaced with true 50/page pagination; started-words-first sort (reviewed words surface first, with a magenta dot indicator); inline `BrowseLevelPicker` chip row (calls `setActiveLevel` + `router.push('/browse')` to clear stale URL params); editable page-number `type="number"` input with JS clamping on blur/Enter. | The initial render cap was a DOM-size guard masquerading as pagination — users on page 5 had no way to reach page 6. True pagination with `safePage = Math.min(currentPage, totalPages)` handles results shrinking mid-session. Started-first ordering makes the first page immediately useful (shows what the user is actively studying). The level switcher navigates without a `?level=` param because `router.refresh()` would have left a stale URL override; `key={lvl}` on `BrowseClient` triggers a clean remount. | Author | §8.3 |
 | 2026-06-04 | **Browse/search shipped as Phase 2 light polish.** `/browse` (whole-deck lookup for the active level) + `GET /api/browse?level=` (browser-cached word list, no sentences) + `GET /api/words/[id]/sentence` (lazy sentence per tap, 24 h cache). Client-side filtering in memory with a render cap of 50. Linked from `/home`. The "soon" tag removed from the Quiz feature card on the landing page — Quiz is live. | Whole-deck browse chosen over "seen cards only" (a collection/history view); the latter belongs in stats. Browser `Cache-Control` headers (rather than server-side Next.js revalidation) were chosen because they eliminate repeat round-trips to Railway for data that changes ~never, and because the client-side filter means zero requests per keystroke. Render cap avoids 2,699-node DOM without requiring a virtualization library. | Author | §8.3, §9, §10 |
