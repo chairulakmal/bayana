@@ -7,10 +7,11 @@
 // Same flip-and-rate loop as study-session.tsx but operates on GrammarPoint /
 // GrammarProgress. No undo in v1 (grammar cards are lighter-weight).
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Parrot } from "@/components/parrot";
 import { SessionHeader, SessionHeaderLink } from "@/components/session-header";
+import { HighlightedSentence } from "@/components/highlighted-sentence";
 
 // --- shapes returned by GET /api/grammar/queue ---
 
@@ -66,12 +67,23 @@ export function GrammarSession({ level }: { level: string }) {
   const [sessionDone, setSessionDone] = useState(false);
   const [totalDueAtLoad, setTotalDueAtLoad] = useState(0);
   const [dueCardsInSession, setDueCardsInSession] = useState(0);
+  // Distinguishes "fetch failed" from "queue is genuinely empty" — both leave
+  // cards as [], but they need different headlines (see render below).
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  // loadQueue is called both from the initial effect and imperatively (the
+  // "Check for more" / retry button), so a plain effect-cleanup `cancelled` flag
+  // can't guard it — a request token does: each call gets its own id, and a
+  // response only applies state if it's still the most recent call in flight.
+  const requestIdRef = useRef(0);
 
   const loadQueue = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     try {
       const res = await fetch(`/api/grammar/queue?level=${encodeURIComponent(level)}`);
       if (!res.ok) throw new Error(`queue ${res.status}`);
       const data: QueueResponse = await res.json();
+      if (requestIdRef.current !== requestId) return;
       const allCards = [
         ...data.due.map((d) => toCard(d.grammarPoint)),
         ...data.newPoints.map(toCard),
@@ -84,8 +96,11 @@ export function GrammarSession({ level }: { level: string }) {
       setFlipped(false);
       setSessionDone(false);
       setError(null);
+      setLoadFailed(false);
     } catch {
+      if (requestIdRef.current !== requestId) return;
       setError("Couldn't load your grammar queue.");
+      setLoadFailed(true);
       setCards((prev) => prev ?? []);
     }
   }, [level]);
@@ -134,6 +149,28 @@ export function GrammarSession({ level }: { level: string }) {
         <p className="mt-3" style={{ color: "var(--ink-soft)" }}>
           Loading…
         </p>
+      </Centered>
+    );
+  }
+
+  if (loadFailed && !sessionDone) {
+    return (
+      <Centered>
+        <Parrot expr="sleepy" title="Pī looking concerned" style={{ width: 124, height: 138 }} />
+        <p className="mt-4 text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
+          Couldn&apos;t load
+        </p>
+        <p className="mt-1" style={{ color: "var(--ink-soft)" }}>
+          {error ?? "Something went wrong loading your grammar queue."}
+        </p>
+        <div className="mt-6 flex gap-3">
+          <button onClick={() => void loadQueue()} disabled={busy} className="btn btn-primary">
+            Try again
+          </button>
+          <Link href="/grammar" className="btn btn-ghost">
+            Back
+          </Link>
+        </div>
       </Centered>
     );
   }
@@ -202,7 +239,7 @@ export function GrammarSession({ level }: { level: string }) {
         <button
           type="button"
           onClick={() => !flipped && setFlipped(true)}
-          className="my-auto flex w-full max-w-md flex-col items-center justify-center gap-5 rounded-[var(--r-lg)] px-6 py-10 text-center"
+          className="mx-auto my-auto flex w-full max-w-md flex-col items-center justify-center gap-5 rounded-[var(--r-lg)] px-6 py-10 text-center"
           style={{
             background: "var(--surface)",
             border: "1px solid var(--line)",
@@ -288,48 +325,6 @@ export function GrammarSession({ level }: { level: string }) {
         )}
       </footer>
     </main>
-  );
-}
-
-/**
- * Render `sentence` with the first occurrence of `pattern` (or `reading` as a
- * fallback) wrapped in <strong>. If neither is found the sentence is returned as-is.
- * Simple substring match — good enough for the structured example sentences we seed.
- */
-function HighlightedSentence({
-  sentence,
-  pattern,
-  reading,
-}: {
-  sentence: string;
-  pattern: string;
-  reading: string;
-}) {
-  // Strip leading/trailing 〜 placeholders (e.g. "〜ために" → "ために") so the
-  // pattern matches its conjugated form in the sentence rather than the bare stem notation.
-  const stripped = pattern.replace(/^[〜～]+|[〜～]+$/g, "");
-  // Try stripped pattern first, then the full pattern, then the kana reading.
-  const needle = (stripped && sentence.includes(stripped))
-    ? stripped
-    : sentence.includes(pattern)
-      ? pattern
-      : sentence.includes(reading)
-        ? reading
-        : null;
-
-  if (!needle) return <>{sentence}</>;
-
-  const idx = sentence.indexOf(needle);
-  const before = sentence.slice(0, idx);
-  const match = sentence.slice(idx, idx + needle.length);
-  const after = sentence.slice(idx + needle.length);
-
-  return (
-    <>
-      {before}
-      <strong style={{ color: "var(--grape)" }}>{match}</strong>
-      {after}
-    </>
   );
 }
 

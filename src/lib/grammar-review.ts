@@ -14,6 +14,11 @@ import type { Grade } from "ts-fsrs";
 
 const DEFAULT_PROFILE = { desiredRetention: 0.9, fsrsParams: [] as number[], newCardsPerDay: 10 };
 
+// Grammar levels are plain strings (not the vocab `Level` enum) so new levels need no
+// schema change — see SPEC.md §16 (2026-06-29, decision (c)). Shared here so both
+// /api/grammar/queue and /api/grammar/browse validate against the same set.
+export const GRAMMAR_LEVELS = new Set(["N5", "N4", "N3", "N2", "N1"]);
+
 /** Apply a rating (1=Again, 2=Hard, 3=Good, 4=Easy) to a (user, grammarPoint). */
 export async function reviewGrammarPoint(
   userId: string,

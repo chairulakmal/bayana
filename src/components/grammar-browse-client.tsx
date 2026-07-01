@@ -13,7 +13,8 @@
 // filters points by pattern/reading/meaning and force-expands any lesson with a match,
 // so results are visible without the user having to open sections by hand.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { HighlightedSentence } from "@/components/highlighted-sentence";
 
 type GrammarPointRow = {
   id: string;
@@ -23,6 +24,7 @@ type GrammarPointRow = {
   meanings: string[];
   exampleJp: string;
   exampleEn: string;
+  status: "new" | "started" | "mature";
 };
 type LessonGroup = { lesson: number; title: string; points: GrammarPointRow[] };
 
@@ -31,6 +33,7 @@ export function GrammarBrowseClient({ level }: { level: string }) {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [openLessons, setOpenLessons] = useState<Set<number>>(new Set());
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,16 +81,21 @@ export function GrammarBrowseClient({ level }: { level: string }) {
   }
 
   // Filter points within each lesson when searching; drop lessons with no matches.
+  // A lesson whose *title* matches (e.g. "conditional") shows all its points unfiltered —
+  // the learner is searching by theme, not a specific pattern, so narrowing to points that
+  // happen to also contain the query text would hide most of the lesson they're after.
   const visibleLessons = q
     ? lessons
         .map((group) => ({
           ...group,
-          points: group.points.filter(
-            (p) =>
-              p.pattern.toLowerCase().includes(q) ||
-              p.reading.toLowerCase().includes(q) ||
-              p.meanings.some((m) => m.toLowerCase().includes(q)),
-          ),
+          points: group.title.toLowerCase().includes(q)
+            ? group.points
+            : group.points.filter(
+                (p) =>
+                  p.pattern.toLowerCase().includes(q) ||
+                  p.reading.toLowerCase().includes(q) ||
+                  p.meanings.some((m) => m.toLowerCase().includes(q)),
+              ),
         }))
         .filter((group) => group.points.length > 0)
     : lessons;
@@ -100,6 +108,7 @@ export function GrammarBrowseClient({ level }: { level: string }) {
       {/* Search input */}
       <div className="relative">
         <input
+          ref={searchInputRef}
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -114,7 +123,10 @@ export function GrammarBrowseClient({ level }: { level: string }) {
           <button
             type="button"
             aria-label="Clear search"
-            onClick={() => setQuery("")}
+            onClick={() => {
+              setQuery("");
+              searchInputRef.current?.focus();
+            }}
             className="absolute top-1/2 right-3 -translate-y-1/2 text-[18px] leading-none"
             style={{ color: "var(--ink-faint)" }}
           >
@@ -141,6 +153,7 @@ export function GrammarBrowseClient({ level }: { level: string }) {
         ) : (
           visibleLessons.map((group) => {
             const isOpen = q ? true : openLessons.has(group.lesson);
+            const studiedCount = group.points.filter((p) => p.status !== "new").length;
             return (
               <div
                 key={group.lesson}
@@ -151,7 +164,10 @@ export function GrammarBrowseClient({ level }: { level: string }) {
                   type="button"
                   onClick={() => toggle(group.lesson)}
                   disabled={!!q}
+                  aria-expanded={isOpen}
+                  aria-label={`${isOpen ? "Collapse" : "Expand"} Lesson ${group.lesson}: ${group.title}`}
                   className="flex w-full items-center gap-3 px-4 py-3 text-left"
+                  style={q ? { opacity: 0.6, cursor: "default" } : undefined}
                 >
                   <span
                     className="flex-shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold"
@@ -162,8 +178,12 @@ export function GrammarBrowseClient({ level }: { level: string }) {
                   <span className="flex-1 text-[14px] font-semibold" style={{ color: "var(--ink)" }}>
                     {group.title}
                   </span>
-                  <span className="flex-shrink-0 text-[12px]" style={{ color: "var(--ink-faint)" }}>
-                    {group.points.length}
+                  <span
+                    className="flex-shrink-0 text-[12px]"
+                    style={{ color: "var(--ink-faint)" }}
+                    aria-label={`${studiedCount} of ${group.points.length} studied`}
+                  >
+                    {studiedCount}/{group.points.length}
                   </span>
                   {!q && (
                     <span className="flex-shrink-0 text-[11px]" style={{ color: "var(--ink-faint)" }} aria-hidden>
@@ -189,6 +209,29 @@ export function GrammarBrowseClient({ level }: { level: string }) {
                               {p.reading}
                             </span>
                           )}
+                          {/* Progress dot: green = mature (scheduledDays >= 21), magenta =
+                              started but not yet mature, none = never studied. Lets a learner
+                              scan the reference list and see what still needs attention. */}
+                          <span
+                            className="ml-auto flex-shrink-0 self-center rounded-full"
+                            aria-label={
+                              p.status === "mature"
+                                ? "Mature"
+                                : p.status === "started"
+                                  ? "Learning"
+                                  : undefined
+                            }
+                            style={{
+                              width: 6,
+                              height: 6,
+                              background:
+                                p.status === "mature"
+                                  ? "var(--good)"
+                                  : p.status === "started"
+                                    ? "var(--mag-500)"
+                                    : "transparent",
+                            }}
+                          />
                         </div>
                         <p className="mt-1 text-[13px]" style={{ color: "var(--ink-soft)" }}>
                           {p.meanings.join(", ")}
@@ -198,7 +241,11 @@ export function GrammarBrowseClient({ level }: { level: string }) {
                           style={{ background: "var(--surface-cream)" }}
                         >
                           <p className="jp text-[14px] leading-relaxed" style={{ color: "var(--ink)" }}>
-                            {p.exampleJp}
+                            <HighlightedSentence
+                              sentence={p.exampleJp}
+                              pattern={p.pattern}
+                              reading={p.reading}
+                            />
                           </p>
                           <p className="mt-1 text-[12px] italic" style={{ color: "var(--ink-soft)" }}>
                             {p.exampleEn}

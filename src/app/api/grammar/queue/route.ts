@@ -6,13 +6,10 @@
 
 import { NextResponse } from "next/server";
 import { getCurrentUserId } from "@/lib/current-user";
-import { getGrammarQueue } from "@/lib/grammar-review";
+import { getGrammarQueue, GRAMMAR_LEVELS } from "@/lib/grammar-review";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-// Grammar levels are plain strings (not the Level enum) so new levels need no code change.
-const VALID_LEVELS = new Set(["N5", "N4", "N3", "N2", "N1"]);
 
 export async function GET(request: Request) {
   let userId: string;
@@ -25,7 +22,7 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
 
   const level = params.get("level") ?? "N3";
-  if (!VALID_LEVELS.has(level)) {
+  if (!GRAMMAR_LEVELS.has(level)) {
     return NextResponse.json({ error: `Unknown level "${level}"` }, { status: 400 });
   }
 

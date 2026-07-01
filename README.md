@@ -81,7 +81,3 @@ Built with Next.js 16 + Prisma + Postgres + `ts-fsrs`, deployed on Railway.
 ## Credits
 
 Vocabulary from [open-anki-jlpt-decks](https://github.com/jamsinclair/open-anki-jlpt-decks) (MIT). 🙏
-
-Grammar content is adapted from a commercial JLPT course, so `decks/grammar-*.md` is
-gitignored rather than committed — bring your own deck in the same format to seed that
-table (see `scripts/seed-grammar.ts`).

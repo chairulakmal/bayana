@@ -87,6 +87,9 @@ committed at `decks/*.csv` — Anki export format, one file per JLPT level.
 
 **Columns:** `expression` (kanji/word), `reading` (kana), `meaning` (English),
 `tags` (space-separated, e.g. `JLPT JLPT_N5 Genki`), `guid` (stable Anki identifier).
+- `guid` is the natural **unique key** and guarantees idempotent re-imports.
+- `tags` encode legacy/overlapping levels (an N5 word may also be tagged `JLPT_3`).
+  The **source file** is authoritative for level; surplus tags are stored as metadata.
 
 `decks/templates/` contains the original Anki card templates (EN→JP and JP→EN
 directions plus `styles.css`); these serve as a visual reference for the card UI.
@@ -100,19 +103,17 @@ directions plus `styles.css`); these serve as a visual reference for the card UI
 
 ### 4.1 Grammar source data
 
-Grammar points (§13 Phase 3.5) come from a **commercial JLPT course**, unlike the
-MIT-licensed vocabulary above. `decks/grammar-*.md` is therefore **gitignored, not
-committed** — the repo ships the schema and seed script, but not the content itself.
-Anyone reproducing this project needs to supply their own grammar deck in the same
-markdown shape (`## Lesson N – Title` / `### pattern reading` heading tag / meanings /
-`**例文:**` sentence / translation — see the header comment in `scripts/seed-grammar.ts`).
+Grammar points (§13 Phase 3.5) come from a source not licensed for redistribution,
+unlike the MIT-licensed vocabulary above. `decks/grammar-*.md` is therefore
+**gitignored, not committed** — the repo ships the schema and seed script, but not
+the content itself. Anyone reproducing this project needs to supply their own
+grammar deck in the same markdown shape (`## Lesson N – Title` / `### pattern reading`
+heading tag / meanings / `**例文:**` sentence / translation — see the header comment
+in `scripts/seed-grammar.ts`).
 
 | File | Points | Lessons | Level |
 |------|--------|---------|-------|
 | `grammar-n3.md` | 220 | 22 | N3 |
-- `guid` is the natural **unique key** and guarantees idempotent re-imports.
-- `tags` encode legacy/overlapping levels (an N5 word may also be tagged `JLPT_3`).
-  The **source file** is authoritative for level; surplus tags are stored as metadata.
 
 ---
 
@@ -1072,6 +1073,8 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-07-01 | **Grammar browse gains a per-point progress status and lesson-level studied-count rollup; search also matches lesson titles.** `GET /api/grammar/browse` now joins `GrammarProgress` and returns `status: "new" \| "started" \| "mature"` per point (mirroring `/api/browse`'s `started` flag, with "mature" reusing `getGrammarStats`' `scheduledDays >= 21` threshold); `GrammarBrowseClient` renders it as a small dot (green = mature, magenta = started, none = new) and shows "studied/total" in each lesson header instead of a bare count. Searching a lesson theme (e.g. "conditional") now matches `lessonTitle` and shows the whole lesson unfiltered, rather than only points whose own text happens to contain the query. | The 2026-07-01 browse launch (next row) reused the vocab `/browse` pattern but missed porting its 2026-06-04 started-indicator decision — leaving grammar's reference view with no signal of what the learner already knows, which is the difference between a study aid and a plain document when scanning ~220 points before an exam. Filtering by lesson title but keeping only text-matching points would silently hide most of a themed lesson from someone searching by unit rather than pattern, so a title match bypasses the point-level filter entirely. | Author | §4.1, §13 |
+| 2026-07-01 | **README's Credits section and SPEC §4.1 no longer name the grammar deck's source type.** Both previously stated grammar content was "adapted from a commercial JLPT course"; the README paragraph is removed entirely, and §4.1's opening sentence now reads "a source not licensed for redistribution" instead. | Publicly committing that unlicensed commercial material was used as a derivative-work source is a pure disclosure risk — it hands a rights holder exactly the admission needed for a takedown/infringement claim — with no offsetting benefit, since `decks/grammar-*.md` being gitignored doesn't change that the derived data is live in the running app, and reproducibility for others is already covered by the header comment in `scripts/seed-grammar.ts`. Flagged by the author after reviewing the committed README. | Author | §4.1 |
 | 2026-07-01 | **Grammar browse view added; `GrammarPoint` gains a denormalized `lessonTitle`; seed script prunes stale rows.** Two forks, both surfaced to the author: (a) *lesson titles* — store `lessonTitle` as its own column (denormalized like `level`) rather than deriving it from a hardcoded in-code lookup table, so the DB stays a faithful mirror of the markdown source and titles can't drift out of sync with it; (b) *stale rows* — when the source file is edited and a lesson's items get renumbered/resized, the old `(level, lesson, position)` key becomes an orphan that `upsert` can't reach (the parser no longer produces it). The seed script now actively `deleteMany`s any row not present in the freshly parsed file, cascading to `GrammarProgress`, rather than leaving orphans to accumulate — chosen because an exact DB↔file mirror was judged more valuable than preserving FSRS progress on a handful of renumbered cards in this single-user app. Browse itself reuses the `/browse` (vocab) pattern, adapted to ship all lessons' points in one payload instead of lazy-loading per row, since grammar's ~220-row dataset is ~40× smaller than vocab's ~8,800. | Author | §4.1, §6, §13 |
 | 2026-06-29 | **Grammar point study added as Phase 3.5.** Separate FSRS queue and dedicated `/grammar` page for JLPT grammar points. N3 is the v1 source; the feature is designed to accept N5–N1 grammar decks later. Four key design decisions: (a) *Separate queue* — grammar and vocabulary are categorically different study objects; mixing them in one queue would obscure progress and complicate scheduling. A second, independent queue (separate models, separate API routes, separate page) keeps the two concerns cleanly isolated and lets each grow independently. (b) *Dedicated `/grammar` page* (not merged into the home hub) — the home hub is the vocabulary mode-picker; adding grammar tiles there would make it a compound navigation screen. A sibling page (with its own `BottomNav` tab) keeps the hub focused and gives grammar room to surface its own stats and CTA. (c) *Level stored as plain `String`* on `GrammarPoint`, not the `Level` enum — the `Level` enum covers vocab levels N5–N1; re-using it for grammar would couple grammar level expansion to enum migrations. A bare string ("N3", etc.) accepts any future level without a schema change. (d) *Card direction: pattern (JP) front → meanings + example sentence back* — the grammar-point object to learn is the pattern itself (e.g. 〜ために); recognition of the form and its meaning is the primary goal, matching how grammar is tested on the JLPT. The example sentence on the back reinforces usage in context; the pattern is bolded in grape so the learner can see exactly where it appears. | Author | §13 |
 | 2026-06-29 | **`CardLike` interface extracted from `src/lib/fsrs.ts`; `toCard` now accepts `CardLike | null`.** Previously `toCard` was typed to `ReviewState | null` (the Prisma vocab model). Introducing grammar scheduling required the same adapter logic for `GrammarProgress`, which has the same FSRS field shape. Rather than duplicating the function or creating a union type tied to two Prisma models, a `CardLike` interface was extracted that both `ReviewState` and `GrammarProgress` satisfy structurally. The vocab flow required no behavior change. | Author | §13 |

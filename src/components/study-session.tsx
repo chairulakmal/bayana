@@ -240,7 +240,7 @@ export function StudySession({ level }: { level: string }) {
         <button
           type="button"
           onClick={() => !flipped && setFlipped(true)}
-          className="my-auto flex w-full max-w-md flex-col items-center justify-center gap-5 rounded-[var(--r-lg)] px-6 py-10 text-center"
+          className="mx-auto my-auto flex w-full max-w-md flex-col items-center justify-center gap-5 rounded-[var(--r-lg)] px-6 py-10 text-center"
           style={{
             background: "var(--surface)",
             border: "1px solid var(--line)",
