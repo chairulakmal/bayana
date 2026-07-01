@@ -235,6 +235,9 @@ model GrammarPoint {
   id        String   @id @default(cuid())
   level     String   // "N3", "N2", etc. — plain string so new levels need no migration
   lesson    Int      // lesson number within the level
+  lessonTitle String // e.g. "During, While, and Sequence" — denormalized from the
+                      // markdown's "## Lesson N – Title" heading (like `level`, repeated
+                      // per row so the browse view can group without a second lookup)
   position  Int      // 1-indexed position within the lesson (e.g. 1 for "1/23")
   pattern   String   // display form, e.g. "ばいい"
   reading   String   // kana reading, e.g. "ばいい" (may differ from pattern)
