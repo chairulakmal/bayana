@@ -171,7 +171,7 @@ meanings + example sentence + translation back.
 - [x] `src/components/grammar-browse-client.tsx` + `src/app/grammar/browse/page.tsx` —
   search + collapsible per-lesson accordion, reachable from a new button on `/grammar`.
 - [x] Re-seeded from the updated `decks/grammar-n3.md`: 220 points across 22 lessons.
-- [x] SPEC §4.1, §6, §13, §16 — documented source data (commercial, gitignored), schema
+- [x] SPEC §4.1, §6, §13, §16 — documented source data (not licensed for redistribution, gitignored), schema
   addition, and the browse feature.
 
 ---
