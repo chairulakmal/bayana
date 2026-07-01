@@ -24,6 +24,7 @@ function parseGrammarFile(
 ): Array<{
   level: string;
   lesson: number;
+  lessonTitle: string;
   position: number;
   pattern: string;
   reading: string;
@@ -37,14 +38,16 @@ function parseGrammarFile(
 
   // Track current lesson as we scan through lines.
   let currentLesson = 0;
+  let currentLessonTitle = "";
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // ## Lesson N – Title  →  extract lesson number
-    const lessonMatch = line.match(/^## Lesson (\d+)/);
+    // ## Lesson N – Title  →  extract lesson number and title
+    const lessonMatch = line.match(/^## Lesson (\d+)\s*[–-]\s*(.+)$/);
     if (lessonMatch) {
       currentLesson = parseInt(lessonMatch[1], 10);
+      currentLessonTitle = lessonMatch[2].trim();
       continue;
     }
 
@@ -115,6 +118,7 @@ function parseGrammarFile(
     results.push({
       level: tagLevel,
       lesson,
+      lessonTitle: currentLessonTitle,
       position,
       pattern,
       reading,
@@ -160,6 +164,7 @@ async function main() {
         },
         create: row,
         update: {
+          lessonTitle: row.lessonTitle,
           pattern: row.pattern,
           reading: row.reading,
           meanings: row.meanings,
@@ -168,6 +173,24 @@ async function main() {
         },
       });
     }
+
+    // Prune stale rows: content gets renumbered/resized across edits (a lesson's
+    // item count changes, points move to a different lesson), which leaves orphan
+    // rows behind under the old (level, lesson, position) key — upsert alone can't
+    // catch these since they're no longer produced by the parser at all. Deleting
+    // them keeps the DB an exact mirror of the file. This cascades to GrammarProgress
+    // (schema: onDelete: Cascade), so any in-progress FSRS state on an orphaned point
+    // is lost — acceptable for this single-user learning app, but worth knowing.
+    const deleted = await db.grammarPoint.deleteMany({
+      where: {
+        level,
+        NOT: { OR: rows.map((r) => ({ lesson: r.lesson, position: r.position })) },
+      },
+    });
+    if (deleted.count > 0) {
+      console.log(`${fileName}: pruned ${deleted.count} stale row(s) no longer in the file`);
+    }
+
     total += rows.length;
   }
 

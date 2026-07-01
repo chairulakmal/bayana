@@ -28,7 +28,7 @@ So Bayana is the thing in between: open it and study.
 | 🎴 **Flashcard** | Real spaced repetition (FSRS, the engine modern Anki runs on). Cards come back right as you're about to forget them. |
 | ⚡ **Quiz** | Fast multiple-choice rounds — like Duolingo, minus the ads and the guilt-trips. Good for a two-minute gap. |
 | 📝 **Exam** | A timed JLPT-style benchmark: kanji reading (問題１) then kanji writing (問題２), 10 questions each. Tells you where you actually stand. |
-| 🗒️ **Grammar** | A separate FSRS queue for JLPT grammar points (N3 v1). Same flip-and-rate loop as Flashcard mode. |
+| 🗒️ **Grammar** | A separate FSRS queue for JLPT grammar points — 220 patterns across 22 lessons (N3 v1). Same flip-and-rate loop as Flashcard mode, plus a browsable lesson-by-lesson reference. |
 
 **Everything else:**
 
@@ -36,7 +36,8 @@ So Bayana is the thing in between: open it and study.
   JLPT level, so it sticks in context, not in a vacuum (written once by Claude Haiku, cached
   forever in Postgres; ~$2.55 for 8,100 words).
 - 🔍 **Browse & search** — whole-deck lookup with live filtering and 50/page pagination.
-  Tap any word to reveal its example sentence.
+  Tap any word to reveal its example sentence. Grammar has its own browse view too, grouped
+  by lesson with search across pattern, reading, and meaning.
 - 📱 **Mobile-first PWA** — thumb-friendly, installable to your home screen
   (fullscreen on Android, standalone on iOS). Designed for the iPhone SE (375 × 667 px)
   baseline.
@@ -80,3 +81,7 @@ Built with Next.js 16 + Prisma + Postgres + `ts-fsrs`, deployed on Railway.
 ## Credits
 
 Vocabulary from [open-anki-jlpt-decks](https://github.com/jamsinclair/open-anki-jlpt-decks) (MIT). 🙏
+
+Grammar content is adapted from a commercial JLPT course, so `decks/grammar-*.md` is
+gitignored rather than committed — bring your own deck in the same format to seed that
+table (see `scripts/seed-grammar.ts`).

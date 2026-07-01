@@ -6,7 +6,7 @@
 |---|---|
 | **Status** | Draft |
 | **Author** | Chairul Akmal |
-| **Last updated** | 2026-06-30 (Spec audit: grammar schema, demo session, onboarding, proxy.ts, browse pagination) |
+| **Last updated** | 2026-07-01 (Grammar browse view, lesson titles, seed pruning) |
 | **Target platform** | Mobile-first responsive web (Next.js 16, deployed on Railway) |
 
 ---
@@ -97,6 +97,19 @@ directions plus `styles.css`); these serve as a visual reference for the card UI
 - Some entries use placeholder markers (`〜` / `～`) and parenthetical notes
   (e.g. `(かさを～) さす`); preserve raw text but flag these for the generation prompt.
 - The `MediaMissing` tag is irrelevant to this product and may be discarded.
+
+### 4.1 Grammar source data
+
+Grammar points (§13 Phase 3.5) come from a **commercial JLPT course**, unlike the
+MIT-licensed vocabulary above. `decks/grammar-*.md` is therefore **gitignored, not
+committed** — the repo ships the schema and seed script, but not the content itself.
+Anyone reproducing this project needs to supply their own grammar deck in the same
+markdown shape (`## Lesson N – Title` / `### pattern reading` heading tag / meanings /
+`**例文:**` sentence / translation — see the header comment in `scripts/seed-grammar.ts`).
+
+| File | Points | Lessons | Level |
+|------|--------|---------|-------|
+| `grammar-n3.md` | 220 | 22 | N3 |
 - `guid` is the natural **unique key** and guarantees idempotent re-imports.
 - `tags` encode legacy/overlapping levels (an N5 word may also be tagged `JLPT_3`).
   The **source file** is authoritative for level; surplus tags are stored as metadata.
@@ -354,9 +367,12 @@ enum FsrsState { NEW LEARNING REVIEW RELEARNING }
 // N5–N1 grammar decks as they are added later, without a schema migration.
 
 model GrammarPoint {
-  id        String   @id @default(cuid())
-  level     String   // "N3", "N2", etc. — plain string so new levels need no migration
-  lesson    Int      // lesson number within the level
+  id          String @id @default(cuid())
+  level       String // "N3", "N2", etc. — plain string so new levels need no migration
+  lesson      Int    // lesson number within the level
+  lessonTitle String // e.g. "During, While, and Sequence" — denormalized from the
+                      // source file's lesson heading (like `level`, repeated per row
+                      // so the browse view can group without a second lookup)
   position  Int      // 1-indexed position within the lesson
   pattern   String   // display form, e.g. "ばいい"
   reading   String   // kana reading (may equal pattern; stored separately to allow differ)
@@ -921,8 +937,8 @@ without an email address. It is fundamentally different from the dev bypass abov
 
 **Phase 3.5 — Grammar point study (N3 v1) — ✅ done (2026-06-29)**
 - Separate FSRS study queue for JLPT grammar points, fully independent of the vocabulary
-  queue. Source data: `decks/grammar-n3.md` (N3 grammar points). Schema designed to
-  accept N5–N1 grammar decks later without migration.
+  queue. Source data: `decks/grammar-n3.md` — 220 grammar points across 22 lessons (§4.1).
+  Schema designed to accept N5–N1 grammar decks later without migration.
 - **Schema:** `GrammarPoint` (`level` stored as plain `String`, not the `Level` enum) and
   `GrammarProgress` (FSRS fields mirroring `ReviewState`; composite unique on
   `[userId, grammarPointId]`). `CardLike` interface extracted from `src/lib/fsrs.ts` so
@@ -942,6 +958,28 @@ without an email address. It is fundamentally different from the dev bypass abov
 - **Demo session (`GET /api/demo/login`):** ephemeral try-without-signup path; creates a new
   `User` + `UserProfile`, signs the userId with HMAC-SHA256, sets a 7-day cookie, and
   redirects to `/onboarding`. Production-available (§11.8).
+
+**Phase 3.5 addendum — Grammar browse + lesson titles — ✅ done (2026-07-01)**
+- **`lessonTitle` column added to `GrammarPoint`** (migration `20260701130743_grammar_lesson_title`),
+  denormalized from the source file's `## Lesson N – Title` heading the same way `level`
+  is denormalized — repeated per row so a browse view can group and label lessons
+  without a second lookup.
+- **`GET /api/grammar/browse?level=`** — auth-gated, returns every grammar point for a
+  level grouped into lessons in one payload (unlike `/api/browse`'s per-word lazy-load:
+  grammar's ~220-row dataset is small enough to ship whole). `Cache-Control` mirrors
+  `/api/browse`.
+- **`/grammar/browse` page + `GrammarBrowseClient`:** collapsible per-lesson accordion
+  (collapsed by default — 22 open lessons would be an unreasonable scroll), search box
+  filters by pattern/reading/meaning and force-expands matching lessons. Reachable via a
+  "Browse all grammar points" button on `/grammar`.
+- **Seed script now prunes stale rows:** after upserting the freshly parsed file, it
+  deletes any `GrammarPoint` row for that level whose `(lesson, position)` no longer
+  appears in the file. Content gets renumbered across edits (a lesson's item count
+  changes, a point moves to a different lesson), which otherwise leaves orphan rows
+  behind under the old key — upsert alone can't catch these since the parser no longer
+  produces them at all. Pruning cascades to `GrammarProgress` (`onDelete: Cascade`), so
+  any in-progress FSRS state on an orphaned point is lost — acceptable for a single-user
+  app, chosen over leaving orphans so the DB stays an exact mirror of the source file.
 
 **Phase 3 — Admin audit + on-demand generation — next, after Quiz mode**
 - **Admin review/audit page** (admin-gated via `UserProfile.role`): inspect each
@@ -1034,6 +1072,7 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-07-01 | **Grammar browse view added; `GrammarPoint` gains a denormalized `lessonTitle`; seed script prunes stale rows.** Two forks, both surfaced to the author: (a) *lesson titles* — store `lessonTitle` as its own column (denormalized like `level`) rather than deriving it from a hardcoded in-code lookup table, so the DB stays a faithful mirror of the markdown source and titles can't drift out of sync with it; (b) *stale rows* — when the source file is edited and a lesson's items get renumbered/resized, the old `(level, lesson, position)` key becomes an orphan that `upsert` can't reach (the parser no longer produces it). The seed script now actively `deleteMany`s any row not present in the freshly parsed file, cascading to `GrammarProgress`, rather than leaving orphans to accumulate — chosen because an exact DB↔file mirror was judged more valuable than preserving FSRS progress on a handful of renumbered cards in this single-user app. Browse itself reuses the `/browse` (vocab) pattern, adapted to ship all lessons' points in one payload instead of lazy-loading per row, since grammar's ~220-row dataset is ~40× smaller than vocab's ~8,800. | Author | §4.1, §6, §13 |
 | 2026-06-29 | **Grammar point study added as Phase 3.5.** Separate FSRS queue and dedicated `/grammar` page for JLPT grammar points. N3 is the v1 source; the feature is designed to accept N5–N1 grammar decks later. Four key design decisions: (a) *Separate queue* — grammar and vocabulary are categorically different study objects; mixing them in one queue would obscure progress and complicate scheduling. A second, independent queue (separate models, separate API routes, separate page) keeps the two concerns cleanly isolated and lets each grow independently. (b) *Dedicated `/grammar` page* (not merged into the home hub) — the home hub is the vocabulary mode-picker; adding grammar tiles there would make it a compound navigation screen. A sibling page (with its own `BottomNav` tab) keeps the hub focused and gives grammar room to surface its own stats and CTA. (c) *Level stored as plain `String`* on `GrammarPoint`, not the `Level` enum — the `Level` enum covers vocab levels N5–N1; re-using it for grammar would couple grammar level expansion to enum migrations. A bare string ("N3", etc.) accepts any future level without a schema change. (d) *Card direction: pattern (JP) front → meanings + example sentence back* — the grammar-point object to learn is the pattern itself (e.g. 〜ために); recognition of the form and its meaning is the primary goal, matching how grammar is tested on the JLPT. The example sentence on the back reinforces usage in context; the pattern is bolded in grape so the learner can see exactly where it appears. | Author | §13 |
 | 2026-06-29 | **`CardLike` interface extracted from `src/lib/fsrs.ts`; `toCard` now accepts `CardLike | null`.** Previously `toCard` was typed to `ReviewState | null` (the Prisma vocab model). Introducing grammar scheduling required the same adapter logic for `GrammarProgress`, which has the same FSRS field shape. Rather than duplicating the function or creating a union type tied to two Prisma models, a `CardLike` interface was extracted that both `ReviewState` and `GrammarProgress` satisfy structurally. The vocab flow required no behavior change. | Author | §13 |
 | 2026-06-07 | **Exam mode added as a third, fully independent study mode.** JLPT-style two-section benchmark: 問題１ (pick the kana reading for an underlined kanji word in a sentence) and 問題２ (pick the kanji form for an underlined kana word in a sentence). 20 questions per round (10 per section); sequential with immediate feedback; section-break screen between sections. **No FSRS coupling by design** — Exam is a benchmark, not a study scheduler. All three modes (Flashcard, Quiz, Exam) are independent: they operate on the same word pool but do not share scheduling state. | Two key decisions: (a) *Modes are independent* — when designing Exam mode the question arose whether Exam correct/wrong answers should feed FSRS (like the planned Quiz↔FSRS Phase 3 coupling). The author chose not to: Exam is a benchmark, and coupling would mean Exam sessions bias the user's SRS schedule in ways that are hard to reason about. The three modes solve distinct problems (retention, warm-up/engagement, benchmarking) and are cleaner as independent tools. This also simplifies the scope of Phase 3 (MC↔FSRS coupling for Quiz only). (b) *Immediate feedback over submit-all-at-end* — a real JLPT exam withholds feedback until submission, but Bayana is a study tool: connecting a correction to the moment of error is the primary teaching mechanism; deferring it wastes the learning window. | Author | §8.6, §13 |

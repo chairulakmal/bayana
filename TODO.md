@@ -7,7 +7,8 @@ record across sessions. Decisions do **not** go here — log them in SPEC.md §1
 
 **Now: Phase 3** — MC↔FSRS coupling for Quiz mode (planned, not started).
 **Next: Phase 4** — Admin sentence audit + on-demand generation.
-**✅ Phase 3.5 complete** — Grammar point study (N3 v1, separate FSRS queue + page).
+**✅ Phase 3.5 complete** — Grammar point study (N3 v1, 220 points / 22 lessons, separate
+FSRS queue + page) plus its browse-view addendum.
 
 ---
 
@@ -128,7 +129,7 @@ meanings + example sentence + translation back.
 - [x] `scripts/seed-grammar.ts` — parse `decks/grammar-n3.md` (regex on `###` headings
   for pattern/reading/lesson/position, meanings line, `**例文:**` for exampleJp, next
   line for exampleEn); upsert each row keyed on `(level, lesson, position)`. Idempotent.
-- [x] Run script locally; verified 220 N3 points seeded across 10 lessons.
+- [x] Run script locally; verified 220 N3 points seeded across 22 lessons.
 
 ### Part C — Shared FSRS util refactor
 - [x] Exported `CardLike` interface from `src/lib/fsrs.ts`; `toCard` now accepts
@@ -154,6 +155,24 @@ meanings + example sentence + translation back.
 - [x] SPEC §13 — add Phase 3.5 milestone entry.
 - [x] SPEC §16 — log decisions: separate grammar FSRS queue, dedicated `/grammar` page,
   N3-first with level-agnostic schema, card direction (pattern→meaning+example).
+
+---
+
+## ✅ Phase 3.5 addendum — Grammar browse + lesson titles (2026-07-01)
+
+- [x] `prisma/schema.prisma` — add `lessonTitle` to `GrammarPoint`; migration
+  `20260701130743_grammar_lesson_title` (backfilled `DEFAULT ''`, not optional at the
+  Prisma layer).
+- [x] `scripts/seed-grammar.ts` — parse `## Lesson N – Title` into `lessonTitle`; prune
+  stale `(level, lesson, position)` rows no longer produced by the parser (cascades to
+  `GrammarProgress`).
+- [x] `GET /api/grammar/browse?level=` — auth-gated, all points for a level grouped by
+  lesson in one payload.
+- [x] `src/components/grammar-browse-client.tsx` + `src/app/grammar/browse/page.tsx` —
+  search + collapsible per-lesson accordion, reachable from a new button on `/grammar`.
+- [x] Re-seeded from the updated `decks/grammar-n3.md`: 220 points across 22 lessons.
+- [x] SPEC §4.1, §6, §13, §16 — documented source data (commercial, gitignored), schema
+  addition, and the browse feature.
 
 ---
 

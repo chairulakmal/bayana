@@ -23,7 +23,8 @@
 # misc
 .DS_Store
 *.pem
-grammar*
+# commercial-source grammar decks — see SPEC.md §4.1
+/decks/grammar*
 
 # debug
 npm-debug.log*

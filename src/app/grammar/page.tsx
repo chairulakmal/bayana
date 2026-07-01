@@ -151,6 +151,19 @@ export default async function GrammarPage() {
             </span>
           </div>
         )}
+
+        <Link
+          href="/grammar/browse"
+          className="mt-3 flex items-center justify-center gap-2 rounded-[var(--r-lg)] px-5 py-3 text-[14px]"
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--line)",
+            color: "var(--ink-soft)",
+          }}
+        >
+          <span aria-hidden>📚</span>
+          Browse all grammar points
+        </Link>
       </div>
 
       <BottomNav />
