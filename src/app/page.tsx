@@ -5,11 +5,11 @@ import { Parrot } from "@/components/parrot";
 import { InfoBubble } from "@/components/info-bubble";
 
 // Public marketing homepage (BRAND.md). The primary CTA is "Sign in" — so this page is for
-// logged-out visitors. Already signed in? Go straight to the study queue (one-tap start,
-// SPEC §2). The authenticated app lives at /study; `/` is public (see proxy.ts).
+// logged-out visitors. Already signed in? Go straight to /grammar — grammar is the main
+// page for now (focus area, SPEC.md §16). `/` itself stays public (see proxy.ts).
 export default async function Home() {
   const session = await auth();
-  if (session) redirect("/home");
+  if (session) redirect("/grammar");
 
   const year = new Date().getFullYear();
 
