@@ -20,7 +20,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description:
       "Learn JLPT Japanese vocabulary with spaced repetition and AI-written example sentences.",
     // Logged-in entry point; an unauthenticated launch redirects to sign-in (proxy.ts).
-    start_url: "/home",
+    // Grammar is the main page for now (focus area) — see SPEC.md §16.
+    start_url: "/grammar",
     display: "fullscreen",
     // Mobile-first study app — lock to portrait so an installed launch never rotates
     // the single-card layout into an awkward landscape (BRAND.md platform focus).

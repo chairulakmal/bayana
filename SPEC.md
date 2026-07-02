@@ -6,7 +6,7 @@
 |---|---|
 | **Status** | Draft |
 | **Author** | Chairul Akmal |
-| **Last updated** | 2026-07-01 (Grammar browse view, lesson titles, seed pruning) |
+| **Last updated** | 2026-07-02 (Grammar is the post-login landing page, for now) |
 | **Target platform** | Mobile-first responsive web (Next.js 16, deployed on Railway) |
 
 ---
@@ -644,14 +644,18 @@ Two user stories drive entry into the app. Both reach the same two level-scoped 
   questions) and **guided tour** remain deferred to Phase 4 (§13). Completing the level
   choice persists `UserProfile.activeLevel` and stamps `onboardedAt` (§6), which is what
   distinguishes a first-time from a returning user thereafter.
-- **Returning user.** Sign in → the **home hub** (`/home`) → start. That's it.
+- **Returning user.** Sign in → **the post-login landing** → start. That's it.
 
-**The home hub (`/home`).** The returning-user landing — sign-in, the dev login, and the
-public `/` all redirect here. It is the **mode picker** (three large cards → Flashcard
-`/study`, Quiz `/quiz`, Exam `/exam`) plus an **inline level selector** (the five JLPT
-chips; tapping one persists `UserProfile.activeLevel` via a server action and re-scopes all
-three engines). The level is therefore changed *here*, not on a separate settings page. The
-hub is deliberately **not a full dashboard** — stats, streak, and history live in a richer
+**Post-login landing: `/grammar`, for now.** Sign-in, the dev login, and the public `/` all
+currently redirect to the grammar hub (§13), not `/home` — a temporary reprioritization
+while the author focuses on grammar study (§16, 2026-07-02). `/home` still exists as the
+vocab **mode picker** and is reachable from the nav (now its second tab, after Grammar).
+
+**The vocab hub (`/home`).** The **mode picker** (three large cards → Flashcard `/study`,
+Quiz `/quiz`, Exam `/exam`) plus an **inline level selector** (the five JLPT chips; tapping
+one persists `UserProfile.activeLevel` via a server action and re-scopes all three engines).
+The level is therefore changed *here*, not on a separate settings page. The hub is
+deliberately **not a full dashboard** — stats, streak, and history live in a richer
 dashboard in Phase 4 (§13). `/study`, `/quiz`, and `/exam` each read the active level and
 link back to the hub.
 
@@ -1073,6 +1077,7 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-07-02 | **`/grammar` becomes the post-login landing page, and the leftmost `BottomNav` tab, for now.** Sign-in (`redirectTo`), the public `/` redirect, `/onboarding`'s already-onboarded bounce, the dev-login route, and the PWA manifest's `start_url` all point to `/grammar` instead of `/home`. `BottomNav`'s tab order becomes Grammar, Home, Stats, Browse. `/home` (the vocab mode picker) is untouched otherwise — still fully functional, just no longer the first thing a returning user sees. | The author is deliberately prioritizing grammar study right now, and wants the app to open there by default rather than requiring an extra tap through the vocab hub each session. Framed as temporary ("for now") rather than a permanent architectural change — unlike the 2026-06-29 decision to keep grammar a *sibling* page rather than merge it into `/home`, which stands. | Author | §8.5, §13, §16 |
 | 2026-07-01 | **Grammar browse gains a per-point progress status and lesson-level studied-count rollup; search also matches lesson titles.** `GET /api/grammar/browse` now joins `GrammarProgress` and returns `status: "new" \| "started" \| "mature"` per point (mirroring `/api/browse`'s `started` flag, with "mature" reusing `getGrammarStats`' `scheduledDays >= 21` threshold); `GrammarBrowseClient` renders it as a small dot (green = mature, magenta = started, none = new) and shows "studied/total" in each lesson header instead of a bare count. Searching a lesson theme (e.g. "conditional") now matches `lessonTitle` and shows the whole lesson unfiltered, rather than only points whose own text happens to contain the query. | The 2026-07-01 browse launch (next row) reused the vocab `/browse` pattern but missed porting its 2026-06-04 started-indicator decision — leaving grammar's reference view with no signal of what the learner already knows, which is the difference between a study aid and a plain document when scanning ~220 points before an exam. Filtering by lesson title but keeping only text-matching points would silently hide most of a themed lesson from someone searching by unit rather than pattern, so a title match bypasses the point-level filter entirely. | Author | §4.1, §13 |
 | 2026-07-01 | **README's Credits section and SPEC §4.1 no longer name the grammar deck's source type.** Both previously stated grammar content was "adapted from a commercial JLPT course"; the README paragraph is removed entirely, and §4.1's opening sentence now reads "a source not licensed for redistribution" instead. | Publicly committing that unlicensed commercial material was used as a derivative-work source is a pure disclosure risk — it hands a rights holder exactly the admission needed for a takedown/infringement claim — with no offsetting benefit, since `decks/grammar-*.md` being gitignored doesn't change that the derived data is live in the running app, and reproducibility for others is already covered by the header comment in `scripts/seed-grammar.ts`. Flagged by the author after reviewing the committed README. | Author | §4.1 |
 | 2026-07-01 | **Grammar browse view added; `GrammarPoint` gains a denormalized `lessonTitle`; seed script prunes stale rows.** Two forks, both surfaced to the author: (a) *lesson titles* — store `lessonTitle` as its own column (denormalized like `level`) rather than deriving it from a hardcoded in-code lookup table, so the DB stays a faithful mirror of the markdown source and titles can't drift out of sync with it; (b) *stale rows* — when the source file is edited and a lesson's items get renumbered/resized, the old `(level, lesson, position)` key becomes an orphan that `upsert` can't reach (the parser no longer produces it). The seed script now actively `deleteMany`s any row not present in the freshly parsed file, cascading to `GrammarProgress`, rather than leaving orphans to accumulate — chosen because an exact DB↔file mirror was judged more valuable than preserving FSRS progress on a handful of renumbered cards in this single-user app. Browse itself reuses the `/browse` (vocab) pattern, adapted to ship all lessons' points in one payload instead of lazy-loading per row, since grammar's ~220-row dataset is ~40× smaller than vocab's ~8,800. | Author | §4.1, §6, §13 |

@@ -9,8 +9,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const TABS = [
-  { label: "Home", href: "/home", icon: HomeIcon },
   { label: "Grammar", href: "/grammar", icon: GrammarIcon },
+  { label: "Home", href: "/home", icon: HomeIcon },
   { label: "Stats", href: "/stats", icon: StatsIcon },
   { label: "Browse", href: "/browse", icon: BrowseIcon },
 ] as const;
