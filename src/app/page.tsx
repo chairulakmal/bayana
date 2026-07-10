@@ -67,7 +67,7 @@ export default async function Home() {
                 ⚡ <strong style={{ color: "var(--ink)" }}>Quiz</strong> — 10 cards a session. A
                 quick round for momentum.
                 <br />
-                <span className="jp">毎日ちょっとずつ</span> — a little every day.
+                <span lang="ja" className="jp">毎日ちょっとずつ</span> — a little every day.
               </InfoBubble>
             </p>
 
@@ -165,7 +165,7 @@ export default async function Home() {
                 b<b style={{ color: "var(--mag-700)" }}>a</b>yana
               </span>
             </span>
-            <span className="jp text-[13px]" style={{ color: "var(--ink-faint)" }}>
+            <span lang="ja" className="jp text-[13px]" style={{ color: "var(--ink-faint)" }}>
               毎日ちょっとずつ — a little every day
             </span>
           </div>

@@ -54,7 +54,7 @@ export default async function SignInPage({
           b<b style={{ color: "var(--mag-700)" }}>a</b>yana
         </h1>
         <p className="mt-1 text-[15px]" style={{ color: "var(--ink-soft)" }}>
-          <span className="jp">メールのリンクでログイン</span> · sign in with your email
+          <span lang="ja" className="jp">メールのリンクでログイン</span> · sign in with your email
         </p>
 
         {message && (
@@ -114,18 +114,19 @@ export default async function SignInPage({
         </p>
 
         {/* Demo divider — always visible. Starts a fresh ephemeral session each click.
-            Progress is cookie-bound (7 days); user is warned on the home hub. */}
+            Progress is cookie-bound (7 days); user is warned on the home hub.
+            A form POST (not a link) because the route is POST-only: a state-changing
+            GET could be triggered cross-site or by prefetching (SPEC §11.8). */}
         <div className="mt-5 flex items-center gap-3">
           <div className="flex-1" style={{ height: 1, background: "var(--line)" }} />
           <span className="text-[11px]" style={{ color: "var(--ink-faint)" }}>or</span>
           <div className="flex-1" style={{ height: 1, background: "var(--line)" }} />
         </div>
-        <a
-          href="/api/demo/login"
-          className="btn btn-ghost mt-3 w-full"
-        >
-          Try demo →
-        </a>
+        <form method="post" action="/api/demo/login">
+          <button type="submit" className="btn btn-ghost mt-3 w-full">
+            Try demo →
+          </button>
+        </form>
         <p className="mt-2 text-[11px]" style={{ color: "var(--ink-faint)" }}>
           No sign-up needed · progress lives in this browser for 7 days
         </p>

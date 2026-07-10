@@ -25,6 +25,42 @@ const WINDOW_MS = 10 * 60_000;
 const checkPerIpSignIn = createRateLimiter({ limit: 5, windowMs: WINDOW_MS });
 const checkGlobalSignIn = createRateLimiter({ limit: 6, windowMs: WINDOW_MS });
 
+// Demo-login rate limiting. POST /api/demo/login is the one write endpoint that is
+// deliberately unauthenticated (each hit inserts a User + UserProfile row), which
+// makes it the obvious DB-flooding target — so it gets its own limiters. A real
+// visitor restarts the demo a handful of times at most; anything past these caps
+// is abuse. Per-IP is generous for humans, the global cap bounds total row
+// creation per hour even from rotating IPs.
+const DEMO_WINDOW_MS = 60 * 60_000; // 1 hour
+const checkPerIpDemo = createRateLimiter({ limit: 5, windowMs: DEMO_WINDOW_MS });
+const checkGlobalDemo = createRateLimiter({ limit: 30, windowMs: DEMO_WINDOW_MS });
+
+/**
+ * Client IP for rate-limit keying. X-Forwarded-For is a comma list where each
+ * proxy hop APPENDS the address it saw — so the RIGHTMOST entry is the one
+ * written by Railway's edge (trustworthy), while everything to its left is
+ * client-supplied and freely spoofable. Taking `[0]` (the previous behavior)
+ * let an attacker mint a fresh per-IP bucket per request by sending a random
+ * header value; taking the last entry keys on the address the attacker cannot
+ * choose. If Bayana ever sits behind a second trusted proxy layer, index from
+ * the end by the number of trusted hops instead.
+ */
+function clientIp(req: NextRequest): string {
+  const hops = (req.headers.get("x-forwarded-for") ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return hops.at(-1) ?? "unknown";
+}
+
+/** Shared 429 for both throttled endpoints. */
+function tooMany(retryAfterSeconds: number, what: string): NextResponse {
+  return new NextResponse(`Too many ${what}. Please try again later.`, {
+    status: 429,
+    headers: { "Retry-After": String(retryAfterSeconds) },
+  });
+}
+
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -37,27 +73,33 @@ export function proxy(req: NextRequest) {
     (pathname === "/auth/signin" || pathname.startsWith("/api/auth/signin"));
 
   if (isSignInRequest) {
-    // Behind Railway's proxy, the client IP is the first entry of X-Forwarded-For.
-    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const ip = clientIp(req);
     const perIp = checkPerIpSignIn(ip);
     const global = checkGlobalSignIn("global");
     const blocked = !perIp.allowed ? perIp : !global.allowed ? global : null;
-    if (blocked) {
-      return new NextResponse("Too many sign-in attempts. Please try again later.", {
-        status: 429,
-        headers: { "Retry-After": String(blocked.retryAfterSeconds) },
-      });
-    }
+    if (blocked) return tooMany(blocked.retryAfterSeconds, "sign-in attempts");
+  }
+
+  // Throttle demo-session creation (POST-only — see the route header for why the
+  // endpoint no longer answers GET). Each request writes DB rows, so this is the
+  // flood-control gate; the route itself adds the CSRF/origin check and cleanup.
+  if (req.method === "POST" && pathname === "/api/demo/login") {
+    const ip = clientIp(req);
+    const perIp = checkPerIpDemo(ip);
+    const global = checkGlobalDemo("global");
+    const blocked = !perIp.allowed ? perIp : !global.allowed ? global : null;
+    if (blocked) return tooMany(blocked.retryAfterSeconds, "demo sessions");
   }
 
   // Public: the marketing homepage, the sign-in page, all Auth.js endpoints, and the
-  // demo login route (it creates the session, so it must be reachable without one).
+  // demo login route (it creates the session, so it must be reachable without one) —
+  // the exact path only, so future /api/demo/* additions don't silently ship public.
   // The dev-login bypass is only outside production (SPEC §11.7).
   const isPublic =
     pathname === "/" ||
     pathname.startsWith("/auth") ||
     pathname.startsWith("/api/auth") ||
-    pathname.startsWith("/api/demo") ||
+    pathname === "/api/demo/login" ||
     (process.env.NODE_ENV !== "production" && pathname.startsWith("/api/dev"));
   // Demo cookie is the second valid session type — no Auth.js Session row.
   // Proxy only checks presence here; HMAC verification happens in getCurrentUserId().

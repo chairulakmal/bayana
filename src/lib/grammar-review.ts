@@ -8,7 +8,7 @@
 //   getGrammarQueue     – due cards first, then a batch of new (unseen) points.
 //   getGrammarStats     – counts for the inline stats panel on /grammar.
 
-import { db } from "@/lib/db";
+import { db, serializableTxn } from "@/lib/db";
 import { schedulerFor, toCard, fromCard } from "@/lib/fsrs";
 import type { Grade } from "ts-fsrs";
 
@@ -27,25 +27,29 @@ export async function reviewGrammarPoint(
 ) {
   const now = new Date();
 
-  const [rawProfile, existing] = await Promise.all([
-    db.userProfile.findUnique({ where: { userId } }),
-    db.grammarProgress.findUnique({
-      where: { userId_grammarPointId: { userId, grammarPointId } },
-    }),
-  ]);
+  // Per-user config, not per-card state — safe to read outside the transaction.
+  const rawProfile = await db.userProfile.findUnique({ where: { userId } });
   const profile = rawProfile ?? DEFAULT_PROFILE;
 
-  const scheduler = schedulerFor(profile);
-  const { card: next } = scheduler.next(toCard(existing, now), now, rating as Grade);
-  const cardFields = fromCard(next);
+  // Read-compute-write as one atomic unit, same reasoning as reviewWord (review.ts):
+  // concurrent ratings of the same card would otherwise lose one update.
+  return serializableTxn(async (tx) => {
+    const existing = await tx.grammarProgress.findUnique({
+      where: { userId_grammarPointId: { userId, grammarPointId } },
+    });
 
-  await db.grammarProgress.upsert({
-    where: { userId_grammarPointId: { userId, grammarPointId } },
-    create: { userId, grammarPointId, ...cardFields },
-    update: cardFields,
+    const scheduler = schedulerFor(profile);
+    const { card: next } = scheduler.next(toCard(existing, now), now, rating as Grade);
+    const cardFields = fromCard(next);
+
+    await tx.grammarProgress.upsert({
+      where: { userId_grammarPointId: { userId, grammarPointId } },
+      create: { userId, grammarPointId, ...cardFields },
+      update: cardFields,
+    });
+
+    return { due: next.due, state: cardFields.state };
   });
-
-  return { due: next.due, state: cardFields.state };
 }
 
 /**

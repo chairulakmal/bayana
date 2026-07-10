@@ -9,7 +9,7 @@
 // The session's card list is fixed at load time, so "undo" simply steps back to the
 // previous card to be re-rated; newly-due cards appear on the next load.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Parrot } from "@/components/parrot";
 import { SessionHeader, SessionHeaderLink, SessionHeaderButton } from "@/components/session-header";
@@ -65,16 +65,28 @@ export function StudySession({ level }: { level: string }) {
   // count from the last queue fetch (pre-cap), used for the "N more waiting" hint.
   const [sessionDone, setSessionDone] = useState(false);
   const [remainingDue, setRemainingDue] = useState(0);
+  // Distinguishes "fetch failed" from "queue is genuinely empty" — both leave cards
+  // as [], but they need different screens: a failure must offer a retry, not claim
+  // "All caught up!" (same pattern as grammar-session.tsx).
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  // loadQueue is called both from the initial effect and imperatively (the
+  // "Check for more" / retry button), so a plain effect-cleanup `cancelled` flag
+  // can't guard it — a request token does: each call gets its own id, and a
+  // response only applies state if it's still the most recent call in flight.
+  const requestIdRef = useRef(0);
 
   // Fetch the queue and flatten due + new into one ordered list. Called on mount and
   // again whenever a batch is exhausted (auto-refetch), so cards that have become due
   // mid-session — e.g. a card you rated "Again", or a learning-step card — cycle back
   // without a manual reload.
   const loadQueue = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     try {
       const res = await fetch(`/api/cards/queue?level=${encodeURIComponent(level)}`);
       if (!res.ok) throw new Error(`queue ${res.status}`);
       const data: QueueResponse = await res.json();
+      if (requestIdRef.current !== requestId) return;
       setCards([...data.due.map((d) => toCard(d.word)), ...data.newWords.map(toCard)]);
       setRemainingDue(data.totalDue);
       setIndex(0);
@@ -82,9 +94,12 @@ export function StudySession({ level }: { level: string }) {
       setFlipped(false);
       setSessionDone(false);
       setError(null);
+      setLoadFailed(false);
     } catch {
+      if (requestIdRef.current !== requestId) return;
       setError("Couldn't load your study queue.");
-      setCards((prev) => prev ?? []); // first-load failure ⇒ show the empty state
+      setLoadFailed(true);
+      setCards((prev) => prev ?? []);
     }
   }, [level]);
 
@@ -109,15 +124,19 @@ export function StudySession({ level }: { level: string }) {
         });
         if (!res.ok) throw new Error(`review ${res.status}`);
 
+        // Advance uniformly — including on the last card — so `index` always equals
+        // the number of cards rated and `reviewed` always holds every rated wordId.
+        // That invariant is what lets a single undo implementation serve both the
+        // mid-session header button and the completion screen (previously the last
+        // card was never pushed onto `reviewed`, so it could not be un-rated).
+        setReviewed((r) => [...r, current.wordId]);
+        setIndex((i) => i + 1);
+        setFlipped(false);
         if (index >= cards.length - 1) {
           // Last card in the session → show the session-complete screen. The user
           // chooses whether to start another session or go home. We don't auto-refetch
           // so there's a clear stopping point (FSRS sessions should feel finite).
           setSessionDone(true);
-        } else {
-          setReviewed((r) => [...r, current.wordId]);
-          setIndex((i) => i + 1);
-          setFlipped(false);
         }
       } catch {
         setError("Failed to save your review.");
@@ -143,6 +162,9 @@ export function StudySession({ level }: { level: string }) {
       setReviewed((r) => r.slice(0, -1));
       setIndex((i) => Math.max(0, i - 1));
       setFlipped(false);
+      // Undoing from the completion screen re-opens the session on the last card
+      // (a no-op mid-session, where sessionDone is already false).
+      setSessionDone(false);
     } catch {
       setError("Failed to undo.");
     } finally {
@@ -159,6 +181,30 @@ export function StudySession({ level }: { level: string }) {
         <p className="mt-3" style={{ color: "var(--ink-soft)" }}>
           Loading…
         </p>
+      </Centered>
+    );
+  }
+
+  // Load failure: the queue fetch failed, so we know nothing about what's due —
+  // offer a retry instead of the misleading "All caught up!" empty state.
+  if (loadFailed && !sessionDone) {
+    return (
+      <Centered>
+        <Parrot expr="sleepy" title="Pī looking concerned" style={{ width: 124, height: 138 }} />
+        <p className="mt-4 text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
+          Couldn&apos;t load
+        </p>
+        <p className="mt-1" style={{ color: "var(--ink-soft)" }}>
+          {error ?? "Something went wrong loading your study queue."}
+        </p>
+        <div className="mt-6 flex gap-3">
+          <button onClick={() => void loadQueue()} disabled={busy} className="btn btn-primary">
+            Try again
+          </button>
+          <Link href="/home" className="btn btn-ghost">
+            Home
+          </Link>
+        </div>
       </Centered>
     );
   }
@@ -183,11 +229,11 @@ export function StudySession({ level }: { level: string }) {
         </p>
         <p className="mt-1" style={{ color: "var(--ink-soft)" }}>
           {allCaughtUp ? (
-            <>No cards are due right now. <span className="jp">またね！</span></>
+            <>No cards are due right now. <span lang="ja" className="jp">またね！</span></>
           ) : approxRemaining > 0 ? (
             <>About {approxRemaining} more cards due today.</>
           ) : (
-            <>All caught up! <span className="jp">おつかれさま</span></>
+            <>All caught up! <span lang="ja" className="jp">おつかれさま</span></>
           )}
         </p>
         <div className="mt-6 flex gap-3">
@@ -198,6 +244,13 @@ export function StudySession({ level }: { level: string }) {
             Home
           </Link>
         </div>
+        {/* Escape hatch for a fat-fingered rating on the LAST card — before, undo
+            was only reachable mid-session, so that one mistake was unrecoverable. */}
+        {!allCaughtUp && reviewed.length > 0 && (
+          <button onClick={() => void undo()} disabled={busy} className="btn btn-ghost mt-3 text-sm">
+            Undo last rating
+          </button>
+        )}
         {error && (
           <p className="mt-3 text-sm" style={{ color: "var(--bad)" }}>
             {error}
@@ -249,13 +302,13 @@ export function StudySession({ level }: { level: string }) {
             cursor: flipped ? "default" : "pointer",
           }}
         >
-          <div className="jp text-6xl" style={{ fontWeight: 800, color: "var(--ink)", lineHeight: 1.1 }}>
+          <div lang="ja" className="jp text-6xl" style={{ fontWeight: 800, color: "var(--ink)", lineHeight: 1.1 }}>
             {current.expression}
           </div>
 
           {flipped ? (
             <div className="flex w-full flex-col items-center gap-2">
-              <div className="jp text-2xl" style={{ color: "var(--mag-600)", fontWeight: 700 }}>
+              <div lang="ja" className="jp text-2xl" style={{ color: "var(--mag-600)", fontWeight: 700 }}>
                 {current.reading}
               </div>
               <div className="text-xl" style={{ color: "var(--ink)" }}>
@@ -266,10 +319,10 @@ export function StudySession({ level }: { level: string }) {
                   className="mt-3 w-full rounded-[var(--r-md)] p-4 text-left"
                   style={{ background: "var(--surface-cream)" }}
                 >
-                  <p className="jp text-[17px] leading-relaxed" style={{ color: "var(--ink)" }}>
+                  <p lang="ja" className="jp text-[17px] leading-relaxed" style={{ color: "var(--ink)" }}>
                     {current.sentence.japanese}
                   </p>
-                  <p className="jp mt-1 text-[13px]" style={{ color: "var(--ink-faint)" }}>
+                  <p lang="ja" className="jp mt-1 text-[13px]" style={{ color: "var(--ink-faint)" }}>
                     {current.sentence.reading}
                   </p>
                   <p className="mt-2 text-[14px] italic" style={{ color: "var(--ink-soft)" }}>
@@ -279,7 +332,7 @@ export function StudySession({ level }: { level: string }) {
               )}
             </div>
           ) : (
-            <span className="jp text-sm" style={{ color: "var(--ink-faint)" }}>
+            <span lang="ja" className="jp text-sm" style={{ color: "var(--ink-faint)" }}>
               タップして答え · tap to reveal
             </span>
           )}

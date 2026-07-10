@@ -9,6 +9,8 @@
     "start": "next start -p 3887",
     "start:prod": "prisma migrate deploy && HOSTNAME=0.0.0.0 NODE_OPTIONS=--max-old-space-size=512 node .next/standalone/server.js",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "postinstall": "prisma generate"
   },
   "engines": {
@@ -37,6 +39,7 @@
     "eslint-config-next": "16.2.7",
     "tailwindcss": "^4",
     "tsx": "^4.22.4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }
