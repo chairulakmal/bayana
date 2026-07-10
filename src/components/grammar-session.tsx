@@ -192,11 +192,11 @@ export function GrammarSession({ level }: { level: string }) {
         </p>
         <p className="mt-1" style={{ color: "var(--ink-soft)" }}>
           {allCaughtUp ? (
-            <>No grammar cards due right now. <span className="jp">またね！</span></>
+            <>No grammar cards due right now. <span lang="ja" className="jp">またね！</span></>
           ) : approxRemaining > 0 ? (
             <>About {approxRemaining} more due today.</>
           ) : (
-            <>All caught up! <span className="jp">おつかれさま</span></>
+            <>All caught up! <span lang="ja" className="jp">おつかれさま</span></>
           )}
         </p>
         <div className="mt-6 flex gap-3">
@@ -250,7 +250,7 @@ export function GrammarSession({ level }: { level: string }) {
         >
           {/* Front: grammar pattern in large Japanese type */}
           <div
-            className="jp text-5xl"
+            lang="ja" className="jp text-5xl"
             style={{ fontWeight: 800, color: "var(--ink)", lineHeight: 1.2 }}
           >
             {current.pattern}
@@ -260,7 +260,7 @@ export function GrammarSession({ level }: { level: string }) {
             <div className="flex w-full flex-col items-center gap-3">
               {/* Reading (only shown if it differs from the pattern) */}
               {current.reading !== current.pattern && (
-                <div className="jp text-xl" style={{ color: "var(--mag-600)", fontWeight: 700 }}>
+                <div lang="ja" className="jp text-xl" style={{ color: "var(--mag-600)", fontWeight: 700 }}>
                   {current.reading}
                 </div>
               )}
@@ -275,7 +275,7 @@ export function GrammarSession({ level }: { level: string }) {
                 className="mt-2 w-full rounded-[var(--r-md)] p-4 text-left"
                 style={{ background: "var(--surface-cream)" }}
               >
-                <p className="jp text-[17px] leading-relaxed" style={{ color: "var(--ink)" }}>
+                <p lang="ja" className="jp text-[17px] leading-relaxed" style={{ color: "var(--ink)" }}>
                   <HighlightedSentence
                     sentence={current.exampleJp}
                     pattern={current.pattern}
@@ -288,7 +288,7 @@ export function GrammarSession({ level }: { level: string }) {
               </div>
             </div>
           ) : (
-            <span className="jp text-sm" style={{ color: "var(--ink-faint)" }}>
+            <span lang="ja" className="jp text-sm" style={{ color: "var(--ink-faint)" }}>
               タップして答え · tap to reveal
             </span>
           )}

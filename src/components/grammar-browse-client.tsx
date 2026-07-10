@@ -201,11 +201,11 @@ export function GrammarBrowseClient({ level }: { level: string }) {
                         style={{ borderTop: i > 0 ? "1px solid var(--line)" : undefined }}
                       >
                         <div className="flex items-baseline gap-2">
-                          <span className="jp text-[18px]" style={{ fontWeight: 700, color: "var(--ink)" }}>
+                          <span lang="ja" className="jp text-[18px]" style={{ fontWeight: 700, color: "var(--ink)" }}>
                             {p.pattern}
                           </span>
                           {p.reading !== p.pattern && (
-                            <span className="jp text-[12px]" style={{ color: "var(--mag-600)" }}>
+                            <span lang="ja" className="jp text-[12px]" style={{ color: "var(--mag-600)" }}>
                               {p.reading}
                             </span>
                           )}
@@ -240,7 +240,7 @@ export function GrammarBrowseClient({ level }: { level: string }) {
                           className="mt-2 rounded-[var(--r-md)] p-3"
                           style={{ background: "var(--surface-cream)" }}
                         >
-                          <p className="jp text-[14px] leading-relaxed" style={{ color: "var(--ink)" }}>
+                          <p lang="ja" className="jp text-[14px] leading-relaxed" style={{ color: "var(--ink)" }}>
                             <HighlightedSentence
                               sentence={p.exampleJp}
                               pattern={p.pattern}

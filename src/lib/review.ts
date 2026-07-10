@@ -4,13 +4,15 @@
 //   undoLastReview – revert the most recent review via ts-fsrs rollback, drop the log.
 //   getStudyQueue  – build today's queue: due cards + a capped number of new words.
 //
-// All mutations that touch two tables (state + log) run in a transaction so they can
-// never half-apply.
+// Mutations run inside SERIALIZABLE transactions (see serializableTxn in db.ts):
+// the FSRS math happens in JS between reading a card's state and writing it back, so
+// two concurrent requests for the same card (e.g. a double-tapped rating button)
+// would otherwise both compute from the same stale row and one update would be lost.
 
-import { db } from "@/lib/db";
+import { db, serializableTxn } from "@/lib/db";
 import { schedulerFor, toCard, fromCard, fromLog, toLog } from "@/lib/fsrs";
 import type { Grade } from "ts-fsrs";
-import type { Level } from "@/generated/prisma/client";
+import { Prisma, type Level } from "@/generated/prisma/client";
 
 // Fallback used when no UserProfile row exists yet (e.g. a new user who reaches study
 // before completing onboarding). Matches schema defaults so behaviour is identical to a
@@ -22,56 +24,72 @@ const DEFAULT_PROFILE = { desiredRetention: 0.9, fsrsParams: [] as number[], new
 export async function reviewWord(userId: string, wordId: string, rating: number) {
   const now = new Date();
 
-  // The profile holds the user's FSRS tuning; `existing` is the card's current state
-  // (null the very first time this word is seen).
-  const [rawProfile, existing] = await Promise.all([
-    db.userProfile.findUnique({ where: { userId } }),
-    db.reviewState.findUnique({ where: { userId_wordId: { userId, wordId } } }),
-  ]);
+  // The profile holds the user's FSRS tuning — per-user config, not per-card state,
+  // so it's safe to read outside the transaction (it isn't part of the race).
+  const rawProfile = await db.userProfile.findUnique({ where: { userId } });
   const profile = rawProfile ?? DEFAULT_PROFILE;
 
-  const scheduler = schedulerFor(profile);
-  const { card: next, log } = scheduler.next(toCard(existing, now), now, rating as Grade);
+  // Read the card's current state, compute the next state, and write it back as one
+  // atomic unit. `existing` is null the very first time this word is seen.
+  return serializableTxn(async (tx) => {
+    const existing = await tx.reviewState.findUnique({
+      where: { userId_wordId: { userId, wordId } },
+    });
 
-  const cardFields = fromCard(next);
-  await db.$transaction([
-    db.reviewState.upsert({
+    const scheduler = schedulerFor(profile);
+    const { card: next, log } = scheduler.next(toCard(existing, now), now, rating as Grade);
+    const cardFields = fromCard(next);
+
+    await tx.reviewState.upsert({
       where: { userId_wordId: { userId, wordId } },
       create: { userId, wordId, ...cardFields },
       update: cardFields,
-    }),
-    db.reviewLog.create({ data: { userId, wordId, ...fromLog(log) } }),
-  ]);
+    });
+    await tx.reviewLog.create({ data: { userId, wordId, ...fromLog(log) } });
 
-  return { due: next.due, state: cardFields.state };
+    return { due: next.due, state: cardFields.state };
+  });
 }
 
 /** Undo the most recent review for a (user, word): roll the card back to its prior
  *  state and delete that log row. Returns null if there is nothing to undo. */
 export async function undoLastReview(userId: string, wordId: string) {
-  const [rawProfile, current, lastLog] = await Promise.all([
-    db.userProfile.findUnique({ where: { userId } }),
-    db.reviewState.findUnique({ where: { userId_wordId: { userId, wordId } } }),
-    db.reviewLog.findFirst({
-      where: { userId, wordId },
-      orderBy: { reviewedAt: "desc" },
-    }),
-  ]);
+  const rawProfile = await db.userProfile.findUnique({ where: { userId } });
   const profile = rawProfile ?? DEFAULT_PROFILE;
-  if (!current || !lastLog) return null;
 
-  // rollback(currentCard, log) reconstructs the card as it was before that review.
-  const previous = schedulerFor(profile).rollback(toCard(current), toLog(lastLog));
+  try {
+    return await serializableTxn(async (tx) => {
+      // Sequential (not Promise.all): an interactive transaction holds one connection.
+      const current = await tx.reviewState.findUnique({
+        where: { userId_wordId: { userId, wordId } },
+      });
+      const lastLog = await tx.reviewLog.findFirst({
+        where: { userId, wordId },
+        orderBy: { reviewedAt: "desc" },
+      });
+      if (!current || !lastLog) return null;
 
-  await db.$transaction([
-    db.reviewState.update({
-      where: { userId_wordId: { userId, wordId } },
-      data: fromCard(previous),
-    }),
-    db.reviewLog.delete({ where: { id: lastLog.id } }),
-  ]);
+      // rollback(currentCard, log) reconstructs the card as it was before that review.
+      const previous = schedulerFor(profile).rollback(toCard(current), toLog(lastLog));
 
-  return { due: previous.due };
+      await tx.reviewState.update({
+        where: { userId_wordId: { userId, wordId } },
+        data: fromCard(previous),
+      });
+      await tx.reviewLog.delete({ where: { id: lastLog.id } });
+
+      return { due: previous.due };
+    });
+  } catch (err) {
+    // Defense in depth: a concurrent undo of the same review that slips past the
+    // serialization retries surfaces as P2025 ("record not found") when the second
+    // transaction deletes the already-deleted log row. Semantically that is just
+    // "nothing left to undo" — map it to null (the route returns 404), not a 500.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
+      return null;
+    }
+    throw err;
+  }
 }
 
 /** Build the study queue:

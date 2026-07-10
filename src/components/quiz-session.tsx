@@ -92,7 +92,7 @@ export function QuizSession({ level }: { level: string }) {
           {score} / {total} 🎉
         </p>
         <p className="mt-1" style={{ color: "var(--ink-soft)" }}>
-          Nice warm-up! <span className="jp">おつかれさま</span>
+          Nice warm-up! <span lang="ja" className="jp">おつかれさま</span>
         </p>
         <div className="mt-6 flex gap-3">
           <button onClick={() => void load()} className="btn btn-primary">
@@ -144,20 +144,20 @@ export function QuizSession({ level }: { level: string }) {
               What does this mean?
             </p>
           )}
-          <div className={answered ? "jp text-6xl" : "jp mt-3 text-6xl"} style={{ fontWeight: 800, color: "var(--ink)", lineHeight: 1.1 }}>
+          <div lang="ja" className={answered ? "jp text-6xl" : "jp mt-3 text-6xl"} style={{ fontWeight: 800, color: "var(--ink)", lineHeight: 1.1 }}>
             {current.expression}
           </div>
           {answered && (
-            <div className="jp mt-2 text-xl" style={{ color: "var(--mag-600)", fontWeight: 700 }}>
+            <div lang="ja" className="jp mt-2 text-xl" style={{ color: "var(--mag-600)", fontWeight: 700 }}>
               {current.reading}
             </div>
           )}
           {answered && current.sentence && (
             <div className="mt-4 w-full max-w-md rounded-[var(--r-md)] p-3 text-left" style={{ background: "var(--surface-cream)" }}>
-              <p className="jp text-[15px] leading-relaxed" style={{ color: "var(--ink)" }}>
+              <p lang="ja" className="jp text-[15px] leading-relaxed" style={{ color: "var(--ink)" }}>
                 {current.sentence.japanese}
               </p>
-              <p className="jp mt-1 text-[13px]" style={{ color: "var(--ink-faint)" }}>
+              <p lang="ja" className="jp mt-1 text-[13px]" style={{ color: "var(--ink-faint)" }}>
                 {current.sentence.reading}
               </p>
               <p className="mt-2 text-[13px] italic" style={{ color: "var(--ink-soft)" }}>
@@ -173,6 +173,16 @@ export function QuizSession({ level }: { level: string }) {
         className="mx-auto w-full max-w-md shrink-0 px-3 pt-2"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
       >
+        {/* Screen-reader announcement of the answer result. The ✓/✕ glyphs below are
+            aria-hidden (they'd read as noise per option), so this live region is the
+            SR-facing feedback. It must exist BEFORE its content changes — conditionally
+            mounting an aria-live node often goes unannounced — hence always rendered. */}
+        <div role="status" className="sr-only">
+          {answered &&
+            (picked === correctIndex
+              ? "Correct!"
+              : `Incorrect. The correct answer is: ${current.options[correctIndex].meaning}.`)}
+        </div>
         <div className="flex flex-col gap-2">
           {current.options.map((o, i) => {
             let cls = "opt";

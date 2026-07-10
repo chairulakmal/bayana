@@ -123,7 +123,7 @@ export function ExamSession({ level }: { level: string }) {
     return (
       <Centered>
         <p
-          className="jp text-5xl"
+          lang="ja" className="jp text-5xl"
           style={{ fontFamily: "var(--f-display)", fontWeight: 800, color: "var(--ink)" }}
         >
           問題２
@@ -223,7 +223,7 @@ export function ExamSession({ level }: { level: string }) {
           <>
             <SessionHeaderLink href="/home">Home</SessionHeaderLink>
             <span className="mx-2">·</span>
-            <span className="jp">{sectionLabel}</span>
+            <span lang="ja" className="jp">{sectionLabel}</span>
             <span className="mx-1 text-[var(--ink-faint)]">·</span>
             {questionNum}/{sectionTotal}
           </>
@@ -234,7 +234,7 @@ export function ExamSession({ level }: { level: string }) {
         <div className="my-auto flex w-full flex-col items-center text-center">
           {/* Question type label */}
           <p
-            className="jp text-[13px] font-semibold"
+            lang="ja" className="jp text-[13px] font-semibold"
             style={{ color: "var(--ink-faint)", letterSpacing: ".06em" }}
           >
             {sectionLabel} {current.type === "reading" ? "読み方" : "書き方"}
@@ -249,7 +249,7 @@ export function ExamSession({ level }: { level: string }) {
 
           {/* Sentence with target word underlined */}
           <div
-            className="jp mt-4 w-full max-w-md rounded-[var(--r-md)] p-4 text-left text-[18px] leading-relaxed"
+            lang="ja" className="jp mt-4 w-full max-w-md rounded-[var(--r-md)] p-4 text-left text-[18px] leading-relaxed"
             style={{ background: "var(--surface-cream)", color: "var(--ink)" }}
           >
             <HighlightedSentence sentence={current.sentence} target={current.target} />
@@ -259,7 +259,7 @@ export function ExamSession({ level }: { level: string }) {
           {answered && (
             <div className="mt-3 w-full max-w-md">
               {/* Correct answer in magenta */}
-              <p className="jp text-center text-xl" style={{ color: "var(--mag-600)", fontWeight: 700 }}>
+              <p lang="ja" className="jp text-center text-xl" style={{ color: "var(--mag-600)", fontWeight: 700 }}>
                 {current.options[correctIndex].text}
               </p>
               {/* Word meaning */}
@@ -273,7 +273,7 @@ export function ExamSession({ level }: { level: string }) {
                   style={{ background: "var(--surface-cream)" }}
                 >
                   {current.sentenceReading && (
-                    <p className="jp text-[13px]" style={{ color: "var(--ink-faint)" }}>
+                    <p lang="ja" className="jp text-[13px]" style={{ color: "var(--ink-faint)" }}>
                       {current.sentenceReading}
                     </p>
                   )}
@@ -293,6 +293,14 @@ export function ExamSession({ level }: { level: string }) {
         className="mx-auto w-full max-w-md shrink-0 px-3 pt-2"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
       >
+        {/* Screen-reader announcement of the answer result (see quiz-session.tsx for
+            why this live region is always mounted rather than conditional). */}
+        <div role="status" className="sr-only">
+          {answered &&
+            (picked === correctIndex
+              ? "Correct!"
+              : `Incorrect. The correct answer is: ${current.options[correctIndex].text}.`)}
+        </div>
         <div className="flex flex-col gap-2">
           {current.options.map((o, i) => {
             let cls = "opt";
@@ -301,6 +309,7 @@ export function ExamSession({ level }: { level: string }) {
             return (
               <button
                 key={i}
+                lang="ja"
                 className={`${cls} jp`}
                 disabled={answered}
                 onClick={() => choose(i)}

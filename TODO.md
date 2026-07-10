@@ -9,6 +9,8 @@ record across sessions. Decisions do **not** go here — log them in SPEC.md §1
 **Next: Phase 4** — Admin sentence audit + on-demand generation.
 **✅ Phase 3.5 complete** — Grammar point study (N3 v1, 220 points / 22 lessons, separate
 FSRS queue + page) plus its browse-view addendum.
+**✅ App review fixes complete (2026-07-10)** — security/UX/a11y pass; remaining findings
+tracked in the [Review backlog](#review-backlog--remaining-findings-2026-07-10) below.
 
 ---
 
@@ -56,8 +58,10 @@ existing POST `/api/review` endpoint.
   the home hub; dev-login leaves `onboardedAt` null so dev users go through onboarding
   too. Simplified from the original "5-question warm-up + guided tour" spec (superseded
   by MC↔FSRS coupling above, which gives the warm-up naturally).
-- [ ] **Ephemeral demo account** — a "Try demo →" path on the sign-in page that gives
+- [x] **Ephemeral demo account** — a "Try demo →" path on the sign-in page that gives
   anyone instant access with no email required. Each click starts a fresh identity.
+  Shipped; since hardened (POST-only, rate limits, signed expiry, cleanup) — see the
+  2026-07-10 review section below and SPEC §11.8.
 
   **Design:** the demo session lives only in a signed cookie — no Auth.js `Session` row.
   DB rows (`User` + `UserProfile`) are still created for FK integrity, but the cookie is
@@ -88,6 +92,70 @@ existing POST `/api/review` endpoint.
     for `requireAuth()` so demo sessions are accepted everywhere.
 
 ---
+
+## ✅ App review fixes — security / UX / a11y (2026-07-10)
+
+Full app review (security, UX, UI, code quality); fixes applied in priority order.
+Decisions and rationale in SPEC §16 (2026-07-10 rows), §11.3 #8, §11.8, §14.5, §14.6.
+
+- [x] **Demo login hardened** — `POST`-only (GET → 405), same-origin check
+  (`AUTH_URL`-derived), per-IP 5/hr + global 30/hr limiters in `proxy.ts`, opportunistic
+  stale-demo-user cleanup on each login (`deleteStaleDemoUsers`, narrow filter).
+- [x] **Demo cookie time-bound** — HMAC now signs `userId:expiresAtMs`; server enforces
+  expiry after a constant-time HMAC check (`src/lib/current-user.ts`).
+- [x] **Security response headers** — `next.config.ts headers()`: HSTS, CSP,
+  `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy` (SPEC §11.3 #8).
+- [x] **a11y: Japanese language + SR feedback** — `lang="ja"` on all Japanese text;
+  persistent `role="status"` live regions announce quiz/exam answer feedback.
+- [x] **Study-session robustness** — failed queue load shows a retry screen (no longer
+  masquerades as "all caught up"); last card undoable from the completion screen;
+  request token discards stale queue responses (`src/components/study-session.tsx`).
+- [x] **Review race + undo 500** — `reviewWord` / `undoLastReview` /
+  `reviewGrammarPoint` wrapped in `serializableTxn()` (SERIALIZABLE + P2034 retry,
+  `src/lib/db.ts`); double-undo maps P2025 → "nothing to undo" 404.
+- [x] **Vitest introduced** — `vitest.config.ts`, `npm test` / `npm run test:watch`;
+  first tests: FSRS adapter round-trips (`src/lib/fsrs.test.ts`, 8 passing).
+- [x] **SPEC + TODO housekeeping** — §11.8 rewrite, §11.3 #8, §14.5, §14.6, two §16
+  rows; this file updated.
+
+## Review backlog — remaining findings (2026-07-10)
+
+Lower-priority findings from the same review, roughly ordered. Pull into a phase as
+capacity allows.
+
+### Bugs / correctness
+- [ ] Onboarding completion still redirects to `/quiz` (`src/app/onboarding/actions.ts`)
+  — should be `/grammar` since the 2026-07-02 landing-page change.
+- [ ] `getGrammarStats` "studied today" uses local-server midnight (`setHours(0,0,0,0)`)
+  — wire in the profile's timezone/day-start handling used elsewhere.
+- [ ] `scripts/collect-batch.ts` — per-item try/catch so one malformed result doesn't
+  abort a whole batch collection.
+
+### UX / UI
+- [ ] Touch targets below 44px: session-header buttons, user-menu avatar (36px), browse
+  pagination + clear-search, level-picker rows, home-link pill.
+- [ ] Root `error.tsx` / `loading.tsx` / `not-found.tsx` (currently unstyled defaults).
+- [ ] Mode-picker tile order on `/home` doesn't match SPEC §8.5 — reconcile (change UI
+  or SPEC, log in §16).
+- [ ] Grammar hub: inline level switcher (currently vocab-hub-only).
+- [ ] Dark mode: decide (support or explicit non-goal) and log in SPEC §16.
+
+### Accessibility
+- [ ] User-menu keyboard/focus management (Escape to close, focus trap/return).
+- [ ] Info-bubble: proper disclosure pattern (button + `aria-expanded`).
+- [ ] Browse accordions: `aria-expanded` on lesson toggles.
+- [ ] Search inputs: `aria-label`s; result counts in an `aria-live` region.
+
+### Code quality / tests
+- [ ] Dedup session components: byte-identical `Centered` in 4 files, duplicated
+  `RATINGS` arrays, duplicated `shuffle` (`review.ts` / `grammar-review.ts`),
+  ~80-line `getStudyQueue` / `getGrammarQueue` overlap.
+- [ ] Exam-session's local `HighlightedSentence` → shared component.
+- [ ] Extract quiz/exam scoring helpers (`pickDistractors`, similarity fns — currently
+  module-private) so they can be unit-tested; then test them + the highlighted-sentence
+  token pipeline.
+- [ ] Log hygiene: audit `console.error` calls for payloads that shouldn't be logged.
+- [ ] Migrate to `next/font` (self-hosted) — also lets CSP drop the Google Fonts hosts.
 
 ---
 

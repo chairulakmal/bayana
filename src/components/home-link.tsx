@@ -25,7 +25,7 @@ export function HomeLink() {
     >
       <Parrot expr="wink" style={{ width: 20, height: 22 }} />
       <span aria-hidden style={{ color: "var(--ink-faint)" }}>←</span>
-      <span className="jp">ただいま</span>
+      <span lang="ja" className="jp">ただいま</span>
     </Link>
   );
 }

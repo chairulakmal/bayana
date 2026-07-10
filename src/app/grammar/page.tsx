@@ -42,7 +42,7 @@ export default async function GrammarPage() {
         <div className="flex items-center gap-3">
           <Parrot expr="happy" style={{ width: 48, height: 54 }} />
           <div>
-            <p className="jp text-[15px]" style={{ color: "var(--ink-soft)" }}>
+            <p lang="ja" className="jp text-[15px]" style={{ color: "var(--ink-soft)" }}>
               文法
             </p>
             <p className="text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>

@@ -218,13 +218,13 @@ export function BrowseClient({ level }: { level: string }) {
                   className="flex w-full items-baseline gap-3 px-4 py-3 text-left"
                 >
                   <span
-                    className="jp flex-shrink-0 text-[22px]"
+                    lang="ja" className="jp flex-shrink-0 text-[22px]"
                     style={{ fontWeight: 700, color: "var(--ink)", lineHeight: 1.2 }}
                   >
                     {word.expression}
                   </span>
                   <span
-                    className="jp flex-shrink-0 text-[13px]"
+                    lang="ja" className="jp flex-shrink-0 text-[13px]"
                     style={{ color: "var(--mag-600)" }}
                   >
                     {word.reading}
@@ -271,13 +271,13 @@ export function BrowseClient({ level }: { level: string }) {
                         style={{ background: "var(--surface)" }}
                       >
                         <p
-                          className="jp text-[15px] leading-relaxed"
+                          lang="ja" className="jp text-[15px] leading-relaxed"
                           style={{ color: "var(--ink)" }}
                         >
                           {sentence.japanese}
                         </p>
                         <p
-                          className="jp mt-1 text-[12px]"
+                          lang="ja" className="jp mt-1 text-[12px]"
                           style={{ color: "var(--ink-faint)" }}
                         >
                           {sentence.reading}

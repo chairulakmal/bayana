@@ -6,7 +6,7 @@
 |---|---|
 | **Status** | Draft |
 | **Author** | Chairul Akmal |
-| **Last updated** | 2026-07-02 (Grammar is the post-login landing page, for now) |
+| **Last updated** | 2026-07-10 (Security & robustness review: demo-login hardening, security headers, review-race fix, first unit tests) |
 | **Target platform** | Mobile-first responsive web (Next.js 16, deployed on Railway) |
 
 ---
@@ -637,7 +637,7 @@ Two user stories drive entry into the app. Both reach the same two level-scoped 
 (§8.1, §8.2); they differ only in the first-run extras.
 
 - **First-time user (first run).** Sign in via the email magic link (§11.2) *or* start a
-  demo session (`GET /api/demo/login`, §11.8) → routed to `/onboarding` (gated on
+  demo session (`POST /api/demo/login`, §11.8) → routed to `/onboarding` (gated on
   `UserProfile.onboardedAt` being unset) → **choose a JLPT level** (N5–N1) → the app
   then drops straight into the home hub. The `/onboarding` level-choice screen is
   **implemented** (Phase 3.5). The follow-on **Quiz mode warm-up** (5 non-scheduling
@@ -719,7 +719,7 @@ is intentionally no web-reachable, cost-incurring Anthropic route at present (se
 | GET | `/api/exam?level=&count=` | JLPT-style exam round: 問題１ (kanji reading) + 問題２ (kanji writing), non-scheduling | required | **Implemented** — 10+10 questions, two-section with break screen (§8.6) |
 | GET | `/api/grammar/queue` | Grammar FSRS study queue (due + new `GrammarProgress` rows) | required | **Implemented** |
 | POST | `/api/grammar/review` | Submit a grammar rating → FSRS update (`GrammarProgress` upsert) | required | **Implemented** |
-| GET | `/api/demo/login` | Start an ephemeral demo session: create `User` + `UserProfile`, sign with HMAC, redirect to `/onboarding` | public | **Implemented** — production-available; session identity is the HMAC-signed cookie (§11.8) |
+| POST | `/api/demo/login` | Start an ephemeral demo session: create `User` + `UserProfile`, sign with HMAC, redirect to `/onboarding` | public (rate-limited, origin-checked) | **Implemented** — production-available; POST-only, session identity is a time-bound HMAC-signed cookie (§11.8) |
 | GET | `/api/dev/login` | **Dev-only**: mint a session for the seeded user (skip the magic link) | none (dev-only) | **Implemented** — 404 in prod; gated by `DEV_AUTH` (§11.7) |
 | GET | `/api/browse?level=` | Word list for one level (id, expression, reading, meaning — no sentences); browser-cached | required | **Implemented** — `Cache-Control: private, max-age=3600, stale-while-revalidate=86400` |
 | GET | `/api/words/[id]/sentence` | Lazy-load one word's cached example sentence | required | **Implemented** — `Cache-Control: private, max-age=86400, stale-while-revalidate=604800` |
@@ -786,6 +786,14 @@ A magic link is a bearer token in transit; the implementation **must** enforce:
 6. **Secure sessions** — `httpOnly`, `Secure`, `SameSite=Lax` cookies with a sane expiry
    and rotation; sessions stored server-side (Auth.js database sessions via Prisma).
 7. **HTTPS everywhere** — provided by Railway TLS; redirect HTTP→HTTPS.
+8. **Security response headers** on every route (`next.config.ts`): HSTS (makes the
+   HTTPS redirect durable in the browser), a Content-Security-Policy that blocks all
+   external script/frame/object loads (`'unsafe-inline'` is retained for script/style
+   because Next.js hydration requires it; per-request nonces were judged not worth the
+   dynamic-rendering cost for an app with no third-party scripts), `frame-ancestors
+   'none'`/`X-Frame-Options: DENY` (clickjacking), `X-Content-Type-Options: nosniff`,
+   and `Referrer-Policy: strict-origin-when-cross-origin` (keeps magic-link URLs out
+   of third-party Referer logs).
 
 ### 11.4 Secrets & API-key protection
 - All secrets (`ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `AUTH_SECRET`, `DATABASE_URL`) are
@@ -837,27 +845,49 @@ Auth.js Credentials provider for this: it requires the JWT session strategy, whe
 uses database sessions (§11.3 #6).
 
 ### 11.8 Demo session (ephemeral, production-available)
-`GET /api/demo/login` (§9) is a **production-available** path that lets visitors try the app
+`POST /api/demo/login` (§9) is a **production-available** path that lets visitors try the app
 without an email address. It is fundamentally different from the dev bypass above:
 
 - **What it does:** creates a fresh `User` row (no email) and a `UserProfile` (no
-  `onboardedAt`) in the database, then signs the `userId` with **HMAC-SHA256** keyed by
-  `AUTH_SECRET`, and writes the result as a 7-day `httpOnly` cookie. The user is then
-  redirected to `/onboarding`.
-- **Session identity.** No Auth.js `Session` row is created. `getCurrentUserId()` in
-  `src/lib/current-user.ts` detects the demo cookie, verifies the HMAC, and returns the
-  `userId` — all authenticated routes work transparently.
-- **Ephemerality by design.** Each click to the demo route creates a new `User`; the previous
-  session's rows are orphaned (no cookie → unreachable). Losing the cookie means losing all
-  data. This is intentional: demo data is cheap to create and users are expected to sign up
-  via magic link if they want persistence.
-- **`/api/demo/*` is public in `proxy.ts`** (no session check) so the route is reachable
-  before authentication — this is the correct, intentional behaviour. It is distinct from
-  `/api/dev/*`, which is public **only outside production**.
+  `onboardedAt`) in the database, then signs `userId:expiresAtMs` with **HMAC-SHA256**
+  keyed by `AUTH_SECRET`, and writes the result as a 7-day `httpOnly` cookie. The user is
+  then redirected (303) to `/onboarding`.
+- **Session identity with server-enforced expiry.** No Auth.js `Session` row is created.
+  `getCurrentUserId()` in `src/lib/current-user.ts` detects the demo cookie, verifies the
+  HMAC (constant-time comparison), then checks the signed `expiresAtMs` against the clock —
+  the expiry is inside the signed payload, so a client cannot extend its session by
+  re-sending an old cookie or editing the timestamp. Cookies in the pre-expiry format
+  (HMAC over `userId` alone) fail verification and are treated as signed-out; this was
+  accepted over dual-format support because demo sessions are disposable by design.
+- **Endpoint hardening.** Because this is the one unauthenticated write endpoint (each hit
+  inserts a `User` + `UserProfile` row), it carries three defenses:
+  1. **POST-only** — a state-changing GET can be triggered cross-site by an `<img>` tag or
+     link prefetch without user intent; GET now returns 405.
+  2. **Same-origin check** — browsers attach an `Origin` header to cross-site POSTs; any
+     `Origin` not matching the app's public origin (derived from `AUTH_URL`) is rejected
+     with 403. Non-browser clients that omit the header pass this check; bounding those is
+     the rate limiter's job.
+  3. **Rate limiting in `proxy.ts`** — per-IP (5/hour) and global (30/hour) fixed-window
+     limiters bound total row creation even from rotating IPs, mirroring the sign-in
+     limiters (§11.3 #5).
+- **Ephemerality by design.** Each demo start creates a new `User`; the previous session's
+  rows are orphaned (no cookie → unreachable). Losing the cookie means losing all data.
+  This is intentional: demo data is cheap to create and users are expected to sign up via
+  magic link if they want persistence.
+- **Opportunistic cleanup.** Each demo login first deletes provably-unreachable demo users
+  — `email IS NULL`, no Auth.js `Session` rows, `createdAt` older than the cookie TTL, and
+  `id ≠ DEFAULT_USER_ID` (the local seed user) — so the table stays bounded without a cron
+  job. The filter is deliberately narrow because a wrong match cascade-deletes real study
+  progress; see §14.5 for why a heuristic filter was chosen over an `isDemo` column.
+- **`/api/demo/login` is public in `proxy.ts`** (exact path, no session check) so the route
+  is reachable before authentication — this is the correct, intentional behaviour. The
+  exact-path match (rather than a `/api/demo/*` prefix) ensures future demo routes do not
+  silently ship unauthenticated. It is distinct from `/api/dev/*`, which is public **only
+  outside production**.
 - **Threat model.** The HMAC prevents a user from forging a cookie to impersonate another
-  `userId`. Each demo session is isolated by the cuid primary key. The accepted risk is DB
-  row accumulation from abandoned demo sessions; a future cleanup job can prune rows older
-  than the cookie TTL.
+  `userId`; the signed expiry bounds how long a leaked cookie is useful; POST + Origin
+  checking prevents cross-site session minting; rate limits plus opportunistic cleanup
+  bound DB row accumulation from abandoned or abusive demo starts.
 
 ---
 
@@ -960,9 +990,10 @@ without an email address. It is fundamentally different from the dev bypass abov
 - **`/onboarding` page:** level-choice screen shown to any user whose `UserProfile.onboardedAt`
   is unset (both magic-link sign-ups and demo visitors). Pulled forward from Phase 4 to
   support the demo flow. The follow-on Quiz warm-up and guided tour remain Phase 4 (below).
-- **Demo session (`GET /api/demo/login`):** ephemeral try-without-signup path; creates a new
+- **Demo session (`/api/demo/login`):** ephemeral try-without-signup path; creates a new
   `User` + `UserProfile`, signs the userId with HMAC-SHA256, sets a 7-day cookie, and
-  redirects to `/onboarding`. Production-available (§11.8).
+  redirects to `/onboarding`. Production-available; since hardened to POST-only with a
+  signed expiry, rate limiting, and origin checking (§11.8, 2026-07-10).
 
 **Phase 3.5 addendum — Grammar browse + lesson titles — ✅ done (2026-07-01)**
 - **`lessonTitle` column added to `GrammarPoint`** (migration `20260701130743_grammar_lesson_title`),
@@ -1055,6 +1086,35 @@ the same release: the browser **Fullscreen API** (`requestFullscreen`) to force 
 route truly fullscreen — it is unsupported on iPhone Safari, so it is not a portable answer,
 whereas the manifest `display` mode covers Android cleanly.
 
+### 14.5 `isDemo` column on `User` instead of a heuristic cleanup filter
+
+**Rejected (for now).** The opportunistic demo-user cleanup (§11.8) must identify rows that
+are certainly abandoned demo sessions, because a wrong match cascade-deletes real study
+progress. An explicit `isDemo: Boolean` column would make that identification trivial and
+self-documenting, but requires a migration and backfill for a property that is already
+fully derivable: demo users are exactly the users with `email IS NULL`, no Auth.js
+`Session` rows, and (for deletability) a `createdAt` older than the cookie TTL, excluding
+the local seed user's pinned id. The heuristic filter was chosen because it needs no
+schema change and each condition independently excludes a class of real user. Revisit if
+the demo flow grows features (e.g. demo-to-real account upgrade) that make "is a demo
+user" load-bearing beyond cleanup.
+
+### 14.6 `SELECT … FOR UPDATE` row locking instead of serializable transactions
+
+**Rejected.** The review write path (§8.1) is a read-modify-write: read the FSRS row,
+compute the next card state in JavaScript (`ts-fsrs`), write it back. Under Postgres's
+default `READ COMMITTED` isolation, two concurrent reviews of the same card both read the
+same prior state and the second write silently discards the first (a lost update).
+Explicit row locking (`SELECT … FOR UPDATE`) fixes this by serializing at the row, but in
+Prisma it requires `$queryRaw` — abandoning the typed query API precisely on the app's
+most correctness-sensitive path. Instead, the transaction runs at `SERIALIZABLE` isolation
+with a bounded retry on Prisma error `P2034` (serialization conflict), wrapped in a shared
+`serializableTxn()` helper in `src/lib/db.ts`. Contention on a single user's single card
+is near-zero, so retries are vanishingly rare and the stronger isolation costs nothing in
+practice; the helper's contract (the callback may run more than once; queries inside must
+be sequentially awaited, since an interactive transaction holds one connection) is
+documented at the definition.
+
 ---
 
 ## 15. Open questions
@@ -1077,6 +1137,8 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-07-10 | **App-wide review run (security, UX, a11y) — hardening + robustness fixes shipped as one pass.** (a) *Demo login hardened*: `POST`-only (GET returns 405), same-origin check against the `AUTH_URL`-derived origin, dedicated per-IP (5/hr) + global (30/hr) rate limiters in `proxy.ts`, and opportunistic stale-demo-user cleanup on each login (§11.8, §14.5). (b) *Demo cookie time-bound*: the HMAC now signs `userId:expiresAtMs` and the server verifies the expiry after a constant-time HMAC check; pre-existing cookies in the old format fail verification (accepted — demo sessions are disposable). (c) *Security response headers* added in `next.config.ts` as §11.3 item 8: HSTS, CSP (external scripts/frames blocked; `'unsafe-inline'` retained for Next.js hydration; Google Fonts hosts allowed), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`. (d) *Review race fixed*: `reviewWord`, `undoLastReview`, and `reviewGrammarPoint` now run their read-compute-write inside `serializableTxn()` (SERIALIZABLE + bounded `P2034` retry, §14.6); double-undo no longer 500s (`P2025` maps to a "nothing to undo" 404). (e) *Study-session UX*: a failed queue load now shows a retry screen instead of a false "all caught up"; the last card can be un-rated from the completion screen; a request token discards stale queue responses. (f) *Accessibility*: `lang="ja"` on all Japanese text so screen readers pick a Japanese voice, and persistent `role="status"` live regions announce quiz/exam answer feedback. | The demo endpoint was the sole unauthenticated write path — as a GET it was triggerable cross-site with no rate bound, and its cookie never expired server-side. The review write path had a genuine lost-update window under `READ COMMITTED`. The remaining items were the highest-priority findings from the same review: silent data-loss UX (load failure indistinguishable from an empty queue), an undo dead-zone on the final card, and screen-reader gaps on the app's core interaction loop. Fixed in priority order as a single session so SPEC, code, and tests land together. | Author (fix list proposed by review, priority order approved) | §11.3, §11.8, §14.5, §14.6, §8.1 |
+| 2026-07-10 | **Vitest adopted as the test runner; first unit tests cover the FSRS adapter (`src/lib/fsrs.ts`).** Config maps the `@` alias manually rather than adding the `vite-tsconfig-paths` plugin (a dependency to avoid two lines of config); tests are colocated (`src/**/*.test.ts`) and run in the `node` environment. The adapter was chosen as the first target because it is the one module where a silent bug corrupts long-lived user data — a mis-mapped field computes wrong intervals for weeks before anyone notices — and it is pure (no DB, no I/O), making it the cheapest module to test. Strategy: round-tripping (`fromCard ∘ toCard` losslessness, all four FSRS states, log round-trip, and a full rate → persist → restore → `rollback()` cycle mirroring what `undoLastReview` relies on). Quiz/exam scoring helpers are the natural next target but are currently module-private; testing them requires an extraction refactor first (tracked in TODO.md). | Author | §13 |
 | 2026-07-02 | **`/grammar` becomes the post-login landing page, and the leftmost `BottomNav` tab, for now.** Sign-in (`redirectTo`), the public `/` redirect, `/onboarding`'s already-onboarded bounce, the dev-login route, and the PWA manifest's `start_url` all point to `/grammar` instead of `/home`. `BottomNav`'s tab order becomes Grammar, Home, Stats, Browse. `/home` (the vocab mode picker) is untouched otherwise — still fully functional, just no longer the first thing a returning user sees. | The author is deliberately prioritizing grammar study right now, and wants the app to open there by default rather than requiring an extra tap through the vocab hub each session. Framed as temporary ("for now") rather than a permanent architectural change — unlike the 2026-06-29 decision to keep grammar a *sibling* page rather than merge it into `/home`, which stands. | Author | §8.5, §13, §16 |
 | 2026-07-01 | **Grammar browse gains a per-point progress status and lesson-level studied-count rollup; search also matches lesson titles.** `GET /api/grammar/browse` now joins `GrammarProgress` and returns `status: "new" \| "started" \| "mature"` per point (mirroring `/api/browse`'s `started` flag, with "mature" reusing `getGrammarStats`' `scheduledDays >= 21` threshold); `GrammarBrowseClient` renders it as a small dot (green = mature, magenta = started, none = new) and shows "studied/total" in each lesson header instead of a bare count. Searching a lesson theme (e.g. "conditional") now matches `lessonTitle` and shows the whole lesson unfiltered, rather than only points whose own text happens to contain the query. | The 2026-07-01 browse launch (next row) reused the vocab `/browse` pattern but missed porting its 2026-06-04 started-indicator decision — leaving grammar's reference view with no signal of what the learner already knows, which is the difference between a study aid and a plain document when scanning ~220 points before an exam. Filtering by lesson title but keeping only text-matching points would silently hide most of a themed lesson from someone searching by unit rather than pattern, so a title match bypasses the point-level filter entirely. | Author | §4.1, §13 |
 | 2026-07-01 | **README's Credits section and SPEC §4.1 no longer name the grammar deck's source type.** Both previously stated grammar content was "adapted from a commercial JLPT course"; the README paragraph is removed entirely, and §4.1's opening sentence now reads "a source not licensed for redistribution" instead. | Publicly committing that unlicensed commercial material was used as a derivative-work source is a pure disclosure risk — it hands a rights holder exactly the admission needed for a takedown/infringement claim — with no offsetting benefit, since `decks/grammar-*.md` being gitignored doesn't change that the derived data is live in the running app, and reproducibility for others is already covered by the header comment in `scripts/seed-grammar.ts`. Flagged by the author after reviewing the committed README. | Author | §4.1 |

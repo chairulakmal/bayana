@@ -30,7 +30,7 @@ export default async function HomePage() {
         <div className="flex items-center gap-3">
           <Parrot expr="happy" style={{ width: 48, height: 54 }} />
           <div>
-            <p className="jp text-[15px]" style={{ color: "var(--ink-soft)" }}>
+            <p lang="ja" className="jp text-[15px]" style={{ color: "var(--ink-soft)" }}>
               おかえり
             </p>
             <p className="text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
@@ -103,7 +103,7 @@ export default async function HomePage() {
           ⚡ <strong style={{ color: "var(--ink)" }}>Quiz</strong> — 10 cards a session. A quick
           round whenever you want momentum.
           <br />
-          <span className="jp">毎日ちょっとずつ</span> — a little every day.
+          <span lang="ja" className="jp">毎日ちょっとずつ</span> — a little every day.
         </InfoBubble>
       </p>
       <BottomNav />
