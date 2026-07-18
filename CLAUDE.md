@@ -42,28 +42,10 @@ when that is slower than doing it yourself. Concretely:
 When the author explicitly asks you to "just do it," do it — but the default mode is
 collaborative and explanatory.
 
-## Tech stack (decided — see SPEC.md for rationale)
+## Tech stack and Next.js 16 trip-wires
 
-- **Full-stack Next.js 16** (App Router, React 19, Turbopack) — a single deployable; UI +
-  API (Route Handlers / Server Actions) + FSRS logic + Anthropic integration in one
-  service. Not a split frontend/backend (see SPEC.md §5.1 and §14.1 for why).
-- **TypeScript** end-to-end.
-- **Postgres** via **Prisma**.
-- **FSRS** scheduling via `ts-fsrs`.
-- **Claude Haiku** via `@anthropic-ai/sdk`, using the **Batch API** for bulk sentence
-  generation and **prompt caching** for the shared system prompt.
-- **Auth.js** Email provider (passwordless magic link) via **Resend**, single-email
-  allowlist at launch.
-- **Tailwind CSS v4** (PostCSS plugin), mobile-first (iPhone SE 375×667 baseline).
-- **Railway** for hosting (1 web service + Postgres plugin).
-
-## Next.js 16 gotchas
-
-- **Route guards use `proxy.ts`, not `middleware.ts`.** v16 renamed middleware →
-  proxy; a `middleware.ts` file is **ignored**. Export a function named `proxy` (type
-  `NextProxy`, or use `NextRequest`/`NextResponse` from `next/server` as before). A
-  `config.matcher` array still scopes which paths it runs on. The proxy runs in the
-  **Node.js runtime** by default (not Edge).
+- **The stack is decided; do not restate or relitigate it here.** It is a single full-stack Next.js 16 service, and every component choice plus its rationale lives in SPEC.md §5/§5.1 (with rejected alternatives in §14.1); check there before adding a dependency or proposing a split backend.
+- **Route guards live in `proxy.ts` at the project root, never `middleware.ts`.** Next.js 16 renamed middleware to proxy, and a `middleware.ts` file is silently ignored, leaving every route unguarded. Full mechanics (export shape, matcher, Node.js runtime, root location): SPEC.md §11.9.
 
 ## Project layout
 

@@ -6,7 +6,7 @@
 |---|---|
 | **Status** | Draft |
 | **Author** | Chairul Akmal |
-| **Last updated** | 2026-07-10 (Security & robustness review: demo-login hardening, security headers, review-race fix, first unit tests) |
+| **Last updated** | 2026-07-18 (Docs: §11.9 added, `proxy.ts` route-guard mechanics moved here from CLAUDE.md) |
 | **Target platform** | Mobile-first responsive web (Next.js 16, deployed on Railway) |
 
 ---
@@ -888,6 +888,15 @@ without an email address. It is fundamentally different from the dev bypass abov
   `userId`; the signed expiry bounds how long a leaked cookie is useful; POST + Origin
   checking prevents cross-site session minting; rate limits plus opportunistic cleanup
   bound DB row accumulation from abandoned or abusive demo starts.
+
+### 11.9 `proxy.ts`: Next.js 16 route-guard mechanics
+
+The route guard, session gate, and rate limiters described above all live in `proxy.ts`, and Next.js 16 changed the mechanics of that file in ways that fail silently if missed:
+
+- Next.js 16 renamed middleware to **proxy**. A `middleware.ts` file is **ignored without error**: creating one produces no guard at all, so every route silently ships unprotected.
+- The file exports a function named `proxy` (type `NextProxy`; `NextRequest`/`NextResponse` from `next/server` work as before), and a `config.matcher` array still scopes which paths it runs on.
+- The proxy runs in the **Node.js runtime** by default (not Edge), which is what allows the in-memory rate limiters (§11.3 #5, §11.8) to live there.
+- `proxy.ts` must sit at the **project root**, not under `src/`; the framework does not pick it up elsewhere (confirmed 2026-06-05, §16).
 
 ---
 
