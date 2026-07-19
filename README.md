@@ -10,6 +10,8 @@
 
 A mobile-first JLPT study PWA: one Next.js 16 service that schedules ~8,800 vocabulary words and 220 N3 grammar points with FSRS (the algorithm modern Anki runs on), where every word carries an example sentence written once by Claude Haiku through the Batch API (about $2.55 for the entire deck, cached in Postgres forever). Below: the study modes, the highlights, the stack, how to run it locally, and how it is tested; [ARCHITECTURE.md](ARCHITECTURE.md) walks the design decisions.
 
+**Live demo:** [bayana.chairulakmal.com](https://bayana.chairulakmal.com). The "Try a demo" button on the landing page needs no account and no email: one click mints a private ephemeral session and lands you in onboarding.
+
 The motivation is the gap between the two obvious options. Anki is incredible but demands setup (decks, note types, add-ons, sync configs), and Duolingo is fun but ad-riddled with no real JLPT course. Bayana is the thing in between: open it and study, guided by Pī, with no deck wrangling, no ads, and no guilt-trips about streaks.
 
 ## Study modes
@@ -21,7 +23,7 @@ The motivation is the gap between the two obvious options. Anki is incredible bu
 | **Exam** | A timed JLPT-style benchmark: kanji reading (問題１) then kanji writing (問題２), 10 questions each. Tells you where you actually stand. |
 | **Grammar** | A separate FSRS queue for JLPT grammar points, 220 patterns across 22 lessons (N3 v1), plus a browsable lesson-by-lesson reference. |
 
-There is also whole-deck browse and search with live filtering, and a "Try a demo" flow on the landing page that needs no account: one click mints a private ephemeral session (a 7-day cookie, no email) and lands you in onboarding.
+There is also whole-deck browse and search with live filtering.
 
 ## Highlights
 
