@@ -174,17 +174,21 @@ capacity allows.
   abort a whole batch collection.
 
 ### UX / UI
-- [ ] Touch targets below 44px: session-header buttons, user-menu avatar (36px), browse
-  pagination + clear-search, home-link pill. (Level-picker rows fixed 2026-07-25.)
+- [ ] Touch targets below 44px: user-menu avatar (36px), browse pagination + clear-search,
+  home-link pill. Use `.tap-44` (BRAND.md §7). (Level-picker rows fixed 2026-07-25;
+  session-header pills and both level-picker chip rows fixed 2026-07-26.)
 - [ ] Root `error.tsx` / `loading.tsx` / `not-found.tsx` (currently unstyled defaults).
 - [ ] Grammar hub: inline level switcher (currently vocab-hub-only).
-- [ ] Dark mode: decide (support or explicit non-goal) and log it in DECISIONS.md.
+- [ ] Dark mode: decide (support or explicit non-goal) and log it in DECISIONS.md. Interim
+  state as of 2026-07-26: light-only, now *declared* via `color-scheme: light` so UA chrome
+  can't render dark against the cream surfaces. That fixes the leak, not the question.
 
 ### Accessibility
 - [ ] User-menu keyboard/focus management (Escape to close, focus trap/return).
 - [ ] Info-bubble: proper disclosure pattern (button + `aria-expanded`).
 - [ ] Browse accordions: `aria-expanded` on lesson toggles.
-- [ ] Search inputs: `aria-label`s; result counts in an `aria-live` region.
+- [ ] Search inputs: `aria-label`s; result counts in an `aria-live` region. (Focus rings
+  fixed 2026-07-26 via `.focus-ring`.)
 
 ### Code quality / tests
 - [ ] Dedup session components: byte-identical `Centered` in 4 files, duplicated

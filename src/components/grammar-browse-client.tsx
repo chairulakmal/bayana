@@ -116,7 +116,7 @@ export function GrammarBrowseClient({ level }: { level: string }) {
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
-          className="w-full rounded-[var(--r-md)] px-4 py-3 text-[15px] outline-none"
+          className="focus-ring w-full rounded-[var(--r-md)] px-4 py-3 text-[15px] outline-none"
           style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--ink)" }}
         />
         {query && (

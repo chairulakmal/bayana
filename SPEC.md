@@ -6,7 +6,7 @@
 |---|---|
 | **Status** | Living document; Phases 1a through 3.5 implemented and deployed (§13) |
 | **Author** | Chairul Akmal |
-| **Last updated** | 2026-07-26 (planned scope added in §2, §4.2, §13, §14.9/§14.10 and §15: the Kalima mock-exam absorption and the bayan/zaka consumer role, neither built yet. Same day: §16 decision log extracted to [DECISIONS.md](DECISIONS.md), leaving a pointer. 2026-07-25, documentation-consistency pass: §8 intro, §8.6, §9, §11.2/§11.3/§11.6 and §13 corrected against the implementation; §13 phases renumbered to admit the MC↔FSRS coupling phase. Earlier the same day: §8.5 rewritten for the `/home` landing and the revamped public `/`; §14.7/§14.8 added; deck-size figure corrected in §3) |
+| **Last updated** | 2026-07-26 (accessibility floors added to §8.4 with the alternatives in §14.11, following a BRAND.md review: contrast and keyboard-focus defects fixed in the session chrome, the level pickers, and the browse inputs; `--ink-faint` darkened to clear AA; BRAND.md resynced against `globals.css`. Same day: planned scope added in §2, §4.2, §13, §14.9/§14.10 and §15: the Kalima mock-exam absorption and the bayan/zaka consumer role, neither built yet. Same day: §16 decision log extracted to [DECISIONS.md](DECISIONS.md), leaving a pointer. 2026-07-25, documentation-consistency pass: §8 intro, §8.6, §9, §11.2/§11.3/§11.6 and §13 corrected against the implementation; §13 phases renumbered to admit the MC↔FSRS coupling phase. Earlier the same day: §8.5 rewritten for the `/home` landing and the revamped public `/`; §14.7/§14.8 added; deck-size figure corrected in §3) |
 | **Target platform** | Mobile-first responsive web (Next.js 16, deployed on Railway) |
 
 ---
@@ -676,7 +676,15 @@ screens; the bulk of study happens on mobile.
 - **Touch ergonomics:** rating actions (Again/Hard/Good/Easy) and MC options are
   full-width, thumb-reachable controls with ≥ 44×44 px hit targets, placed in the lower
   portion of the viewport. Card flip is tap-anywhere; swipe gestures are an optional
-  enhancement, never the only path.
+  enhancement, never the only path. A control is allowed to be *painted* smaller than 44px
+  where visual quiet matters (session-header pills, JLPT chips); its **hit target** is not,
+  and `.tap-44` expands the target without changing the painted box (BRAND.md §7).
+- **Accessibility floors (2026-07-26):** all text clears WCAG AA (4.5 : 1), which makes
+  `--ink-faint` the quietest value in the app rather than a decorative one; every control
+  carries a visible keyboard focus indicator, and `outline` is reserved for that indicator
+  so a selected state never removes it. Ratios, the token ramp, and the two ways this gets
+  broken in practice (compositing with `opacity`, drawing selection with `outline`) are in
+  BRAND.md §3 and §7; the alternatives weighed are in §14.11.
 - **Typography:** Japanese text (expression/reading) is sized for legibility on small
   screens and must render correctly with appropriate CJK font fallbacks; respects dynamic
   type / user font-scaling.
@@ -1345,6 +1353,49 @@ grading into a real scheduler is what a dataset publisher wants demonstrated. Th
 accepted: Bayana stops being a single-purpose vocabulary trainer (§2), Kalima loses its
 main feature, and this repo takes on a public surface it did not have if the mock exam
 stays open to visitors (§15). Author decided.
+
+### 14.11 Alternatives weighed in the 2026-07-26 accessibility pass
+
+Four forks surfaced while fixing the contrast and focus defects found in the BRAND.md
+review (§8.4). Each is recorded because the rejected option is the one a later reader is
+likely to reach for again.
+
+**A new tertiary token instead of darkening `--ink-faint`. Rejected.** `--ink-faint`
+(`#9a8597`, 3.25 : 1) was documented as a disabled/hints value but used as tertiary body
+text at ~60 call sites. Adding a compliant `--ink-tertiary` and leaving `--ink-faint` alone
+would have preserved the token's documented meaning, but it requires auditing all 60 sites
+to decide which meant "disabled" and which meant "quiet", and it leaves a failing token in
+the palette for the next author to reach for. Darkening the token in place to `#7d6a7a`
+(4.8 : 1) fixes every site at once and costs only a small loss of contrast *range* between
+`--ink-soft` and `--ink-faint`. The palette gains a rule instead of a token: the ramp is
+three steps and its last step is the AA floor.
+
+**Padding the small controls to 44px instead of `.tap-44`. Rejected.** The honest reading
+of the ≥ 44px rule is to make the control 44px. It was rejected for the two places it
+applies: a 44px-tall session header adds ~25px of chrome to a screen whose entire purpose
+is the card below it, and a 44px-tall JLPT chip stops reading as a chip and starts reading
+as a button, which changes the meaning of a level row. The `.tap-44` overlay is the
+standard "expand the target past the visual bounds" technique and resolves the two. Its
+expansion is **vertical only**, which was itself a fork: a full 44 × 44 overlay on a
+horizontal chip row would make adjacent level buttons overlap, and a mis-tap that selects
+the *wrong level* is worse than a target that is narrow but unambiguous. Horizontal reach
+is met by giving chip rows real padding instead.
+
+**Tuning the inactive-chip opacity to a passing value instead of removing it. Rejected.**
+Inactive JLPT chips were dimmed (`0.55` on the home picker, `0.45` on browse), which
+composited the white-text chips to ~3.2 : 1 and ~2.5 : 1. A safe alpha exists (~0.8
+measures 5.1 : 1), but it is a magic number that holds only for the current five chip
+colours and would silently break if a chip's fill changed. Removing the dim entirely and
+carrying selection with a ring plus a slight scale (the pattern the onboarding picker
+already used) eliminates the failure mode rather than parameterising it, and the rows
+already read as inactive from their cream fill and `--ink-soft` label.
+
+**Leaving the level-chip ring colour as `currentColor`. Rejected.** `currentColor` resolves
+to white on `.chip-n5` and `.chip-n2`, so a ring drawn in it disappears against `--paper`.
+The onboarding picker had already discovered this and carried a local `RING_COLOR` override;
+the browse picker needed the same map. Rather than copy it, both now import
+`src/components/level-chip.ts`. A duplicated contrast rule is a contrast bug with a delay
+on it: the second copy is the one nobody updates.
 
 ---
 

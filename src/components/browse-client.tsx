@@ -151,7 +151,7 @@ export function BrowseClient({ level }: { level: string }) {
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
-          className="w-full rounded-[var(--r-md)] px-4 py-3 text-[15px] outline-none"
+          className="focus-ring w-full rounded-[var(--r-md)] px-4 py-3 text-[15px] outline-none"
           style={{
             background: "var(--surface)",
             border: "1px solid var(--line)",
@@ -340,7 +340,7 @@ export function BrowseClient({ level }: { level: string }) {
                   e.currentTarget.blur();
                 }
               }}
-              className="rounded text-center text-[13px] outline-none"
+              className="focus-ring rounded text-center text-[13px] outline-none"
               style={{
                 // Width: enough for the max page number plus a little padding.
                 width: `${Math.max(2, String(totalPages).length) + 2}ch`,

@@ -13,20 +13,10 @@ import { useState, useTransition } from "react";
 import { Parrot } from "@/components/parrot";
 import { completeOnboarding } from "@/app/onboarding/actions";
 import type { Level } from "@/generated/prisma/enums";
+import { RING_COLOR, type LevelStr } from "@/components/level-chip";
 
 // Row order: N1 top → N4/N5 bottom.
 const LEVEL_ROWS = [["N1"], ["N2", "N3"], ["N4", "N5"]] as const;
-type LevelStr = "N1" | "N2" | "N3" | "N4" | "N5";
-
-// N5 and N2 have white text (color: #fff), so currentColor outline is invisible on the
-// cream background. Override those two to ink; all others use currentColor fine.
-const RING_COLOR: Record<LevelStr, string> = {
-  N5: "var(--ink)",
-  N4: "currentColor",
-  N3: "currentColor",
-  N2: "var(--ink)",
-  N1: "currentColor",
-};
 
 const LEVEL_LABEL: Record<LevelStr, string> = {
   N5: "Absolute beginner",
@@ -73,13 +63,19 @@ export function OnboardingClient() {
                   onClick={() => setSelected(lvl)}
                   disabled={pending}
                   aria-pressed={active}
-                  className={`chip chip-${lvl.toLowerCase()}`}
+                  className={`chip chip-${lvl.toLowerCase()} tap-44`}
                   style={{
                     padding: "9px 22px",
                     fontSize: 16,
                     opacity: pending ? 0.4 : 1,
-                    outline: active ? `2px solid ${RING_COLOR[lvl]}` : "none",
-                    outlineOffset: 3,
+                    // Selection ring as box-shadow rather than outline: `outline: "none"`
+                    // on the inactive chips was suppressing the browser's own focus ring,
+                    // so keyboard users had no focus indicator here. outline now belongs to
+                    // the UA, box-shadow to us. The inner --paper layer is the ring gap
+                    // outlineOffset used to provide.
+                    boxShadow: active
+                      ? `0 0 0 3px var(--paper), 0 0 0 5px ${RING_COLOR[lvl]}`
+                      : undefined,
                     transform: active ? "scale(1.06)" : undefined,
                     cursor: active ? "default" : "pointer",
                     transition: "opacity .15s, transform .15s",

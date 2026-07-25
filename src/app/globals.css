@@ -5,6 +5,12 @@
 
 /* ── Design tokens (BRAND.md §8) ───────────────────────────────────────────── */
 :root {
+  /* The app is light-only by design (BRAND.md §3 is a single light palette; there is no
+     dark ramp). Declaring the scheme stops a phone in dark mode from painting UA-owned
+     chrome (form controls, the browse search field, scrollbars) in dark styling against
+     our cream surfaces, which is the one place a light-only app still leaks dark UI. */
+  color-scheme: light;
+
   /* hero palette */
   --magenta:#ff61f8; --pink:#ffa6fb; --yellow:#ffea6c; --cream:#fffba7;
 
@@ -24,7 +30,12 @@
 
   /* action / neutrals */
   --grape:#b717b2; --grape-edge:#7c0079; --grape-hi:#cf1fc9; --yel-edge:#d9c24a;
-  --ink:#341832; --ink-soft:#684e65; --ink-faint:#9a8597;
+  /* Three-step text ramp on --paper: 15.2:1 / 7.0:1 / 4.8:1, all clearing WCAG AA (4.5:1)
+     for normal-size text. --ink-faint was #9a8597 (3.25:1), which BRAND.md described as a
+     "disabled / hints" value but the app actually uses as its tertiary *content* colour:
+     furigana readings, stat labels, tile subtitles. Darkened rather than renamed, because
+     the ~60 call sites all want "quiet secondary", not "disabled". */
+  --ink:#341832; --ink-soft:#684e65; --ink-faint:#7d6a7a;
   --paper:#fcfaf1; --surface:#ffffff; --surface-cream:#fff7e4; --line:#efe4e9;
 
   /* functional */
@@ -135,6 +146,40 @@ body {
 .opt:disabled { cursor: default; }
 .opt-correct { background: #eafaf1; border-color: var(--good); color: var(--good-edge); box-shadow: 0 3px 0 var(--good-edge); }
 .opt-wrong   { background: #ffe9ee; border-color: var(--bad);  color: #b12a44;        box-shadow: 0 3px 0 #d63a55; }
+
+/* ── Accessibility utilities ─────────────────────────────────────────────────
+   Two cross-cutting helpers. Both exist because the obvious inline fix doesn't work:
+   an element with `style={{ border: ... }}` beats any Tailwind `focus:border-*` class,
+   and a control that must stay visually small can't simply be padded to 44px. */
+
+/* Visible keyboard focus for inputs that suppress the UA outline. Carried on box-shadow,
+   not border-color, precisely because box-shadow is not set inline on those fields, so
+   nothing overrides it. :focus-visible (not :focus) keeps the ring off pointer taps. */
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--mag-300);
+  border-color: var(--magenta);
+}
+
+/* Raises a deliberately small control to the 44px hit-target floor (BRAND.md platform
+   focus) without growing its painted box, using the standard "expand the touch target past
+   the visual bounds" technique. Session-header pills and JLPT level chips are small on
+   purpose: chrome that competes with the card is a design regression, but an 18px tap
+   target is an accessibility one, and this resolves the two.
+
+   Vertical only, by design. `inset: 50% 0 auto 0` pins the overlay to the control's own
+   width, so adjacent chips in a row can never overlap each other's hit areas: a
+   mis-tap between two *different* level buttons is worse than a slightly narrow one.
+   Horizontal reach is handled per-component, by giving chip rows real padding. */
+.tap-44 { position: relative; }
+.tap-44::after {
+  content: "";
+  position: absolute;
+  inset: 50% 0 auto 0;
+  transform: translateY(-50%);
+  height: 100%;
+  min-height: 44px;
+}
 
 /* Honor reduced-motion: keep the press functional, drop the spring (BRAND.md §7, SPEC §8.2). */
 @media (prefers-reduced-motion: reduce) {

@@ -17,8 +17,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setActiveLevel } from "@/app/home/actions";
 import type { Level } from "@/generated/prisma/enums";
-
-const LEVELS = ["N1", "N2", "N3", "N4", "N5"] as const;
+import { LEVELS, RING_COLOR } from "@/components/level-chip";
 
 export function BrowseLevelPicker({ current }: { current: string }) {
   const [pending, startTransition] = useTransition();
@@ -45,13 +44,30 @@ export function BrowseLevelPicker({ current }: { current: string }) {
             onClick={() => pick(lvl)}
             disabled={pending}
             aria-pressed={active}
-            className={`chip chip-${lvl.toLowerCase()}`}
+            className={`chip chip-${lvl.toLowerCase()} tap-44`}
             style={{
-              opacity: active ? 1 : pending ? 0.3 : 0.45,
+              // Real padding, not the default .chip 5px/12px: at ~54x36px each chip clears
+              // 44px horizontally on its own, and `.tap-44` covers the vertical axis. Five
+              // of these plus the 8px gaps come to ~302px, inside the 375px baseline.
+              padding: "8px 16px",
+              // Inactive chips are NOT dimmed. They used to sit at 0.45 opacity, which took
+              // the white-on-colour chips (N5, N2) to roughly 2.5:1, unreadable, on the
+              // labels of the controls themselves. Selection is carried by the ring below,
+              // the same way the onboarding picker does it. `pending` still dims the whole
+              // row, but that is a transient loading state, not a resting one.
+              opacity: pending ? 0.4 : 1,
               cursor: active ? "default" : "pointer",
-              // Active chip gets a subtle ring to make selection unambiguous.
-              outline: active ? "2px solid currentColor" : "none",
-              outlineOffset: 2,
+              // Selection ring as box-shadow, not outline. `outline: none` on the inactive
+              // chips was silently suppressing the browser's focus ring, leaving keyboard
+              // users with no focus indicator at all. Keeping outline free for the UA and
+              // expressing selection in box-shadow separates the two concerns cleanly. The
+              // inner --paper layer reads as a gap between chip and ring; RING_COLOR (not
+              // currentColor) keeps the ring visible on the two white-text chips.
+              boxShadow: active
+                ? `0 0 0 2px var(--paper), 0 0 0 4px ${RING_COLOR[lvl]}`
+                : undefined,
+              transform: active ? "scale(1.04)" : undefined,
+              transition: "opacity .15s, transform .15s",
             }}
           >
             {lvl}

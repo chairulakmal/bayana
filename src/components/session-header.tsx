@@ -42,12 +42,11 @@ export function SessionHeader({ progress, level, left, right }: Props) {
       </div>
 
       {/* Info row: left slot | centred chip | right slot.
-          A single opacity on this container uniformly dims all chrome — text,
-          chips, and interactive pills — so focus stays on the card below. */}
-      <div
-        className="mt-2 flex items-center text-[13px]"
-        style={{ color: "var(--ink-faint)", opacity: 0.65 }}
-      >
+          No container opacity. It used to carry `opacity: 0.65`, which stacked on top of
+          --ink-faint and dropped the row to roughly 2:1 against --paper, including the
+          only exit and the only undo in a session. Recessiveness now comes from size and
+          colour choice alone, both of which stay above the AA floor. */}
+      <div className="mt-2 flex items-center text-[13px]" style={{ color: "var(--ink-faint)" }}>
         <span className="flex-1">{left}</span>
         {/* Level chip — centred; small scale so it reads as context, not navigation */}
         <span
@@ -62,6 +61,19 @@ export function SessionHeader({ progress, level, left, right }: Props) {
   );
 }
 
+/* Shared pill styling for the two interactive slots. --ink-soft (7:1), a step stronger
+ * than the row's ambient --ink-faint: these are controls, and a control should not be
+ * quieter than the text beside it. 12px rather than the old 10px, which was below the
+ * readable floor for a control label. `.tap-44` lifts the ~26px painted pill to a 44px
+ * hit target without making the header taller (see globals.css). */
+const PILL_CLASS = "tap-44 rounded-full";
+const PILL_STYLE = {
+  fontSize: "12px",
+  padding: "4px 10px",
+  color: "var(--ink-soft)",
+  border: "1px solid var(--line)",
+} as const;
+
 /** A ghost pill link for use in SessionHeader slots — identical appearance to
  *  SessionHeaderButton so Home and Undo read as the same visual weight. */
 export function SessionHeaderLink({
@@ -72,25 +84,16 @@ export function SessionHeaderLink({
   children: ReactNode;
 }) {
   return (
-    <Link
-      href={href}
-      className="rounded-full"
-      style={{
-        fontSize: "10px",
-        padding: "2px 8px",
-        color: "var(--ink-faint)",
-        border: "1px solid var(--line)",
-      }}
-    >
+    <Link href={href} className={PILL_CLASS} style={PILL_STYLE}>
       {children}
     </Link>
   );
 }
 
 /** A ghost-style pill button for use in SessionHeader slots (e.g. Undo).
- *  Sized to the same height as the level chip (10px text, 2px/8px padding) so the
- *  row stays vertically balanced. Outlined with --line; no fill or lip so it stays
- *  quiet during recall. Disabled state fades to 25% opacity. */
+ *  Matches SessionHeaderLink exactly so the row reads as one family. Outlined with
+ *  --line; no fill or lip so it stays quiet during recall. Disabled fades to 40%,
+ *  enough to read as unavailable, not so far that it vanishes. */
 export function SessionHeaderButton({
   onClick,
   disabled,
@@ -104,13 +107,8 @@ export function SessionHeaderButton({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="rounded-full disabled:opacity-25"
-      style={{
-        fontSize: "10px",
-        padding: "2px 8px",
-        color: "var(--ink-faint)",
-        border: "1px solid var(--line)",
-      }}
+      className={`${PILL_CLASS} disabled:opacity-40`}
+      style={PILL_STYLE}
     >
       {children}
     </button>

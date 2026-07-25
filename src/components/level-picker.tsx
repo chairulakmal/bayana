@@ -12,9 +12,8 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Level } from "@/generated/prisma/enums";
 import { setActiveLevel } from "@/app/home/actions";
-
-// N1 at top (hardest / the goal), N5 at bottom (easiest / the start).
-const LEVELS = ["N1", "N2", "N3", "N4", "N5"] as const;
+// N1 at top (hardest / the goal), N5 at bottom (easiest / the start): the shared order.
+import { LEVELS } from "@/components/level-chip";
 
 const LEVEL_LABEL: Record<string, string> = {
   N1: "匠 · the artisan",
@@ -62,15 +61,14 @@ export function LevelPicker({ current }: { current: string }) {
               opacity: pending && !active ? 0.4 : 1,
             }}
           >
-            {/* Level chip — brand colour at full opacity regardless of active state */}
+            {/* Level chip, always at full opacity. Inactive rows used to dim theirs to
+                0.55, which composited the white-on-colour chips (N5, N2) down to ~3.2:1;
+                the chip *is* the row's label, so that was the one element that could not
+                afford to fade. The row already reads as inactive from its cream fill and
+                --ink-soft label, so the opacity was redundant as well as harmful. */}
             <span
               className={`chip chip-${lvl.toLowerCase()}`}
-              style={{
-                fontSize: "12px",
-                padding: "3px 10px",
-                flexShrink: 0,
-                opacity: active ? 1 : 0.55,
-              }}
+              style={{ fontSize: "12px", padding: "3px 10px", flexShrink: 0 }}
             >
               {lvl}
             </span>
