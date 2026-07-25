@@ -61,7 +61,7 @@ export async function GET(request: Request) {
 
   // … and set its cookie on the redirect response. Dev is http, so the non-secure cookie
   // name (`authjs.session-token`) is what `auth()` / proxy.ts expect.
-  const res = NextResponse.redirect(new URL("/grammar", request.url));
+  const res = NextResponse.redirect(new URL("/home", request.url));
   res.cookies.set("authjs.session-token", sessionToken, {
     httpOnly: true,
     sameSite: "lax",

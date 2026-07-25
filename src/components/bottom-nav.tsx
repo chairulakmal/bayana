@@ -1,15 +1,25 @@
 "use client";
 
-// BottomNav — fixed bottom tab bar for hub pages (home, stats, browse).
-// Duolingo-style: three equal tabs with icons and labels.
+// BottomNav: fixed bottom tab bar for hub pages (home, grammar, stats, browse).
+// Duolingo-style, three equal tabs with icons and labels.
 // Active tab shown in grape; inactive in ink-faint.
-// Not rendered on session screens (study, quiz, exam) — those own their full viewport.
+// Not rendered on session screens (study, quiz, exam), which own their full viewport.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+// The nav lists *places*, not study modes. Flashcards, Quiz, Exam, and Grammar are all
+// reached from the home hub's mode grid; putting only Grammar in the tab bar mixed the two
+// categories and made the omission of the other three look arbitrary. Grammar was in here
+// because it was briefly the post-login landing itself (SPEC §16, 2026-07-02), which no
+// longer holds now the hub surfaces grammar with a live due count.
+//
+// Home leads: it is the app's default page, so it is also the first tab.
+//
+// Known wart: `/grammar` is a place with no tab, so no tab highlights while you are on it.
+// Accepted, and standard for a sub-page. The alternative (a fourth tab) is the thing this
+// change is undoing.
 const TABS = [
-  { label: "Grammar", href: "/grammar", icon: GrammarIcon },
   { label: "Home", href: "/home", icon: HomeIcon },
   { label: "Stats", href: "/stats", icon: StatsIcon },
   { label: "Browse", href: "/browse", icon: BrowseIcon },
@@ -93,25 +103,6 @@ function StatsIcon({ active }: { active: boolean }) {
       <line x1="6" y1="20" x2="6" y2="14" />
       <line x1="12" y1="20" x2="12" y2="4" />
       <line x1="18" y1="20" x2="18" y2="10" />
-    </svg>
-  );
-}
-
-function GrammarIcon({ active }: { active: boolean }) {
-  return (
-    <svg
-      width="26"
-      height="26"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={active ? "var(--grape)" : "currentColor"}
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
     </svg>
   );
 }

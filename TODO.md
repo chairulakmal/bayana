@@ -7,10 +7,88 @@ record across sessions. Decisions do **not** go here — log them in SPEC.md §1
 
 **Now: Phase 3** — MC↔FSRS coupling for Quiz mode (planned, not started).
 **Next: Phase 4** — Admin sentence audit + on-demand generation.
+**✅ Home + landing revamp complete (2026-07-25)** — `/home` is the default page again and
+is now a light dashboard; public `/` rebuilt around the demo CTA. See
+[below](#-home--landing-revamp-2026-07-25).
 **✅ Phase 3.5 complete** — Grammar point study (N3 v1, 220 points / 22 lessons, separate
 FSRS queue + page) plus its browse-view addendum.
 **✅ App review fixes complete (2026-07-10)** — security/UX/a11y pass; remaining findings
 tracked in the [Review backlog](#review-backlog--remaining-findings-2026-07-10) below.
+
+---
+
+## ✅ Home + landing revamp (2026-07-25)
+
+Decisions and rationale in SPEC §8.5, §14.7, §14.8, and the §16 row dated 2026-07-25.
+
+**Routing — `/home` is the default page again** (reverses the 2026-07-02 `/grammar` landing):
+- [x] `src/app/auth/signin/page.tsx` — `redirectTo: "/home"`.
+- [x] `src/app/page.tsx` — signed-in redirect to `/home`; now uses the new
+  `getOptionalUser()` so demo-cookie visitors are recognised too.
+- [x] `src/app/api/dev/login/route.ts` — redirects to `/home`.
+- [x] `src/app/onboarding/page.tsx` — already-onboarded bounce to `/home`.
+- [x] `src/app/onboarding/actions.ts` — completion goes to `/home`, **not `/quiz`** (clears
+  the first bug in the review backlog below; a new user never reached the hub before).
+- [x] `src/app/manifest.ts` — `start_url: "/home"`.
+- [x] Demo flow unchanged: `POST /api/demo/login` → `/onboarding` → `/home` (author's call
+  to keep the level choice; rejected alternative in SPEC §14.7).
+
+**`/home` rebuilt as a light dashboard:**
+- [x] `src/lib/home.ts` (new) — `getHomeSnapshot()` (one parallel round-trip of counts;
+  purpose-built rather than reusing `getLevelStats`, whose word-id fetch + 30-day log scan
+  the hub never renders) and `pickNextAction()` (routes the single primary CTA by priority).
+- [x] `src/app/home/page.tsx` — Today panel (words due / grammar due / done today + level
+  progress bar), routed primary CTA, 2×2 mode grid, level selector moved below the modes.
+- [x] Grammar added to the mode grid, always as a live link (see review fixes below).
+- [x] Mode order corrected to SPEC §8.5 (Flashcard, Quiz, Exam) — clears the
+  "mode-picker tile order" item in the backlog below.
+- [x] Demo banner promoted from loose grey text to a bordered inset card.
+- [x] `src/components/bottom-nav.tsx` — Grammar tab removed; nav is Home / Stats / Browse
+  (places, not modes). `GrammarIcon` deleted.
+- [x] `src/components/level-picker.tsx` — rows `py-2.5` → `py-3.5` (~50px, clears the 44px
+  touch-target floor); partially clears the touch-target item below.
+
+**Public `/` restructured** around the demo CTA (the only door an uninvited visitor can use):
+- [x] Demo promoted to the hero's primary CTA (form POST, since the route is POST-only).
+- [x] Deck-size proof strip; all four modes (Exam and Grammar were never added after they
+  shipped); rendered example-sentence card; three-step "how it works"; closing CTA band.
+- [x] `src/lib/current-user.ts` — new `getOptionalUser()` (non-redirecting) + `CurrentUser`
+  type; `requireAuth()` now delegates to it.
+
+**Docs:**
+- [x] SPEC §8.5 rewritten; §14.7 + §14.8 added; §16 row; header date.
+- [x] **Deck-size figure corrected**: "≈ 8,800 words" → 8,128 CSV rows / 8,101 imported
+  words, in SPEC §3 + TL;DR, README, CLAUDE.md. SPEC §3's per-level table had always summed
+  to 8,128, so the total was a long-standing arithmetic error that had reached public copy.
+  Two comparative/historical mentions left as-is on purpose: SPEC §7's pre-fill cost
+  estimate (written against the old assumption) and the "~40× smaller" aside in
+  `src/app/api/grammar/browse/route.ts`.
+
+**Review pass on the above — 4 defects found and fixed before landing:**
+- [x] **Grammar unreachable off N3.** The Grammar tile was disabled when the level had no
+  seeded deck; combined with the nav-tab removal, that left `/grammar` (and existing grammar
+  progress) with zero UI paths on N5/N4/N2/N1. Tiles are never disabled now: each is the sole
+  route to its mode. `ModeTile`'s `disabled` variant deleted outright.
+- [x] **`/grammar` claimed "All caught up" on levels with no deck** (`stats` all zeros passed
+  the `started < total` check). Now distinguishes the empty-deck case explicitly.
+- [x] **"done today" mixed units** — vocab *review events* (several per card when rated Again)
+  plus grammar *points touched* (no event log exists). Now counts distinct cards on both
+  sides via `distinct: ["wordId"]`, renamed `cardsStudiedToday`. Also removed a duplicated
+  query: `getGrammarStats` already ran the same "studied today" count, now exposed as
+  `studiedTodayCount` and reused.
+- [x] **Today panel's level chip implied all three stats were level-scoped** when words-due
+  deliberately is not. Chip moved onto the progress bar, the one level-scoped element.
+- [x] Landing proof strip: dropped a `<dl>` whose `sr-only` `<dt>` duplicated the visible
+  label, so screen readers announced each label twice.
+
+**Verified:** `tsc --noEmit` clean, `npm run lint` clean (2 pre-existing warnings in
+`scripts/seed-grammar.ts`), `npm test` 8/8, `next build` succeeds.
+
+> **Note:** `.env` pins `NODE_OPTIONS=--max-old-space-size=256`, which OOM-kills
+> `next build`'s TypeScript worker locally. Building needs an override
+> (`NODE_OPTIONS=--max-old-space-size=4096 npm run build`). Pre-existing, unrelated to this
+> work — decide whether the cap is still wanted (it mirrors the Railway runtime budget, but
+> `start:prod` sets its own 512MB anyway).
 
 ---
 
@@ -124,19 +202,19 @@ Lower-priority findings from the same review, roughly ordered. Pull into a phase
 capacity allows.
 
 ### Bugs / correctness
-- [ ] Onboarding completion still redirects to `/quiz` (`src/app/onboarding/actions.ts`)
-  — should be `/grammar` since the 2026-07-02 landing-page change.
-- [ ] `getGrammarStats` "studied today" uses local-server midnight (`setHours(0,0,0,0)`)
-  — wire in the profile's timezone/day-start handling used elsewhere.
+- [x] ~~Onboarding completion still redirects to `/quiz`~~ — fixed 2026-07-25; now `/home`.
+- [ ] Day boundaries use local-server midnight (`setHours(0,0,0,0)`) in `getGrammarStats`
+  and in `startOfToday` (`src/lib/home.ts`, which powers the hub's "done today") — wire in a
+  per-user timezone / day-start. The hub's helper is centralised so the fix is one function.
 - [ ] `scripts/collect-batch.ts` — per-item try/catch so one malformed result doesn't
   abort a whole batch collection.
 
 ### UX / UI
 - [ ] Touch targets below 44px: session-header buttons, user-menu avatar (36px), browse
-  pagination + clear-search, level-picker rows, home-link pill.
+  pagination + clear-search, home-link pill. (Level-picker rows fixed 2026-07-25.)
 - [ ] Root `error.tsx` / `loading.tsx` / `not-found.tsx` (currently unstyled defaults).
-- [ ] Mode-picker tile order on `/home` doesn't match SPEC §8.5 — reconcile (change UI
-  or SPEC, log in §16).
+- [x] ~~Mode-picker tile order on `/home` doesn't match SPEC §8.5~~ — fixed 2026-07-25
+  (UI changed to Flashcard, Quiz, Exam, + Grammar).
 - [ ] Grammar hub: inline level switcher (currently vocab-hub-only).
 - [ ] Dark mode: decide (support or explicit non-goal) and log in SPEC §16.
 

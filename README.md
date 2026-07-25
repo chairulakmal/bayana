@@ -8,7 +8,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-A mobile-first JLPT study PWA: one Next.js 16 service that schedules ~8,800 vocabulary words and 220 N3 grammar points with FSRS (the algorithm modern Anki runs on), where every word carries an example sentence written once by Claude Haiku through the Batch API (about $2.55 for the entire deck, cached in Postgres forever). Below: the study modes, the highlights, the stack, how to run it locally, and how it is tested; [ARCHITECTURE.md](ARCHITECTURE.md) walks the design decisions.
+A mobile-first JLPT study PWA: one Next.js 16 service that schedules ~8,100 vocabulary words and 220 N3 grammar points with FSRS (the algorithm modern Anki runs on), where every word carries an example sentence written once by Claude Haiku through the Batch API (about $2.55 for the entire deck, cached in Postgres forever). Below: the study modes, the highlights, the stack, how to run it locally, and how it is tested; [ARCHITECTURE.md](ARCHITECTURE.md) walks the design decisions.
 
 **Live demo:** [bayana.chairulakmal.com](https://bayana.chairulakmal.com). The "Try a demo" button on the landing page needs no account and no email: one click mints a private ephemeral session and lands you in onboarding.
 

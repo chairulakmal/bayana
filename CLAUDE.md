@@ -5,7 +5,7 @@ Guidance for Claude Code working in this repository.
 ## What this project is
 
 **Bayana** — a mobile-first, spaced-repetition JLPT vocabulary web app with
-AI-generated example sentences. It turns an existing ~8,800-word Anki deck (N5–N1) into
+AI-generated example sentences. It turns an existing ~8,100-word Anki deck (N5–N1) into
 flashcards scheduled by FSRS, where each word is paired with example sentences generated
 once by Claude Haiku and cached in Postgres. Two study modes: **Flashcard mode** (serious SRS
 recall) and **Quiz mode** (gamified multiple choice).

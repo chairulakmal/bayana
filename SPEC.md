@@ -6,14 +6,14 @@
 |---|---|
 | **Status** | Draft |
 | **Author** | Chairul Akmal |
-| **Last updated** | 2026-07-18 (Docs: §11.9 added, `proxy.ts` route-guard mechanics moved here from CLAUDE.md) |
+| **Last updated** | 2026-07-25 (§8.5 rewritten: `/home` restored as the post-login landing and rebuilt as a light dashboard; public `/` revamped around the demo CTA; §14.7/§14.8 added; deck-size figure corrected in §3) |
 | **Target platform** | Mobile-first responsive web (Next.js 16, deployed on Railway) |
 
 ---
 
 ## TL;DR
 
-Bayana turns an existing ~8,800-word JLPT vocabulary deck (N5–N1, Anki export) into a
+Bayana turns an existing ~8,100-word JLPT vocabulary deck (N5–N1, Anki export) into a
 modern web flashcard app. Cards are scheduled with **FSRS** (the algorithm used by
 current Anki), and each word is paired with **example sentences generated once by
 Claude Haiku and cached permanently** in Postgres. It offers two study modes — a serious
@@ -29,7 +29,7 @@ address) and a data model that is multi-user-ready from day one.
 
 JLPT learners memorize large vocabulary lists, but isolated word↔meaning pairs are weak
 memory anchors. Contextual example sentences materially improve retention, yet writing
-~8,800 of them by hand is impractical and licensing pre-made sentence banks is costly.
+~8,100 of them by hand is impractical and licensing pre-made sentence banks is costly.
 
 We start with a clean, structured deck in Anki export format. By
 generating one set of high-quality, level-appropriate example sentences per word with a
@@ -83,7 +83,7 @@ committed at `decks/*.csv` — Anki export format, one file per JLPT level.
 | `n3.csv` | 2,140 | N3 |
 | `n2.csv` | 1,906 | N2 |
 | `n1.csv` | 2,698 | N1 (hardest) |
-| **Total** | **≈ 8,800 words** | |
+| **Total** | **8,128 rows → 8,101 words** | after `guid` de-duplication on import |
 
 **Columns:** `expression` (kanji/word), `reading` (kana), `meaning` (English),
 `tags` (space-separated, e.g. `JLPT JLPT_N5 Genki`), `guid` (stable Anki identifier).
@@ -633,8 +633,9 @@ screens; the bulk of study happens on mobile.
   §8); the iPhone SE baseline above is the shared design target for both docs.
 
 ### 8.5 Onboarding & session flows
-Two user stories drive entry into the app. Both reach the same two level-scoped engines
-(§8.1, §8.2); they differ only in the first-run extras.
+Two user stories drive entry into the app. Both reach the same level-scoped engines
+(§8.1, §8.2, §8.6, plus the grammar queue of Phase 3.5); they differ only in the
+first-run extras.
 
 - **First-time user (first run).** Sign in via the email magic link (§11.2) *or* start a
   demo session (`POST /api/demo/login`, §11.8) → routed to `/onboarding` (gated on
@@ -646,18 +647,53 @@ Two user stories drive entry into the app. Both reach the same two level-scoped 
   distinguishes a first-time from a returning user thereafter.
 - **Returning user.** Sign in → **the post-login landing** → start. That's it.
 
-**Post-login landing: `/grammar`, for now.** Sign-in, the dev login, and the public `/` all
-currently redirect to the grammar hub (§13), not `/home` — a temporary reprioritization
-while the author focuses on grammar study (§16, 2026-07-02). `/home` still exists as the
-vocab **mode picker** and is reachable from the nav (now its second tab, after Grammar).
+**Post-login landing: `/home`.** Sign-in (`redirectTo`), the dev login, `/onboarding`
+completion, `/onboarding`'s already-onboarded bounce, the public `/` redirect, and the PWA
+manifest's `start_url` all resolve to the home hub. This reverses the temporary
+`/grammar` reprioritization of 2026-07-02 (§16): that change existed because the hub
+carried no status of its own, so opening on it cost a tap and told the user nothing. The
+hub now reports what is due across both queues, which removes the reason to bypass it.
 
-**The vocab hub (`/home`).** The **mode picker** (three large cards → Flashcard `/study`,
-Quiz `/quiz`, Exam `/exam`) plus an **inline level selector** (the five JLPT chips; tapping
-one persists `UserProfile.activeLevel` via a server action and re-scopes all three engines).
-The level is therefore changed *here*, not on a separate settings page. The hub is
-deliberately **not a full dashboard** — stats, streak, and history live in a richer
-dashboard in Phase 4 (§13). `/study`, `/quiz`, and `/exam` each read the active level and
-link back to the hub.
+**The hub (`/home`).** A **light dashboard**, in four bands, ordered by how often each is
+used:
+
+1. **Today panel** — words due, grammar points due, and reviews completed today, plus a
+   progress bar for the active level (started / total). This is the "where am I" glance the
+   hub previously lacked entirely.
+2. **Primary CTA** — a single button routed by `pickNextAction` (`src/lib/home.ts`) to the
+   highest-priority work: due vocab, then due grammar, then new vocab, then Quiz as a
+   never-a-dead-end fallback. This is what preserves the one-tap, no-config promise (§2)
+   now that the hub shows more than three buttons.
+3. **Mode grid** — four tiles (Flashcard `/study`, Quiz `/quiz`, Exam `/exam`, Grammar
+   `/grammar`) in a 2×2 layout, each with a subtitle derived from live counts. Grammar is
+   included here because the hub is the app's default page; a mode absent from it is
+   effectively hidden. **No tile is ever disabled.** Each is the sole route to its mode, so
+   a dimmed tile removes a section of the app: with the Grammar nav tab gone, disabling the
+   Grammar tile on levels with no seeded deck (only N3 is seeded, §4.1) made `/grammar` and
+   all existing grammar progress unreachable behind a level switch. Caveats go in the
+   subtitle instead, and `/grammar` itself distinguishes "no deck for this level" from
+   "all caught up" rather than reporting a deck that does not exist as finished.
+4. **Inline level selector** — the five JLPT chips, persisting `UserProfile.activeLevel`
+   via a server action and re-scoping every engine. The level is changed *here*, not on a
+   separate settings page. It sits **below** the mode grid: a level is chosen once and
+   revisited rarely, whereas a mode is chosen every session.
+
+**Scoping asymmetry, stated deliberately.** The Today panel's *words due* count is **not**
+level-scoped, because `getStudyQueue` (§8.1) returns due cards regardless of level so
+nothing already in progress is stranded. A level-scoped number here would promise a
+smaller session than the one the tile actually opens. The progress bar *is* level-scoped
+and is labelled with the level to make that explicit.
+
+**Still not the full dashboard.** Streak, history, and charts remain deferred to the Phase 4
+dashboard (§13); `/stats` keeps the heavier per-level aggregates (including the 30-day
+recall rate, which the hub deliberately does not compute — see the header comment in
+`src/lib/home.ts` for why the hub has its own narrower query set rather than reusing
+`getLevelStats`).
+
+**`BottomNav` lists places, not modes:** Home, Stats, Browse. Grammar was a fourth tab only
+while it was itself the post-login landing; with all four modes on the hub, keeping one mode
+in the tab bar mixed two categories and made the other three look arbitrarily omitted
+(§16, 2026-07-25; rejected alternative in §14.8).
 
 ### 8.6 Exam mode — JLPT-style reading & writing
 
@@ -794,6 +830,18 @@ A magic link is a bearer token in transit; the implementation **must** enforce:
    'none'`/`X-Frame-Options: DENY` (clickjacking), `X-Content-Type-Options: nosniff`,
    and `Referrer-Policy: strict-origin-when-cross-origin` (keeps magic-link URLs out
    of third-party Referer logs).
+
+   **Two development-only relaxations**, gated on `process.env.NODE_ENV === "development"`
+   so the production policy is unaffected: `'unsafe-eval'` in `script-src`, and `ws:`/`wss:`
+   in `connect-src`. React's development build calls `eval()` for debugging features (it
+   reconstructs cross-environment callstacks for the error overlay) and Turbopack's HMR
+   runtime evaluates hot-updated modules, so without the first the dev server throws
+   `eval() is not supported in this environment` and the overlay degrades; the second covers
+   the HMR websocket, which CSP 3 says `'self'` already permits on the same origin but which
+   browsers have handled inconsistently. `'unsafe-eval'` is deliberately **not** granted in
+   production: it would make any injected string executable and undo much of what this
+   policy exists to prevent. React never uses `eval()` in production builds, so nothing
+   needs it there.
 
 ### 11.4 Secrets & API-key protection
 - All secrets (`ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `AUTH_SECRET`, `DATABASE_URL`) are
@@ -1124,6 +1172,30 @@ practice; the helper's contract (the callback may run more than once; queries in
 be sequentially awaited, since an interactive transaction holds one connection) is
 documented at the definition.
 
+### 14.7 Demo sessions skipping onboarding entirely
+
+**Rejected.** When the home hub became the app's default page (§8.5, 2026-07-25), an option
+was to send `POST /api/demo/login` straight to `/home` with a preset level (N3, the only
+fully-seeded grammar level), on the grounds that a reviewer evaluating the app wants the
+shortest possible path to seeing it work. It was rejected because the active level scopes
+every engine, every count, and the hub's progress bar: a demo user who never chose N3 would
+be shown a Today panel and a progress bar describing a level picked for them, which is a
+worse first impression than one extra tap. The level choice is also the app's clearest
+statement of what it is (a JLPT tool, N5 to N1), so it doubles as orientation. Author
+decided; deciding factor was that onboarding is a single tap and is itself informative.
+
+### 14.8 Grammar as a permanent `BottomNav` tab
+
+**Rejected.** Grammar had a tab of its own from Phase 3.5, and was promoted to the leftmost
+tab on 2026-07-02 when `/grammar` became the post-login landing. With the hub restored as
+the default page and carrying all four modes (§8.5), the tab was removed instead of kept
+alongside the new Grammar tile. Keeping it was the conservative option and would have saved
+a tap when navigating from `/stats` or `/browse`, but the tab bar then listed three
+*places* plus one *study mode*, which both mixed categories and implied Flashcard, Quiz, and
+Exam had been deliberately excluded. The accepted cost: `/grammar` is a page with no
+corresponding tab, so no tab highlights while the user is on it. That is a standard
+sub-page condition and was judged the smaller wart. Author decided.
+
 ---
 
 ## 15. Open questions
@@ -1146,6 +1218,8 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-07-25 | **CSP gains two development-only relaxations: `'unsafe-eval'` in `script-src` and `ws:`/`wss:` in `connect-src`**, both gated on `NODE_ENV === "development"` so the production header is byte-identical to before. | The CSP added on 2026-07-10 broke local development: React's development build calls `eval()` to reconstruct cross-environment callstacks for its error overlay, and Turbopack's HMR runtime evaluates hot-updated modules, so the dev server threw `eval() is not supported in this environment`. The alternatives were both worse: granting `'unsafe-eval'` in production would make any injected string executable and undo most of the policy's value, while dropping the CSP in dev would mean developing against a materially different security posture than production runs under (exactly how a CSP-violating dependency ships unnoticed). Gating the single directive that dev genuinely needs keeps the two environments as close as possible. `ws:`/`wss:` is named explicitly rather than relying on CSP 3's rule that `'self'` covers same-origin websockets, which browsers have implemented inconsistently. Note that `next.config.ts` changes require a dev-server restart to take effect. | Author | §11.3 |
+| 2026-07-25 | **`/home` restored as the post-login landing, and rebuilt as a light dashboard; both it and the public `/` revamped.** (a) *Routing*: sign-in `redirectTo`, the dev login, `/onboarding` completion, `/onboarding`'s already-onboarded bounce, the public `/` redirect, and the manifest `start_url` all resolve to `/home`, reversing the 2026-07-02 `/grammar` reprioritization. `/onboarding` completion previously went to `/quiz`, which meant a first-time user never saw the hub at all; that is fixed as part of the same change. (b) *Hub restructured* into four bands (Today panel → single routed CTA → 2×2 mode grid → inline level selector), with counts from a new purpose-built `getHomeSnapshot` (`src/lib/home.ts`) rather than `getLevelStats`, whose per-level word-id fetch and 30-day log scan the hub never renders. A new `pickNextAction` routes one primary CTA by priority (due vocab → due grammar → new vocab → Quiz) so more content on the page does not cost the one-tap start (§2). Grammar joins the mode grid. Mode order corrected to match §8.5 (Exam had been listed first). Level selector moved below the modes, on frequency-of-use grounds. (c) *`BottomNav` reduced to Home, Stats, Browse* — places, not modes (§14.8). (d) *Public `/` restructured* around the demo as the primary CTA: Bayana is invite-only, so a visitor without an invite previously had nothing to click but a sign-in form that would reject them, with the no-email demo path buried below the fold of `/auth/signin`. Added a deck-size proof strip, all four modes (Exam and Grammar shipped after the page was written and were never added, so it under-sold the app by half), a rendered example-sentence card, a three-step "how it works", and a closing CTA. `/` now recognises the demo cookie via a new non-redirecting `getOptionalUser()`, so returning demo visitors are sent to the app rather than shown the marketing page. (e) *Deck-size figure corrected* from "≈ 8,800 words" to 8,128 CSV rows / 8,101 imported words, in §3, the TL;DR, the README, and CLAUDE.md; §3's own per-level table had always summed to 8,128, so the total was an arithmetic error that had propagated into public-facing copy. | The 2026-07-02 landing change was explicitly framed as temporary, and its premise (that the hub cost a tap and showed nothing) was a property of the hub, not a permanent preference — so the fix was to make the hub worth landing on rather than to route around it. The hub is still deliberately not the Phase 4 dashboard: it gained status and a routed CTA, not charts or history. On the public page, the guiding constraint was that the demo is the only door an uninvited visitor can walk through, which makes it the primary CTA rather than a secondary option. Every hub number is derived from a live count for the same reason: a hardcoded subtitle is how a dashboard starts lying. The one deliberate scoping asymmetry (words-due is level-agnostic, matching `getStudyQueue`; the progress bar is level-scoped and labelled) is documented at both the call site and in §8.5. **Four defects found in a review of this same change and fixed before it landed:** (i) the Grammar tile was disabled on levels with no seeded deck, which — combined with the nav-tab removal in (c) — left `/grammar` and all existing grammar progress with no reachable UI path on any level but N3. No mode tile may be disabled, since each is the sole route to its mode. (ii) `/grammar` reported "All caught up" on levels with no deck, i.e. announced a non-existent deck as finished; it now distinguishes the empty-deck case. (iii) The hub's "done today" figure summed vocab *review events* (ReviewLog rows, several per card when a card is rated Again and cycles learning steps) with grammar *points touched* (GrammarProgress has no event log, so it can only report one per point), mixing units so that a bad vocab session inflated the number. It now counts distinct cards for both halves, via `distinct: ["wordId"]`. (iv) The Today panel's level chip sat in the panel header, implying all three stats were level-scoped when words-due deliberately is not; the chip moved onto the progress bar, which is the only genuinely level-scoped element. Also removed a `<dl>` on the landing whose `sr-only` `<dt>` duplicated the visible label, making screen readers announce every proof-strip label twice. | Author (page targets, revamp depth, demo-keeps-onboarding, and Grammar-tab removal all decided by the author) | §8.5, §3, §14.7, §14.8 |
 | 2026-07-10 | **App-wide review run (security, UX, a11y) — hardening + robustness fixes shipped as one pass.** (a) *Demo login hardened*: `POST`-only (GET returns 405), same-origin check against the `AUTH_URL`-derived origin, dedicated per-IP (5/hr) + global (30/hr) rate limiters in `proxy.ts`, and opportunistic stale-demo-user cleanup on each login (§11.8, §14.5). (b) *Demo cookie time-bound*: the HMAC now signs `userId:expiresAtMs` and the server verifies the expiry after a constant-time HMAC check; pre-existing cookies in the old format fail verification (accepted — demo sessions are disposable). (c) *Security response headers* added in `next.config.ts` as §11.3 item 8: HSTS, CSP (external scripts/frames blocked; `'unsafe-inline'` retained for Next.js hydration; Google Fonts hosts allowed), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`. (d) *Review race fixed*: `reviewWord`, `undoLastReview`, and `reviewGrammarPoint` now run their read-compute-write inside `serializableTxn()` (SERIALIZABLE + bounded `P2034` retry, §14.6); double-undo no longer 500s (`P2025` maps to a "nothing to undo" 404). (e) *Study-session UX*: a failed queue load now shows a retry screen instead of a false "all caught up"; the last card can be un-rated from the completion screen; a request token discards stale queue responses. (f) *Accessibility*: `lang="ja"` on all Japanese text so screen readers pick a Japanese voice, and persistent `role="status"` live regions announce quiz/exam answer feedback. | The demo endpoint was the sole unauthenticated write path — as a GET it was triggerable cross-site with no rate bound, and its cookie never expired server-side. The review write path had a genuine lost-update window under `READ COMMITTED`. The remaining items were the highest-priority findings from the same review: silent data-loss UX (load failure indistinguishable from an empty queue), an undo dead-zone on the final card, and screen-reader gaps on the app's core interaction loop. Fixed in priority order as a single session so SPEC, code, and tests land together. | Author (fix list proposed by review, priority order approved) | §11.3, §11.8, §14.5, §14.6, §8.1 |
 | 2026-07-10 | **Vitest adopted as the test runner; first unit tests cover the FSRS adapter (`src/lib/fsrs.ts`).** Config maps the `@` alias manually rather than adding the `vite-tsconfig-paths` plugin (a dependency to avoid two lines of config); tests are colocated (`src/**/*.test.ts`) and run in the `node` environment. The adapter was chosen as the first target because it is the one module where a silent bug corrupts long-lived user data — a mis-mapped field computes wrong intervals for weeks before anyone notices — and it is pure (no DB, no I/O), making it the cheapest module to test. Strategy: round-tripping (`fromCard ∘ toCard` losslessness, all four FSRS states, log round-trip, and a full rate → persist → restore → `rollback()` cycle mirroring what `undoLastReview` relies on). Quiz/exam scoring helpers are the natural next target but are currently module-private; testing them requires an extraction refactor first (tracked in TODO.md). | Author | §13 |
 | 2026-07-02 | **`/grammar` becomes the post-login landing page, and the leftmost `BottomNav` tab, for now.** Sign-in (`redirectTo`), the public `/` redirect, `/onboarding`'s already-onboarded bounce, the dev-login route, and the PWA manifest's `start_url` all point to `/grammar` instead of `/home`. `BottomNav`'s tab order becomes Grammar, Home, Stats, Browse. `/home` (the vocab mode picker) is untouched otherwise — still fully functional, just no longer the first thing a returning user sees. | The author is deliberately prioritizing grammar study right now, and wants the app to open there by default rather than requiring an extra tap through the vocab hub each session. Framed as temporary ("for now") rather than a permanent architectural change — unlike the 2026-06-29 decision to keep grammar a *sibling* page rather than merge it into `/home`, which stands. | Author | §8.5, §13, §16 |
