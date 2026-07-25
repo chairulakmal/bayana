@@ -1,16 +1,17 @@
 # TODO — Bayana
 
-Execution checklist and progress tracker. **Plan and rationale live in
-[SPEC.md](SPEC.md)** (§13 Milestones, §16 Decision log); this file only tracks *task
-state* — what's done and what's next. Keep it current; it's the "where we left off"
-record across sessions. Decisions do **not** go here — log them in SPEC.md §16.
+Open work only: what is planned, in flight, or found-but-not-fixed. This file is the
+cross-session "where we left off" record, so keep it current, and **delete an item in the
+commit that lands it** rather than archiving it. Shipped work is already recorded three
+times over: [SPEC.md](SPEC.md) §13 Milestones at design altitude, [DECISIONS.md](DECISIONS.md)
+for why it was done that way, and git for the detail. Decisions do **not** go here.
 
 **Now: Phase 3** — MC↔FSRS coupling for Quiz mode (planned, not started).
-**Next: Phase 4** — Admin sentence audit + on-demand generation.
-**✅ Phase 3.5 complete** — Grammar point study (N3 v1, 220 points / 22 lessons, separate
-FSRS queue + page) plus its browse-view addendum.
-**✅ App review fixes complete (2026-07-10)** — security/UX/a11y pass; remaining findings
-tracked in the [Review backlog](#review-backlog--remaining-findings-2026-07-10) below.
+**Next: Phase 4** — Admin sentence audit + on-demand generation. Then Phase 5 (multi-user)
+and Phase 6 (further enhancements), both tracked only in SPEC.md §13 for now.
+**Unsequenced:** Kalima absorption + bayan/zaka consumer (section below). New scope, decided
+2026-07-26. Recorded as an unnumbered SPEC §13 milestone; not yet slotted against Phases 3
+to 6, and note it is coupled to Phase 4 (Kalima's rank review folds into that admin page).
 
 ---
 
@@ -27,7 +28,7 @@ existing POST `/api/review` endpoint.
   correct, Again on wrong). Do NOT await — quiz UI must stay snappy. No UI change.
 - [ ] **Decide before coding**: correct → Good (3) or Hard (2)? MC is recognition-only
   (easier than flashcard active recall), so Hard is more conservative and gives a shorter
-  interval. Good is simpler and still rewards the answer. Document the choice in SPEC §16.
+  interval. Good is simpler and still rewards the answer. Log the choice in DECISIONS.md.
 
 ### Part B — 50/50 MC source split (review pool + new)
 - [ ] `src/lib/quiz.ts` `buildQuiz(level, count, userId)` — add `userId`; split target
@@ -42,7 +43,7 @@ existing POST `/api/review` endpoint.
 - [ ] SPEC §8.2 — update to reflect MC→FSRS coupling; retire "non-scheduling first-run
   warm-up" (superseded: the first quiz session now seeds FSRS, which is the warm-up).
 - [ ] SPEC §15 — close open question #1 once the implementation decision is recorded.
-- [ ] SPEC §16 — add decision-log entry for the coupling + calibration choice.
+- [ ] DECISIONS.md — add a row for the coupling + calibration choice.
 
 ### Nice-to-have (defer if scope creep)
 - `ReviewLog.source` field to distinguish MC vs flashcard review events (helps stats;
@@ -50,95 +51,134 @@ existing POST `/api/review` endpoint.
 
 ---
 
-## Phase 3 — Access & demo
+## Phase 4 — Admin audit + on-demand generation
 
-- [x] **Comma-separated allowlist** — `AUTH_ALLOWED_EMAIL` parsed as CSV into a
-  `Set<string>`; single address still works. First reviewer engineer can now sign in.
-- [x] **First-run onboarding** — level choice → redirect to `/quiz`; `onboardedAt` gates
-  the home hub; dev-login leaves `onboardedAt` null so dev users go through onboarding
-  too. Simplified from the original "5-question warm-up + guided tour" spec (superseded
-  by MC↔FSRS coupling above, which gives the warm-up naturally).
-- [x] **Ephemeral demo account** — a "Try demo →" path on the sign-in page that gives
-  anyone instant access with no email required. Each click starts a fresh identity.
-  Shipped; since hardened (POST-only, rate limits, signed expiry, cleanup) — see the
-  2026-07-10 review section below and SPEC §11.8.
-
-  **Design:** the demo session lives only in a signed cookie — no Auth.js `Session` row.
-  DB rows (`User` + `UserProfile`) are still created for FK integrity, but the cookie is
-  the *only* key to them. Lose the cookie → data is unreachable (effectively ephemeral).
-  Re-clicking demo generates a new UUID → new DB rows → fresh new-user experience.
-  No behavior change for allowlisted users.
-
-  **Implementation pieces (no schema change):**
-  - [x] `src/app/api/demo/login/route.ts` — creates `User` (no email) + `UserProfile`
-    (no `onboardedAt` → goes to onboarding), writes an httpOnly `bayana-demo-token`
-    cookie signed with `HMAC-SHA256(AUTH_SECRET, userId)` (7-day TTL), redirects to
-    `/onboarding`. Available in prod. Each click orphans old rows (acceptable at scale).
-  - [x] `src/lib/current-user.ts` — `requireAuth()` for pages returns
-    `{ userId, email, isDemo }`; `getCurrentUserId()` for API routes falls back to demo
-    cookie; `verifyDemoCookie()` uses `timingSafeEqual` for constant-time HMAC check.
-  - [x] `src/proxy.ts` — `bayana-demo-token` added to `hasSession`; `/api/demo` added
-    to `isPublic` (the route creates the session, so it must be reachable without one).
-  - [x] `src/app/auth/signin/page.tsx` — "Try demo →" ghost button below the form with
-    "or" divider; 7-day / browser-only note below it.
-  - [x] `src/app/home/actions.ts` — `demoSignOutAction` deletes the cookie and redirects
-    to sign-in (no DB Session to clear).
-  - [x] `src/components/user-menu.tsx` — `isDemo` prop: shows "Demo account" header,
-    "?" avatar initial, "End demo" sign-out using `demoSignOutAction`.
-  - [x] `src/app/home/page.tsx` — demo warning banner (ink-faint, non-alarming) with
-    `mailto:OWNER_CONTACT_EMAIL` link to request real access. Falls back to plain text
-    when env var is unset.
-  - [x] All app pages (`study`, `quiz`, `stats`, `browse`) — swapped `auth()` + redirect
-    for `requireAuth()` so demo sessions are accepted everywhere.
+- [ ] Admin sentence-audit page — admin-gated (`UserProfile.role = ADMIN`); add a
+  review-status field to `ExampleSentence`; accept/reject generated sentences (SPEC §13)
+- [ ] On-demand `/api/generate` + study-UI fetch-on-flip, with §11.4 guardrails:
+  auth + per-user rate-limit + cache-first + bounded `max_tokens`
 
 ---
 
-## ✅ App review fixes — security / UX / a11y (2026-07-10)
+## Kalima absorption + bayan/zaka consumer (new scope, 2026-07-26)
 
-Full app review (security, UX, UI, code quality); fixes applied in priority order.
-Decisions and rationale in SPEC §16 (2026-07-10 rows), §11.3 #8, §11.8, §14.5, §14.6.
+Kalima's JLPT mock exam moves into Bayana, and Bayana replaces Kalima as the named reference
+consumer of the bayan/zaka dataset. Both land in the same new table, so they are one piece of
+work, not two: Kalima's 496 seeded N3 vocabulary questions and bayan's published releases are
+the same kind of row from different sources.
 
-- [x] **Demo login hardened** — `POST`-only (GET → 405), same-origin check
-  (`AUTH_URL`-derived), per-IP 5/hr + global 30/hr limiters in `proxy.ts`, opportunistic
-  stale-demo-user cleanup on each login (`deleteStaleDemoUsers`, narrow filter).
-- [x] **Demo cookie time-bound** — HMAC now signs `userId:expiresAtMs`; server enforces
-  expiry after a constant-time HMAC check (`src/lib/current-user.ts`).
-- [x] **Security response headers** — `next.config.ts headers()`: HSTS, CSP,
-  `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy` (SPEC §11.3 #8).
-- [x] **a11y: Japanese language + SR feedback** — `lang="ja"` on all Japanese text;
-  persistent `role="status"` live regions announce quiz/exam answer feedback.
-- [x] **Study-session robustness** — failed queue load shows a retry screen (no longer
-  masquerades as "all caught up"); last card undoable from the completion screen;
-  request token discards stale queue responses (`src/components/study-session.tsx`).
-- [x] **Review race + undo 500** — `reviewWord` / `undoLastReview` /
-  `reviewGrammarPoint` wrapped in `serializableTxn()` (SERIALIZABLE + P2034 retry,
-  `src/lib/db.ts`); double-undo maps P2025 → "nothing to undo" 404.
-- [x] **Vitest introduced** — `vitest.config.ts`, `npm test` / `npm run test:watch`;
-  first tests: FSRS adapter round-trips (`src/lib/fsrs.test.ts`, 8 passing).
-- [x] **SPEC + TODO housekeeping** — §11.8 rewrite, §11.3 #8, §14.5, §14.6, two §16
-  rows; this file updated.
+Why Bayana rather than Kalima, in one line each: Kalima is N3 vocabulary only across five
+question types, while this app already models N5 to N1, holds ~8,100 words plus a grammar
+table whose `pattern` matches bayan's `grammar_points`, and can grade an exported question
+into a learner's FSRS state. Full reasoning belongs in SPEC §14 and DECISIONS.md (see the
+housekeeping items below); the porting checklist for Kalima's side is in that repo's TODO.md.
+
+### Part A — the question store (decide before writing any of it)
+- [ ] **Shape the table like bayan's `ExportedQuestion`, not like Kalima's `ExamQuestion`.**
+  Kalima's five types are a subset of bayan's 22-value `question_type` enum (`reading` to
+  `read-kanji`, `orthography` to `pick-spelling`, `contextual` to `word-choice`, `synonym` to
+  `same-meaning`, `usage` to `right-sentence`). Keep bayan's `source` field to distinguish the
+  Kalima seed rows from dataset releases, and leave room for `stimuli` and `provenance` so
+  reading and listening need no second migration.
+- [ ] **Decide the overlap with Exam mode.** `src/lib/exam.ts` already builds 問題１/問題２ with
+  algorithmic confusability distractors and no FSRS coupling. Either it stays as the quick
+  benchmark while the imported pool powers a timed mock exam, or one of the two retires.
+  Log the choice in DECISIONS.md; do not leave both undocumented.
+- [ ] Write the Prisma migration. Note this repo uses real migrations (`prisma migrate dev`),
+  unlike Kalima's `db push` on boot, so the schema arrives as a reviewed migration.
+- [ ] Vocab crosswalk for bayan imports: match on expression plus reading, and keep it on this
+  side. Bayan deliberately cannot carry an Anki identifier (its Hard legal rule #4 rests on the
+  word lists having no third-party deck in the chain), so the join cannot come from there.
+
+### Part B — port from Kalima
+- [ ] Answer secrecy: `toClientQuestion` stripping, opaque choice IDs, answers resolved only
+  after submit. This is the property the mock exam is built around; port it first, not last.
+- [ ] The four session endpoints (`prepare` / `submit` / `results` / `analysis`) as route
+  handlers. Nitro's `defineEventHandler` maps onto `Request`/`NextResponse` mechanically.
+- [ ] Atomic `consumeBudget()` upsert plus the per-IP throttle for the analysis call. This repo
+  currently has only the in-memory limiter in `src/lib/rate-limit.ts`, which does not survive a
+  restart and cannot bound spend across replicas.
+- [ ] Timed 35-question vocabulary session (8-6-11-5-5, 30-minute timer) and the per-type
+  accuracy radar, rewritten in React. The radar is polar math plus SVG, so it ports nearly intact.
+- [ ] Wrong-answer review queue, rehomed from Kalima's localStorage onto per-user rows. Consider
+  whether it should feed `ReviewState` rather than living beside it.
+- [ ] Remap `wordId` from Kalima's cuids to `Word.id` via the shared Anki guid. Kalima's
+  `words/*.json` is already an export of this corpus, so the guid joins cleanly.
+- [ ] Carry `prisma/seed-data/passages-n3.json` across (20 short, 10 medium, 5 long, 10 info,
+  already generated and audited). Paid AI output that will otherwise be regenerated.
+- [ ] Fold Kalima's S-F rank review into the Phase 4 admin page under `UserProfile.role = ADMIN`
+  rather than porting its `ADMIN_PASSWORD` HMAC path. These two admin surfaces should be one.
+
+### Part C — access decision
+- [ ] Decide whether the mock exam is public. Kalima's homepage is deliberately open for
+  recruiters, which is most of its value; this app gates everything through `proxy.ts` except an
+  explicit list. If it stays public, add exact paths (not a prefix) to that list, consistent with
+  the `/api/demo/login` precedent in SPEC §11.8.
+
+### Part D — bayan/zaka consumer
+- [ ] Import path for a pinned `export.json` release tag: fetch, validate against a copy of
+  bayan's Zod schema, insert with `source` set. Pin a dated tag, never "latest".
+- [ ] CC BY 4.0 attribution surface for imported questions. This is a license obligation, not a
+  nicety.
+- [ ] Grade an imported question into `ReviewState` end to end. This is the behaviour that makes
+  Bayana worth naming as the reference consumer, so it is the acceptance test for Part D.
+
+### Part E — doc housekeeping
+
+Done 2026-07-26, before any code: SPEC §2 (scope change), §3 (terms), §4.2 (the third
+source-data class and its CC BY 4.0 obligation), §13 (unnumbered milestone), §14.9/§14.10
+(both resolved forks), §15 (two open forks), and the DECISIONS.md row. Remaining:
+
+- [ ] SPEC §13: give the milestone a phase number once it is sequenced.
+- [ ] SPEC §6 + §9: the question-store model and the session routes, both deliberately
+  deferred until the Exam-mode fork in §15 is resolved, since that answer changes the shape.
+- [ ] DECISIONS.md: a row for the Exam-mode overlap resolution, and one for the public-access
+  decision (Part C), when each is made.
+- [ ] **Claims that go false when this ships; flip each in the same commit as the code:**
+  SPEC §11.4 ("no web-reachable route that spends Anthropic tokens") and ARCHITECTURE's
+  "generation is a seeding pipeline, not a request-time feature", both broken by the analysis
+  endpoint; SPEC §12 (`ExampleSentence` as "the only paid, hard-to-regenerate artifact"),
+  broken by the passage set; SPEC §8's four-mode count; README's mode table and Credits
+  section, which owes the CC BY 4.0 attribution.
+- [ ] README + ARCHITECTURE truth pass once the mock exam is live, per the standing rule that
+  both must be true of the code in the same commit.
+
+---
+
+## Phase 5 — Multi-user (later)
+
+Not tracked here yet. See SPEC.md §13: widen or remove the email allowlist, authorization
+checks on every read/write, and the remaining first-run onboarding (5-question warm-up +
+guided tour).
+
+---
+
+## Phase 6 — Further enhancements (later)
+
+See SPEC.md §13 — audio/TTS, furigana, the full stats dashboard (streak/heatmap, history,
+charts), sentence regeneration/voting, export to Anki, **PWA offline shell / service
+worker** (install + fullscreen already done, Phase 2).
+
+---
 
 ## Review backlog — remaining findings (2026-07-10)
 
-Lower-priority findings from the same review, roughly ordered. Pull into a phase as
+Lower-priority findings from the app review, roughly ordered. Pull into a phase as
 capacity allows.
 
 ### Bugs / correctness
-- [ ] Onboarding completion still redirects to `/quiz` (`src/app/onboarding/actions.ts`)
-  — should be `/grammar` since the 2026-07-02 landing-page change.
-- [ ] `getGrammarStats` "studied today" uses local-server midnight (`setHours(0,0,0,0)`)
-  — wire in the profile's timezone/day-start handling used elsewhere.
+- [ ] Day boundaries use local-server midnight (`setHours(0,0,0,0)`) in `getGrammarStats`
+  and in `startOfToday` (`src/lib/home.ts`, which powers the hub's "done today") — wire in a
+  per-user timezone / day-start. The hub's helper is centralised so the fix is one function.
 - [ ] `scripts/collect-batch.ts` — per-item try/catch so one malformed result doesn't
   abort a whole batch collection.
 
 ### UX / UI
 - [ ] Touch targets below 44px: session-header buttons, user-menu avatar (36px), browse
-  pagination + clear-search, level-picker rows, home-link pill.
+  pagination + clear-search, home-link pill. (Level-picker rows fixed 2026-07-25.)
 - [ ] Root `error.tsx` / `loading.tsx` / `not-found.tsx` (currently unstyled defaults).
-- [ ] Mode-picker tile order on `/home` doesn't match SPEC §8.5 — reconcile (change UI
-  or SPEC, log in §16).
 - [ ] Grammar hub: inline level switcher (currently vocab-hub-only).
-- [ ] Dark mode: decide (support or explicit non-goal) and log in SPEC §16.
+- [ ] Dark mode: decide (support or explicit non-goal) and log it in DECISIONS.md.
 
 ### Accessibility
 - [ ] User-menu keyboard/focus management (Escape to close, focus trap/return).
@@ -157,208 +197,14 @@ capacity allows.
 - [ ] Log hygiene: audit `console.error` calls for payloads that shouldn't be logged.
 - [ ] Migrate to `next/font` (self-hosted) — also lets CSP drop the Google Fonts hosts.
 
----
-
-## ✅ Phase 2 addendum — Exam mode (2026-06-07)
-
-- [x] `src/lib/exam.ts` — `buildExam(level, readingCount, writingCount)`: random word
-  selection, 問題１ reading distractors (kanji+reading confusability), 問題２ writing
-  distractors (reading-similarity-primary), kana substitution in sentences for 問題２.
-- [x] `src/app/api/exam/route.ts` — `GET /api/exam?level=&count=` (default 20, max 40).
-  Auth required; non-scheduling (no FSRS reads or writes).
-- [x] `src/app/exam/page.tsx` — page shell (mirrors quiz/page.tsx pattern).
-- [x] `src/components/exam-session.tsx` — two-section sequential UI with immediate
-  feedback, section-break screen (shows 問題１ score), split summary (問題１/問題２ scores).
-  `HighlightedSentence` renders the target word underlined in the sentence.
-- [x] `src/app/home/page.tsx` — Exam tile added to mode picker (three tiles: Flashcard /
-  Quiz / Exam). Modes are independent — no FSRS coupling by design (SPEC §8.6, §16).
-
----
-
-## Phase 3.5 — Grammar point study
-
-Separate FSRS study queue for JLPT grammar points. Source data: `decks/grammar-n3.md`
-(N3 v1; schema designed to accept N5–N1 later). Completely separate from vocab FSRS —
-different page, different models, different API routes. Card shape: pattern (JP) front →
-meanings + example sentence + translation back.
-
-### Part A — Schema + migration
-- [x] Add `GrammarPoint` model to `prisma/schema.prisma`: `id`, `level` (String — "N3"
-  etc.), `lesson` (Int), `position` (Int), `pattern` (String), `reading` (String),
-  `meanings` (String[]), `exampleJp` (String), `exampleEn` (String). Composite unique on
-  `[level, lesson, position]`.
-- [x] Add `GrammarProgress` model: `id`, `userId`, `grammarPointId`, FSRS state fields
-  (same shape as `ReviewState` — `due`, `stability`, `difficulty`, `elapsed_days`,
-  `scheduled_days`, `reps`, `lapses`, `state`, `last_review`). Unique on
-  `[userId, grammarPointId]`. FK → `User` and `GrammarPoint`.
-- [x] Run `prisma migrate dev --name grammar-points`.
-
-### Part B — Seed script
-- [x] `scripts/seed-grammar.ts` — parse `decks/grammar-n3.md` (regex on `###` headings
-  for pattern/reading/lesson/position, meanings line, `**例文:**` for exampleJp, next
-  line for exampleEn); upsert each row keyed on `(level, lesson, position)`. Idempotent.
-- [x] Run script locally; verified 220 N3 points seeded across 22 lessons.
-
-### Part C — Shared FSRS util refactor
-- [x] Exported `CardLike` interface from `src/lib/fsrs.ts`; `toCard` now accepts
-  `CardLike | null` instead of `ReviewState | null`. Both vocab and grammar share the
-  same adapter functions with no copy-paste. No behavior change for existing vocab flow.
-
-### Part D — API routes
-- [x] `GET /api/grammar/queue` — returns N grammar points due for the current user at
-  their active level, ordered by `due asc`; new points fill remaining slots.
-- [x] `POST /api/grammar/review` — accepts `{ grammarPointId, rating }`; applies FSRS
-  scheduling via shared util; writes updated `GrammarProgress`. Auth required.
-
-### Part E — Grammar page + UI
-- [x] `src/app/grammar/page.tsx` — server component; requires auth; inline stats panel
-  (total, started, mature, due now); "Study Grammar" CTA links to `/grammar/study`.
-  Vocab stats stay on `/stats` — no grammar data there.
-- [x] `src/app/grammar/study/page.tsx` — session page shell (mirrors /study).
-- [x] `src/components/grammar-session.tsx` — client component; flip-and-rate loop for
-  grammar cards. Front: pattern (large JP). Back: reading (if differs) + meanings + example.
-- [x] Grammar tab added to `BottomNav` (pencil icon, between Home and Stats).
-
-### Part F — SPEC + TODO housekeeping
-- [x] SPEC §13 — add Phase 3.5 milestone entry.
-- [x] SPEC §16 — log decisions: separate grammar FSRS queue, dedicated `/grammar` page,
-  N3-first with level-agnostic schema, card direction (pattern→meaning+example).
-
----
-
-## ✅ Phase 3.5 addendum — Grammar browse + lesson titles (2026-07-01)
-
-- [x] `prisma/schema.prisma` — add `lessonTitle` to `GrammarPoint`; migration
-  `20260701130743_grammar_lesson_title` (backfilled `DEFAULT ''`, not optional at the
-  Prisma layer).
-- [x] `scripts/seed-grammar.ts` — parse `## Lesson N – Title` into `lessonTitle`; prune
-  stale `(level, lesson, position)` rows no longer produced by the parser (cascades to
-  `GrammarProgress`).
-- [x] `GET /api/grammar/browse?level=` — auth-gated, all points for a level grouped by
-  lesson in one payload.
-- [x] `src/components/grammar-browse-client.tsx` + `src/app/grammar/browse/page.tsx` —
-  search + collapsible per-lesson accordion, reachable from a new button on `/grammar`.
-- [x] Re-seeded from the updated `decks/grammar-n3.md`: 220 points across 22 lessons.
-- [x] SPEC §4.1, §6, §13, §16 — documented source data (not licensed for redistribution, gitignored), schema
-  addition, and the browse feature.
-
----
-
-## Phase 4 — Admin audit + on-demand generation
-
-- [ ] Admin sentence-audit page — admin-gated (`UserProfile.role = ADMIN`); add a
-  review-status field to `ExampleSentence`; accept/reject generated sentences (SPEC §13)
-- [ ] On-demand `/api/generate` + study-UI fetch-on-flip, with §11.4 guardrails:
-  auth + per-user rate-limit + cache-first + bounded `max_tokens`
-
----
-
-## Phase 5+ (later)
-
-See SPEC.md §13 — audio/TTS, furigana, streak/heatmap, sentence regeneration/voting,
-export to Anki, **PWA offline shell / service worker** (install + fullscreen already
-done, Phase 2).
+### Local environment
+- [ ] `.env` pins `NODE_OPTIONS=--max-old-space-size=256`, which OOM-kills `next build`'s
+  TypeScript worker locally; building needs an override
+  (`NODE_OPTIONS=--max-old-space-size=4096 npm run build`). Decide whether the cap is still
+  wanted: it mirrors the Railway runtime budget, but `start:prod` sets its own 512MB anyway.
 
 ---
 
 ## Open questions
 
 Tracked in SPEC.md §15.
-
----
-
-## ✅ Archive — completed phases (chronological)
-
-### Phase 1a — Playable slice (local, study ASAP)
-
-#### Foundation
-- [x] Initialize git repo
-- [x] Scaffold Next.js 16 app (TS, App Router, Tailwind v4) — builds clean
-- [x] Add Prisma + `@prisma/client`; `docker-compose.yml` for local Postgres (port 5887);
-  `.env` + `.env.example`; verify DB connection
-- [x] Write `prisma/schema.prisma` from SPEC §6 — `User`, `UserProfile`, `Word`,
-  `ExampleSentence`, `ReviewState`, **`ReviewLog`** + enums; first migration applied;
-  `src/lib/db.ts` client singleton (Prisma 7 + `@prisma/adapter-pg`) — connection verified
-
-#### Data import (N3 only)
-- [x] `scripts/import-csv.ts` — parse `decks/*.csv` → `Word` rows (quoted commas,
-  `〜`/`(...)` placeholders, tag→level rules, `guid` unique key). N3 imported (2,140).
-- [x] Seed the default `User` + `UserProfile` (`scripts/seed-user.ts`, idempotent);
-  `DEFAULT_USER_ID` written to `.env`
-
-#### AI sentence generation (N3)
-- [x] `src/lib/generate.ts` — cached prompt + JSON validation; sanity-checked 5 N3 words
-  (~$0.003). On-demand `POST /api/generate` deferred to Phase 1b.
-- [x] `scripts/seed-sentences.ts` — `--test` quality gate + Batch API submit
-  (batch `msgbatch_01VKSSFCPCC8t5KECm3H83Gt`, 2135 N3 requests)
-- [x] `scripts/collect-batch.ts` — collected 2,135 (0 malformed/failed); **N3 fully
-  covered: 2,140 / 2,140 words have a sentence**
-
-#### Flashcard mode — review loop (JP→EN)
-- [x] `ts-fsrs` adapter (`src/lib/fsrs.ts`) — Card ⇄ ReviewState, scheduler, log mapping
-- [x] Review services (`src/lib/review.ts`) — `reviewWord` (+ `ReviewLog`),
-  `undoLastReview` (ts-fsrs `rollback`), `getStudyQueue` — verified end-to-end
-- [x] API route handlers: `GET /api/cards/queue`, `POST /api/review`,
-  `POST /api/review/undo` — verified over HTTP (incl. 400 validation)
-- [x] Mobile-first card UI (`src/components/study-session.tsx` + home page) —
-  flip / rate / undo, iPhone SE baseline; builds + SSR-renders
-- [x] Run locally and study N3 end-to-end off the app
-
----
-
-### Phase 1b — Shippable: auth + deploy (N3 only)
-- [x] **Auth** — magic-link (Auth.js v5 + Resend, single-email allowlist), database sessions
-  - [x] Verified Auth.js v5 ↔ Next 16 (proxy.ts is Node runtime → DB sessions OK)
-  - [x] Schema + migration (`User` fields + Account/Session/VerificationToken)
-  - [x] `src/auth.ts` — Resend provider, **allowlist enforced before send**, 15-min tokens,
-    DB sessions; route handler; sign-in page
-  - [x] `proxy.ts` cookie guard; `getCurrentUserId` → session; API routes 401; page redirect
-  - [x] Seeded user linked to allowlist email (sign-in attaches to existing user)
-  - [x] Rate-limit the sign-in request — in-memory fixed-window limiter
-    (`src/lib/rate-limit.ts`), per-IP 5/10min + global 6/10min, in `proxy.ts`; explicit
-    30-day session TTL (SPEC §11.3)
-  - [x] Manual test: magic-link sign-in end-to-end — verified locally and in prod
-- [x] **Deploy prep** — `railway.json` (Railpack, `start:prod`), `postinstall` generate,
-  `start:prod` = migrate + `$PORT`, `prisma`/`dotenv` → runtime deps; runbook in
-  `notes/deploy.md`. Verified `prisma migrate deploy` runs clean.
-- [x] Push to GitHub; transfer N3 cache via `pg_dump` pipe; env vars + `AUTH_URL` set;
-  deploy + smoke-test sign-in — **live, working**
-- [x] First manual `pg_dump` backup of local (paid sentence cache; Hobby prod not backed up)
-
----
-
-### Phase 1c — Fill content (post-deploy)
-- [x] Seed remaining levels N5/N4/N2/N1 (Batch API) — **all 8,101 words now have a
-  sentence** (local DB). Batch ids + counts in `notes/batch-generation.md`.
-- [x] Re-backup local after all decks seeded.
-- [x] Transfer local → prod so deployed app serves all levels.
-- On-demand `/api/generate` + fetch-on-flip — moved to Phase 4 (not needed for coverage).
-
----
-
-### Phase 2 — Quiz mode ✅
-- [x] **Level scope + home hub** — `UserProfile.activeLevel` (migration); `/home` mode
-  picker + inline level chips (`setActiveLevel` server action); `/study` & `/quiz` read
-  active level; login/dev-login/`/` → `/home`. Full stats dashboard deferred to Phase 4.
-- [x] `GET /api/quiz?level=&count=` — batch of JP→EN MC questions; random distractors
-  with meaning-dedupe guard, non-scheduling; selection isolated in `src/lib/quiz.ts`
-- [x] **Confusability-scored distractors** — `pickDistractors` ranks by shared kanji
-  (Jaccard) + reading similarity (normalized Levenshtein); meaning guard; top-K + random
-  fallback (SPEC §8.2)
-- [x] MC quiz UI (`/quiz` + `src/components/quiz-session.tsx`) — brand-styled, instant
-  feedback, score summary with Pī; `prefers-reduced-motion`-aware; mobile-first
-- [x] **Dev login** — `GET /api/dev/login` mints a real session (gated by `DEV_AUTH`,
-  404 in prod); dev button on sign-in page (SPEC §11.7)
-- [x] **Basic stats** — `/stats` + `src/lib/stats.ts`; words started/total + mature, due
-  now, 30-day recall rate per active level; linked from `/home`
-- [x] **Browse/search** — `/browse` + `GET /api/browse?level=` (browser-cached,
-  `Cache-Control: private, max-age=3600, stale-while-revalidate=86400`) + lazy sentence
-  on tap; client-side filtering; paginated 50/page; started-words-first ordering
-- [x] **Public homepage** at `/`; brand foundation (tokens/fonts, `Parrot`, Pī favicon)
-- [x] **Installable-PWA basics** — manifest + icons, `display: fullscreen`, safe-area
-  insets on session screens. Android chrome-free fullscreen; iOS standalone fallback.
-- [x] **Security review** (2026-06-05) — `getStudyQueue` O(backlog) query fixed
-  (count + take); `Object.hasOwn` enum validation at all 6 call sites; `proxy.ts` →
-  `src/proxy.ts`. Documented in SPEC §16.
-- Flashcard↔Quiz synergy / MC↔FSRS coupling — **moved to Phase 3 above**
-- User-adjustable settings UI — **intentional non-goal** (SPEC §16)

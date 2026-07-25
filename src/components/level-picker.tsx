@@ -51,7 +51,10 @@ export function LevelPicker({ current }: { current: string }) {
             onClick={() => pick(lvl)}
             disabled={pending}
             aria-pressed={active}
-            className="flex w-full items-center gap-3 px-4 py-2.5 text-left"
+            // py-3.5 (not py-2.5): with the 22px chip this makes each row about 50px tall,
+            // clearing the 44px minimum touch target BRAND.md sets for thumb-reachable
+            // controls. The tighter padding put every row under that floor.
+            className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
             style={{
               background: active ? "var(--surface)" : "var(--surface-cream)",
               borderTop: i > 0 ? "1px solid var(--line)" : undefined,

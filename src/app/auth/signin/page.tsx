@@ -1,5 +1,6 @@
 import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Parrot } from "@/components/parrot";
 
@@ -48,11 +49,18 @@ export default async function SignInPage({
         className="w-full max-w-sm rounded-[var(--r-lg)] px-6 py-8 text-center"
         style={{ background: "var(--surface)", border: "1px solid var(--line)", boxShadow: "var(--shadow)" }}
       >
-        <Parrot expr="happy" title="Pī, the Bayana mascot" style={{ width: 72, height: 80, margin: "0 auto" }} />
+        {/* Wordmark doubles as the way back to the landing page. Without it this screen is
+            terminal: a visitor who clicks "Sign in" from `/`, then realises they have no
+            invite, has only the browser back button to reach the demo CTA. Logo-goes-home is
+            the convention, so it needs no extra link competing with the two real CTAs below.
+            Internal link, so it stays in the same tab. */}
+        <Link href="/" className="inline-block" aria-label="Bayana home">
+          <Parrot expr="happy" title="Pī, the Bayana mascot" style={{ width: 72, height: 80, margin: "0 auto" }} />
 
-        <h1 className="mt-3 text-3xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600, color: "var(--ink)" }}>
-          b<b style={{ color: "var(--mag-700)" }}>a</b>yana
-        </h1>
+          <h1 className="mt-3 text-3xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600, color: "var(--ink)" }}>
+            b<b style={{ color: "var(--mag-700)" }}>a</b>yana
+          </h1>
+        </Link>
         <p className="mt-1 text-[15px]" style={{ color: "var(--ink-soft)" }}>
           <span lang="ja" className="jp">メールのリンクでログイン</span> · sign in with your email
         </p>
@@ -84,7 +92,7 @@ export default async function SignInPage({
             try {
               await signIn("resend", {
                 email: String(formData.get("email") ?? ""),
-                redirectTo: "/grammar",
+                redirectTo: "/home",
               });
             } catch (err) {
               // Denied/again? Show it on the page instead of a 500.

@@ -108,20 +108,25 @@ function verifyDemoCookie(value: string): string | null {
 // Public helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Primary helper for page Server Components. Resolves the current user from either
- * an Auth.js database session or a signed demo cookie. Redirects to /auth/signin
- * if neither is present.
- *
- * Returns `{ userId, email, isDemo }`:
- *   - `email` is null for demo accounts (they have no email).
- *   - `isDemo` gates demo-specific UI (warning banner, different sign-out action).
- */
-export async function requireAuth(): Promise<{
+/** The resolved acting user. `email` is null for demo accounts (they have none). */
+export type CurrentUser = {
   userId: string;
   email: string | null;
+  /** Gates demo-specific UI (warning banner, different sign-out action). */
   isDemo: boolean;
-}> {
+};
+
+/**
+ * Resolves the current user, or null if nobody is signed in. **Does not redirect**, which
+ * is the whole point: use this on *public* pages that merely want to know whether a
+ * visitor is already signed in (e.g. `/` bouncing them to the app). Calling `requireAuth()`
+ * there would send logged-out visitors to sign-in and make the public page unreachable.
+ *
+ * Checks both session paths in priority order: a real Auth.js database session first, then
+ * the signed demo cookie. Demo visitors therefore count as signed in. Without this, a demo
+ * user landing on `/` would be shown the marketing page instead of the app.
+ */
+export async function getOptionalUser(): Promise<CurrentUser | null> {
   // Real Auth.js database session (magic-link users).
   const session = await auth();
   if (session?.user?.id) {
@@ -136,7 +141,19 @@ export async function requireAuth(): Promise<{
     if (userId) return { userId, email: null, isDemo: true };
   }
 
-  // Neither present → send to sign-in.
+  return null;
+}
+
+/**
+ * Primary helper for *authenticated* page Server Components. Same resolution as
+ * `getOptionalUser()`, but redirects to /auth/signin when nobody is signed in, so the
+ * caller can treat the return value as guaranteed.
+ */
+export async function requireAuth(): Promise<CurrentUser> {
+  const user = await getOptionalUser();
+  if (user) return user;
+
+  // Neither session path present, so send to sign-in.
   redirect("/auth/signin");
 }
 

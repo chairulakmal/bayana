@@ -7,7 +7,12 @@
 //   1. Creates a new User (no email) + UserProfile (no onboardedAt) in the DB.
 //   2. Signs `userId:expiresAtMs` with HMAC-SHA256 keyed by AUTH_SECRET.
 //   3. Writes a 7-day httpOnly cookie — the *only* key to those DB rows.
-//   4. Redirects (303) to /onboarding (no onboardedAt → treated as a new user).
+//   4. Redirects (303) to /onboarding (no onboardedAt → treated as a new user),
+//      which on completion lands on /home, the app's default page.
+//
+// Demo users go through onboarding rather than skipping it: the level choice is what
+// scopes every engine (§8.5), and picking it themselves means the hub's counts and
+// progress bar describe a level they actually chose. It costs one tap.
 //
 // The previous demo session's DB rows are silently orphaned. Without the cookie
 // they are unreachable, so the user's data is effectively ephemeral. This is the

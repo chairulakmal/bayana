@@ -116,6 +116,11 @@ export async function getGrammarQueue(
  *   dueNow       — GrammarProgress rows whose due date has passed
  *   studiedToday — true if any grammar point at this level was reviewed today
  *                  (derived from lastReview; no review-event log needed)
+ *   studiedTodayCount — how many distinct points were reviewed today. Same query as
+ *                  `studiedToday`, exposed as a number so the home hub can display it
+ *                  without re-running the count (`getHomeSnapshot`). Note the unit: this
+ *                  counts *points touched*, not review events, because GrammarProgress
+ *                  holds only the latest review per point (there is no grammar ReviewLog).
  */
 export async function getGrammarStats(userId: string, level: string) {
   const now = new Date();
@@ -136,7 +141,7 @@ export async function getGrammarStats(userId: string, level: string) {
     }),
   ]);
 
-  return { total, started, mature, dueNow, studiedToday: studiedTodayCount > 0 };
+  return { total, started, mature, dueNow, studiedTodayCount, studiedToday: studiedTodayCount > 0 };
 }
 
 function shuffle<T>(arr: T[]): T[] {

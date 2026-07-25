@@ -23,12 +23,20 @@ export async function signOutAction(): Promise<void> {
 
 /**
  * End a demo session. Deletes the demo cookie (no DB Session row to clear) and
- * redirects to the sign-in page. Called from UserMenu when `isDemo` is true.
+ * redirects to the public landing page. Called from UserMenu when `isDemo` is true.
+ *
+ * Lands on `/`, not `/auth/signin`, for two reasons: it matches where `signOutAction`
+ * sends a real user (one exit, one destination), and the landing page offers both doors
+ * (restart the demo, or sign in) whereas the sign-in form is a dead end for a visitor
+ * without an invite — Bayana is allowlisted to a single address (SPEC §11.2).
+ *
+ * The cookie deletion is committed on this response, so the follow-up GET of `/` arrives
+ * without it and `getOptionalUser()` renders the landing instead of bouncing to /home.
  */
 export async function demoSignOutAction(): Promise<void> {
   const jar = await cookies();
   jar.delete(DEMO_COOKIE_NAME);
-  redirect("/auth/signin");
+  redirect("/");
 }
 
 /** Persist the user's active JLPT level (the level both modes operate on). */

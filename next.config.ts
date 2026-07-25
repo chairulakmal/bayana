@@ -10,6 +10,10 @@ import type { NextConfig } from "next";
 // not worth it for an app with no third-party scripts). Even with 'unsafe-inline',
 // the policy still blocks loading any EXTERNAL script/frame/object, which is the
 // main XSS exfiltration/escalation path worth blocking here.
+// `next dev` sets NODE_ENV=development. Gate dev-only CSP relaxations on this so the
+// production policy is unaffected by them.
+const isDev = process.env.NODE_ENV === "development";
+
 const securityHeaders = [
   {
     // Force HTTPS for two years, subdomains included. Browsers remember this and
@@ -22,14 +26,24 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      // 'unsafe-eval' in DEVELOPMENT ONLY. React's development build calls eval() for
+      // debugging features (reconstructing cross-environment callstacks for the error
+      // overlay), and Turbopack's HMR runtime evaluates hot-updated modules the same way.
+      // Without it the dev server throws "eval() is not supported in this environment" and
+      // the overlay degrades. React never uses eval() in production, so the production
+      // policy keeps script-src strict — which matters, because 'unsafe-eval' would undo
+      // much of what this CSP is for by making any injected string executable.
+      isDev ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self' 'unsafe-inline'",
       // globals.css @imports Google Fonts at runtime: the stylesheet comes from
       // fonts.googleapis.com and the font files from fonts.gstatic.com. If we
       // later migrate to next/font (self-hosted), both hosts can be dropped.
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data:",
       "font-src 'self' https://fonts.gstatic.com",
-      "connect-src 'self'",
+      // Dev also needs the HMR websocket. CSP 3 says 'self' covers ws:// on the same
+      // origin, but browser behaviour here has been inconsistent, so name it explicitly
+      // rather than leave hot reload dependent on that detail.
+      isDev ? "connect-src 'self' ws: wss:" : "connect-src 'self'",
       "frame-ancestors 'none'", // nothing may embed Bayana in an iframe
       "base-uri 'self'",
       "form-action 'self'", // forms may only submit back to our own origin

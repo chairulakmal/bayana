@@ -24,9 +24,15 @@ export default async function GrammarPage() {
   const stats = await getGrammarStats(userId, grammarLevel);
   const hasCards = stats.dueNow > 0 || stats.started < stats.total;
 
+  // Only N3 grammar is seeded (SPEC §4.1). On any other active level `stats` is all zeros,
+  // which the checks below would otherwise report as "All caught up" — telling the user they
+  // have finished a deck that does not exist. Distinguish the empty-deck case explicitly.
+  const hasDeck = stats.total > 0;
+
   // Subtitle for the CTA card — contextual, never just a raw count.
-  const ctaSubtitle =
-    stats.dueNow > 0
+  const ctaSubtitle = !hasDeck
+    ? "No grammar deck for this level yet (N3 only)"
+    : stats.dueNow > 0
       ? `${stats.dueNow} card${stats.dueNow === 1 ? "" : "s"} due`
       : stats.started < stats.total
         ? "New cards available"
