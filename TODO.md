@@ -6,7 +6,8 @@ state* — what's done and what's next. Keep it current; it's the "where we left
 record across sessions. Decisions do **not** go here — log them in SPEC.md §16.
 
 **Now: Phase 3** — MC↔FSRS coupling for Quiz mode (planned, not started).
-**Next: Phase 4** — Admin sentence audit + on-demand generation.
+**Next: Phase 4** — Admin sentence audit + on-demand generation. Then Phase 5 (multi-user)
+and Phase 6 (further enhancements), both tracked only in SPEC.md §13 for now.
 **✅ Home + landing revamp complete (2026-07-25)** — `/home` is the default page again and
 is now a light dashboard; public `/` rebuilt around the demo CTA. See
 [below](#-home--landing-revamp-2026-07-25).
@@ -128,11 +129,14 @@ existing POST `/api/review` endpoint.
 
 ---
 
-## Phase 3 — Access & demo
+## ✅ Access & demo — allowlist, onboarding, demo sessions
+
+(Shipped alongside Phase 3.5; not a numbered phase of its own.)
 
 - [x] **Comma-separated allowlist** — `AUTH_ALLOWED_EMAIL` parsed as CSV into a
   `Set<string>`; single address still works. First reviewer engineer can now sign in.
-- [x] **First-run onboarding** — level choice → redirect to `/quiz`; `onboardedAt` gates
+- [x] **First-run onboarding** — level choice → redirect to `/home` (was `/quiz` until
+  2026-07-25); `onboardedAt` gates
   the home hub; dev-login leaves `onboardedAt` null so dev users go through onboarding
   too. Simplified from the original "5-question warm-up + guided tour" spec (superseded
   by MC↔FSRS coupling above, which gives the warm-up naturally).
@@ -155,7 +159,7 @@ existing POST `/api/review` endpoint.
   - [x] `src/lib/current-user.ts` — `requireAuth()` for pages returns
     `{ userId, email, isDemo }`; `getCurrentUserId()` for API routes falls back to demo
     cookie; `verifyDemoCookie()` uses `timingSafeEqual` for constant-time HMAC check.
-  - [x] `src/proxy.ts` — `bayana-demo-token` added to `hasSession`; `/api/demo` added
+  - [x] `proxy.ts` (project root) — `bayana-demo-token` added to `hasSession`; `/api/demo` added
     to `isPublic` (the route creates the session, so it must be reachable without one).
   - [x] `src/app/auth/signin/page.tsx` — "Try demo →" ghost button below the form with
     "or" divider; 7-day / browser-only note below it.
@@ -253,7 +257,7 @@ capacity allows.
 
 ---
 
-## Phase 3.5 — Grammar point study
+## ✅ Phase 3.5 — Grammar point study
 
 Separate FSRS study queue for JLPT grammar points. Source data: `decks/grammar-n3.md`
 (N3 v1; schema designed to accept N5–N1 later). Completely separate from vocab FSRS —
@@ -331,11 +335,19 @@ meanings + example sentence + translation back.
 
 ---
 
-## Phase 5+ (later)
+## Phase 5 — Multi-user (later)
 
-See SPEC.md §13 — audio/TTS, furigana, streak/heatmap, sentence regeneration/voting,
-export to Anki, **PWA offline shell / service worker** (install + fullscreen already
-done, Phase 2).
+Not tracked here yet. See SPEC.md §13: widen or remove the email allowlist, authorization
+checks on every read/write, and the remaining first-run onboarding (5-question warm-up +
+guided tour).
+
+---
+
+## Phase 6 — Further enhancements (later)
+
+See SPEC.md §13 — audio/TTS, furigana, the full stats dashboard (streak/heatmap, history,
+charts), sentence regeneration/voting, export to Anki, **PWA offline shell / service
+worker** (install + fullscreen already done, Phase 2).
 
 ---
 
@@ -436,7 +448,7 @@ Tracked in SPEC.md §15.
 - [x] **Installable-PWA basics** — manifest + icons, `display: fullscreen`, safe-area
   insets on session screens. Android chrome-free fullscreen; iOS standalone fallback.
 - [x] **Security review** (2026-06-05) — `getStudyQueue` O(backlog) query fixed
-  (count + take); `Object.hasOwn` enum validation at all 6 call sites; `proxy.ts` →
-  `src/proxy.ts`. Documented in SPEC §16.
+  (count + take); `Object.hasOwn` enum validation at all 6 call sites; confirmed `proxy.ts`
+  belongs at the **project root**, not under `src/` (SPEC §11.9). Documented in SPEC §16.
 - Flashcard↔Quiz synergy / MC↔FSRS coupling — **moved to Phase 3 above**
 - User-adjustable settings UI — **intentional non-goal** (SPEC §16)

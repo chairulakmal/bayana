@@ -1,16 +1,20 @@
 # Bayana — Brand & Design Guide
 
-**ばやな · 毎日ちょっとずつ — spaced-repetition JLPT vocab, with AI-written example
-sentences.**
+**ばやな · 毎日ちょっとずつ — spaced-repetition JLPT vocabulary and grammar, with
+AI-written example sentences.**
 
-This is the working design reference for Bayana's UI. The visual source of truth is the
-interactive guide in `notes/bayana/` (gitignored, personal) — `bayana Brand Guide.html` +
-`styles.css` + `brand.js`. This file distills it into something committed and
-build-ready, so the Quiz mode UI (SPEC §8.2, §13 Phase 2) can be implemented against
-real tokens. Where this and the HTML disagree, the HTML wins; update this file to match.
+This is the source of truth for Bayana's visual language: build every screen against the
+tokens and rules here, not against a screenshot or an older comp. It covers personality
+and voice, the mascot Pī, color, typography, iconography, the app icon, components, and
+the CSS custom properties that implement all of it (§8).
 
-It complements **[SPEC.md](SPEC.md)** (the architecture/engineering doc) — SPEC §8.4 owns
-the responsive/mobile-first *rules*; this file owns the *look, feel, and tokens*.
+It was distilled from an interactive guide kept locally in `notes/bayana/` (gitignored:
+`bayana Brand Guide.html` + `styles.css` + `brand.js`). That guide is a historical
+exploration, useful for anything not yet captured here, but **this file wins** wherever
+they disagree, because it is the version the repo and the code can see.
+
+It complements **[SPEC.md](SPEC.md)** (the architecture/engineering doc): SPEC §8.4 owns
+the responsive/mobile-first *rules*, this file owns the *look, feel, and tokens*.
 
 > **Platform focus.** Bayana is a **mobile-first web app** (no native apps). The design
 > target is the **phone browser at the iPhone SE baseline — 375 × 667 CSS px**: every

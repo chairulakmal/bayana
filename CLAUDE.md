@@ -4,18 +4,24 @@ Guidance for Claude Code working in this repository.
 
 ## What this project is
 
-**Bayana** — a mobile-first, spaced-repetition JLPT vocabulary web app with
+**Bayana** — a mobile-first, spaced-repetition JLPT vocabulary and grammar web app with
 AI-generated example sentences. It turns an existing ~8,100-word Anki deck (N5–N1) into
 flashcards scheduled by FSRS, where each word is paired with example sentences generated
-once by Claude Haiku and cached in Postgres. Two study modes: **Flashcard mode** (serious SRS
-recall) and **Quiz mode** (gamified multiple choice).
+once by Claude Haiku and cached in Postgres. Four study modes: **Flashcard** (serious SRS
+recall), **Quiz** (gamified multiple choice), **Exam** (JLPT-style benchmark), and
+**Grammar** (a separate FSRS queue). Details in SPEC.md §8.
 
 **[SPEC.md](SPEC.md) is the single source of truth** for the design — architecture,
 data model, generation pipeline, security, milestones, and the rationale behind every
 major decision. Read it before proposing or implementing anything, and **keep it
 updated** when a decision changes (it is a living design doc, not a frozen artifact).
 
-**[BRAND.md](BRAND.md) is the single source of truth** for the styles and brand voice.
+**[BRAND.md](BRAND.md) is the single source of truth** for the styles and brand voice
+(it is the committed one; the interactive guide it was distilled from is local-only).
+
+**[README.md](README.md) and [ARCHITECTURE.md](ARCHITECTURE.md) are the public face** of
+the repo, written for a general technical audience. Every claim in them must be true of
+the code as it stands; when behaviour changes, they change in the same commit.
 
 ## Primary goal: this is a learning project
 
@@ -51,13 +57,14 @@ collaborative and explanatory.
 
 - `SPEC.md` — the design document. Start here.
 - `decks/*.csv` — the source JLPT vocabulary (MIT-licensed open-anki-jlpt-decks), one
-  file per level, plus `decks/templates/` (original Anki card templates, a styling
-  reference). This is committed; the gitignored files are not the source of truth.
+  file per level. Committed. `decks/grammar-*.md` is **gitignored** (source not licensed
+  for redistribution, SPEC.md §4.1), so grammar seeding needs a locally supplied deck.
 
 ## Working agreements
 
-- **Status:** early build. SPEC.md is settled enough to start Phase 1 (see its
-  Milestones section). Confirm scope against SPEC.md before large changes.
+- **Status:** live on Railway; Phases 1a through 3.5 are shipped and Phase 3 (MC↔FSRS
+  coupling) is next. Current state is in [TODO.md](TODO.md), the plan in SPEC.md §13.
+  Confirm scope against both before large changes.
 - **Track execution state in [TODO.md](TODO.md); keep it current.** It is the
   cross-session "where we left off" checklist. Boundary: TODO.md holds *task state* only —
   the plan/rationale stays in SPEC.md (§13 Milestones) and decisions go in SPEC.md §16,

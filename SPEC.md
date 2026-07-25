@@ -4,9 +4,9 @@
 
 | | |
 |---|---|
-| **Status** | Draft |
+| **Status** | Living document; Phases 1a through 3.5 implemented and deployed (§13) |
 | **Author** | Chairul Akmal |
-| **Last updated** | 2026-07-25 (§8.5 rewritten: `/home` restored as the post-login landing and rebuilt as a light dashboard; public `/` revamped around the demo CTA; §14.7/§14.8 added; deck-size figure corrected in §3) |
+| **Last updated** | 2026-07-25 (documentation-consistency pass: §8 intro, §8.6, §9, §11.2/§11.3/§11.6 and §13 corrected against the implementation; §13 phases renumbered to admit the MC↔FSRS coupling phase. Earlier the same day: §8.5 rewritten for the `/home` landing and the revamped public `/`; §14.7/§14.8 added; deck-size figure corrected in §3) |
 | **Target platform** | Mobile-first responsive web (Next.js 16, deployed on Railway) |
 
 ---
@@ -16,12 +16,13 @@
 Bayana turns an existing ~8,100-word JLPT vocabulary deck (N5–N1, Anki export) into a
 modern web flashcard app. Cards are scheduled with **FSRS** (the algorithm used by
 current Anki), and each word is paired with **example sentences generated once by
-Claude Haiku and cached permanently** in Postgres. It offers two study modes — a serious
-spaced-repetition **"Flashcard mode"** and a fast, gamified multiple-choice **"Quiz mode."**
-The app ships as a **single
+Claude Haiku and cached permanently** in Postgres. It offers four study modes (§8): a
+serious spaced-repetition **"Flashcard mode,"** a fast, gamified multiple-choice
+**"Quiz mode,"** a JLPT-style **"Exam mode"** benchmark, and a separate FSRS queue for
+**grammar points**. The app ships as a **single
 full-stack Next.js service** on Railway. It launches single-user with **passwordless
-email magic-link authentication** (Auth.js + Resend, restricted to one allowlisted
-address) and a data model that is multi-user-ready from day one.
+email magic-link authentication** (Auth.js + Resend, restricted to an email allowlist that
+holds one address today) and a data model that is multi-user-ready from day one.
 
 ---
 
@@ -49,10 +50,11 @@ cost — and a study experience tailored to our own data and scheduling.
 - Be secure by default despite a single-user launch, and extend cleanly to multi-user.
 - Deliver a **mobile-first** experience optimized for small phone screens (iPhone SE
   baseline) that remains fully usable on desktop.
-- **Minimal-friction start.** Returning users are a single tap from studying: after signing
-  in they pick a **mode** (Flashcard or Quiz) for their remembered **active level** and go —
-  no decks, note types, or configuration. First-time users complete a one-time level choice
-  and a short warm-up first (§8.5). Frictionless entry is a core differentiator from Anki.
+- **Minimal-friction start.** Returning users are a single tap from studying: signing in
+  lands them on the home hub, whose primary CTA is routed to the highest-priority work for
+  their remembered **active level**, with the four modes one tap away. No decks, note types,
+  or configuration. First-time users complete a one-time level choice first (§8.5).
+  Frictionless entry is a core differentiator from Anki.
 
 **Non-goals (initial release)**
 - Native mobile apps (mobile-first responsive web only; see §8.4).
@@ -91,8 +93,9 @@ committed at `decks/*.csv` — Anki export format, one file per JLPT level.
 - `tags` encode legacy/overlapping levels (an N5 word may also be tagged `JLPT_3`).
   The **source file** is authoritative for level; surplus tags are stored as metadata.
 
-`decks/templates/` contains the original Anki card templates (EN→JP and JP→EN
-directions plus `styles.css`); these serve as a visual reference for the card UI.
+The original Anki card templates (EN→JP and JP→EN directions plus `styles.css`) served as
+a visual reference for the card UI during Phase 1a. They are **not committed**: the card UI
+has since diverged from them and [BRAND.md](BRAND.md) is the visual reference now.
 
 **Import considerations**
 - Some `meaning` fields are quoted CSV containing commas (`"to meet, to see"`); use a
@@ -442,7 +445,7 @@ On-demand generation exists only as a fallback for the rare cache miss.
   with vocabulary/grammar restricted to at-or-below the target level where feasible.
 - **One sentence per word** at launch — simplest and lowest cost. The schema already
   permits multiple `ExampleSentence` rows per word (§6), so generating more later needs no
-  core change. A future **admin review/audit** workflow (§13 Phase 3) will let an admin
+  core change. A future **admin review/audit** workflow (§13 Phase 4) will let an admin
   accept or reject each generated sentence before it surfaces to learners.
 
 ### 7.3 Seeding order
@@ -480,24 +483,24 @@ the contextual-sentence benefit is achieved at a near-zero, one-time cost.
 
 ## 8. Study experience
 
-Bayana offers three complementary study modes: **Flashcard mode** (serious
-spaced-repetition recall), **Quiz mode** (fast, gamified JP→EN multiple choice), and
-**Exam mode** (JLPT-style reading/writing questions). Flashcard mode is the retention
-engine; Quiz mode is the lightweight warm-up; Exam mode is the benchmark.
+Bayana offers four complementary study modes: **Flashcard mode** (serious
+spaced-repetition recall, §8.1), **Quiz mode** (fast, gamified JP→EN multiple choice,
+§8.2), **Exam mode** (JLPT-style reading/writing questions, §8.6), and **grammar study**
+(a separate FSRS queue over grammar points, §13 Phase 3.5). Flashcard mode is the
+retention engine; Quiz mode is the lightweight warm-up; Exam mode is the benchmark;
+grammar runs alongside all three on its own schedule. Browse/search (§8.3) is a reference
+tool rather than a mode.
 
-**Level scope.** Both modes operate within a **single JLPT level at a time — the user's
+**Level scope.** Every mode operates within a **single JLPT level at a time, the user's
 *active level***, chosen once at onboarding (§8.5) and changeable later (stored on
-`UserProfile.activeLevel`, §6). The Flashcard queue and the Quiz are both filtered to
-it, so scheduling, new-card selection, and multiple-choice distractors all stay within one
-level's vocabulary. The two modes are thus *separated by level* — you study or quiz one
-level at a time, not the whole deck at once.
+`UserProfile.activeLevel`, §6). Queues, new-card selection, and multiple-choice
+distractors all stay within one level's vocabulary, so the modes are *separated by level*:
+you study one level at a time, not the whole deck at once. The one deliberate exception is
+the home hub's words-due count, which is level-agnostic for the reason given in §8.5.
 
-**Minimal-friction entry.** A **public marketing homepage** lives at `/` (brand + mascot + a
-single **Sign in** CTA, for logged-out visitors); the authenticated app lives at `/study`. A
-**returning** user signing in lands on a simple **mode picker** (Flashcard or Quiz) for their
-active level and starts with one tap — no deck selection or config (§2). A **first-time**
-user is routed through onboarding first (§8.5). The home/landing look-and-feel follows
-**[BRAND.md](BRAND.md)**.
+**Entry points.** A **public marketing page** lives at `/` for logged-out visitors and the
+authenticated app opens on the home hub. Onboarding, the hub, and the routing between them
+are specified in **§8.5**; the look-and-feel follows **[BRAND.md](BRAND.md)**.
 
 ### 8.1 Flashcard mode — SRS review (FSRS)
 The classic spaced-repetition flashcard loop, modeled on Anki.
@@ -535,7 +538,8 @@ questions, run as a **non-scheduling** practice (it doesn't affect FSRS state).
   `expression`/`reading`.
 - Instant correct/incorrect feedback with the cached example sentence shown on reveal.
 - Whether Quiz mode results feed the FSRS scheduler (correct ≈ Good, wrong ≈ Again) or
-  remain a separate, non-scheduling practice mode is deferred to Phase 2 (§15, §16).
+  remain a separate, non-scheduling practice mode is **Phase 3** (§13; open question #1
+  in §15).
 
 #### UI & feel — Duolingo-grade, deliberately restrained
 The mode should *feel* as polished and satisfying as Duolingo — that bar is the point — but
@@ -642,8 +646,8 @@ first-run extras.
   `UserProfile.onboardedAt` being unset) → **choose a JLPT level** (N5–N1) → the app
   then drops straight into the home hub. The `/onboarding` level-choice screen is
   **implemented** (Phase 3.5). The follow-on **Quiz mode warm-up** (5 non-scheduling
-  questions) and **guided tour** remain deferred to Phase 4 (§13). Completing the level
-  choice persists `UserProfile.activeLevel` and stamps `onboardedAt` (§6), which is what
+  questions) and **guided tour** remain deferred to the multi-user phase (§13). Completing
+  the level choice persists `UserProfile.activeLevel` and stamps `onboardedAt` (§6), which is what
   distinguishes a first-time from a returning user thereafter.
 - **Returning user.** Sign in → **the post-login landing** → start. That's it.
 
@@ -684,9 +688,9 @@ nothing already in progress is stranded. A level-scoped number here would promis
 smaller session than the one the tile actually opens. The progress bar *is* level-scoped
 and is labelled with the level to make that explicit.
 
-**Still not the full dashboard.** Streak, history, and charts remain deferred to the Phase 4
-dashboard (§13); `/stats` keeps the heavier per-level aggregates (including the 30-day
-recall rate, which the hub deliberately does not compute — see the header comment in
+**Still not the full dashboard.** Streak, history, and charts remain deferred to the later
+stats/dashboard work (§13, Phase 6); `/stats` keeps the heavier per-level aggregates
+(including the 30-day recall rate, which the hub deliberately does not compute — see the header comment in
 `src/lib/home.ts` for why the hub has its own narrower query set rather than reusing
 `getLevelStats`).
 
@@ -697,8 +701,11 @@ in the tab bar mixed two categories and made the other three look arbitrarily om
 
 ### 8.6 Exam mode — JLPT-style reading & writing
 
-A timed benchmark mode that presents 20 questions in two sections mirroring the
-vocabulary sub-problems of the JLPT Reading section:
+A benchmark mode that presents 20 questions in two sections mirroring the
+vocabulary sub-problems of the JLPT Reading section. **No timer is implemented**; earlier
+revisions of this section described the mode as "timed," which it never was. Whether to add
+one is an open item: with per-question feedback (below), the mode is a study tool rather
+than a mock sitting, and a countdown would change that character.
 
 - **問題１ — 漢字の読み方 (kanji reading):** An example sentence is shown with the
   target word underlined in its kanji form. The student picks its kana reading from four
@@ -726,8 +733,9 @@ delay.
 **Independence from FSRS.** Exam mode neither reads from nor writes to `ReviewState`.
 Questions are drawn at random from the active level's word pool — not from the FSRS due
 queue. The mode is a pure benchmark; its results do not schedule or unschedule anything.
-All three modes (Flashcard, Quiz, Exam) are independent by design; FSRS coupling is a
-deliberate non-goal for Exam mode (§16 decision log).
+Flashcard, Quiz, and Exam are independent today, and FSRS coupling is a **permanent**
+non-goal for Exam specifically (§16 decision log); Quiz gains it in Phase 3 (§13). Grammar
+schedules against its own separate queue either way.
 
 **Sentence substitution edge case.** For 問題２, the kana replacement uses `String.replace`
 on the first occurrence of `Word.expression` in the sentence. If the sentence uses a
@@ -755,11 +763,12 @@ is intentionally no web-reachable, cost-incurring Anthropic route at present (se
 | GET | `/api/exam?level=&count=` | JLPT-style exam round: 問題１ (kanji reading) + 問題２ (kanji writing), non-scheduling | required | **Implemented** — 10+10 questions, two-section with break screen (§8.6) |
 | GET | `/api/grammar/queue` | Grammar FSRS study queue (due + new `GrammarProgress` rows) | required | **Implemented** |
 | POST | `/api/grammar/review` | Submit a grammar rating → FSRS update (`GrammarProgress` upsert) | required | **Implemented** |
+| GET | `/api/grammar/browse?level=` | Every grammar point for one level, grouped by lesson, with per-point progress status | required | **Implemented** — whole dataset in one payload (§13 Phase 3.5 addendum); `Cache-Control` mirrors `/api/browse` |
 | POST | `/api/demo/login` | Start an ephemeral demo session: create `User` + `UserProfile`, sign with HMAC, redirect to `/onboarding` | public (rate-limited, origin-checked) | **Implemented** — production-available; POST-only, session identity is a time-bound HMAC-signed cookie (§11.8) |
 | GET | `/api/dev/login` | **Dev-only**: mint a session for the seeded user (skip the magic link) | none (dev-only) | **Implemented** — 404 in prod; gated by `DEV_AUTH` (§11.7) |
 | GET | `/api/browse?level=` | Word list for one level (id, expression, reading, meaning — no sentences); browser-cached | required | **Implemented** — `Cache-Control: private, max-age=3600, stale-while-revalidate=86400` |
 | GET | `/api/words/[id]/sentence` | Lazy-load one word's cached example sentence | required | **Implemented** — `Cache-Control: private, max-age=86400, stale-while-revalidate=604800` |
-| POST | `/api/generate` | On-demand single-sentence fallback | required + rate-limited | Planned (Phase 1c, optional — see §11.4) |
+| POST | `/api/generate` | On-demand single-sentence fallback | required + rate-limited | Planned (Phase 4, optional — see §11.4) |
 | POST | `/api/batch/submit` | Submit a generation batch | admin | Not planned (scripts only) |
 | GET | `/api/batch/:id` | Poll batch status / collect | admin | Not planned (scripts only) |
 
@@ -793,8 +802,10 @@ scope for the initial release.
 
 ### 11.2 Authentication: passwordless email magic link
 Authentication uses **Auth.js with the Email provider**, sending magic links via
-**Resend** (already provisioned). Access is restricted to a **single allowlisted email
-address**. We chose passwordless magic links over a seeded password deliberately:
+**Resend** (already provisioned). Access is restricted to an **email allowlist**:
+`AUTH_ALLOWED_EMAIL` is parsed as a comma-separated list into a `Set` (a single address is
+the degenerate case, and is what production runs today). We chose passwordless magic links
+over a seeded password deliberately:
 
 - **No long-lived shared secret lives in the application.** A seeded password is a static
   credential that must be stored, rotated, and kept out of source control, env dumps, and
@@ -805,8 +816,9 @@ address**. We chose passwordless magic links over a seeded password deliberately
   is stronger than any password store we would build, and removes a redundant secret rather
   than adding one.
 - **The allowlist contains blast radius.** Even if the sign-in endpoint is discovered, a
-  link can only ever be delivered to the one allowlisted address — an attacker cannot have
-  one sent to themselves.
+  link can only ever be delivered to an allowlisted address, so an attacker cannot have one
+  sent to themselves. The list is kept to the few addresses that genuinely need access
+  (today: one), which is what keeps this property meaningful.
 
 ### 11.3 Hardening requirements (the magic link is only secure if these hold)
 A magic link is a bearer token in transit; the implementation **must** enforce:
@@ -814,9 +826,11 @@ A magic link is a bearer token in transit; the implementation **must** enforce:
 1. **High-entropy tokens** (≥ 256 bits) stored **hashed at rest** — never the raw token.
 2. **Single-use** tokens, invalidated immediately on redemption.
 3. **Short TTL** — 10–15 minutes.
-4. **Server-side allowlist enforcement** (case-insensitive `email === AUTH_ALLOWED_EMAIL`,
-   normalized on both sides) *before* any email is sent, and **failing closed** if the
-   allowlist is unset — without this the endpoint is an open email-spam relay.
+4. **Server-side allowlist enforcement** (case-insensitive membership in the
+   `AUTH_ALLOWED_EMAIL` set, normalized on both sides) *before* any email is sent, and
+   **failing closed** if the allowlist is unset. Without this the endpoint is an open
+   email-spam relay. The check is repeated in the `signIn` callback at verification time,
+   as defense in depth.
 5. **Rate limiting** on the sign-in request endpoint (per-IP and global) to prevent inbox
    bombing and token-guessing.
 6. **Secure sessions** — `httpOnly`, `Secure`, `SameSite=Lax` cookies with a sane expiry
@@ -862,7 +876,7 @@ A magic link is a bearer token in transit; the implementation **must** enforce:
   marker beyond a normal session.
 
 ### 11.5 Path to multi-user
-Multi-user is reached by: removing the single-email allowlist (or widening it to an
+Multi-user is reached by: removing the allowlist (or widening it from a fixed list to an
 invite/allow rule), relying on the already-present `userId` scoping for all queries, and
 adding explicit authorization checks so every read/write is constrained to the
 session's user. No schema migration of the core shape is required (§6).
@@ -870,11 +884,11 @@ session's user. No schema migration of the core shape is required (§6).
 ### 11.6 Public repository & PII
 This repository is intended to be **open-sourced**, so no personal data is committed.
 
-- **The allowlist email is configuration, not source.** `AUTH_ALLOWED_EMAIL` holds the
-  single address permitted to sign in; its *value* lives only in Railway environment
-  variables and is **never committed**. `.env.example` carries a placeholder
+- **The allowlist is configuration, not source.** `AUTH_ALLOWED_EMAIL` holds the
+  comma-separated addresses permitted to sign in; its *value* lives only in Railway
+  environment variables and is **never committed**. `.env.example` carries a placeholder
   (`you@example.com`), never a real address.
-- **A dedicated alias will be used for the allowlist** rather than a primary personal
+- **A dedicated alias is preferred for the allowlist** rather than a primary personal
   inbox — it scopes the app's reach and is trivially rotatable if abused.
 - **Git commit metadata is accepted as public.** Commits are authored under an email the
   author already publishes, so no history rewrite or noreply alias is required. (Decision:
@@ -970,8 +984,9 @@ The route guard, session gate, and rate limiters described above all live in `pr
   **local** Postgres (the `bayana-postgres` container), which is the authoritative source of
   the generated sentence cache — Batch results land there first, then are transferred to
   prod — so backing it up protects `ExampleSentence`, the only paid, hard-to-regenerate
-  artifact. (`Word` is free to re-import from `decks/`.) Back it up with `pg_dump` (commands
-  in `notes/deploy.md`); for long-term keeping, a `Word.guid`-keyed JSON export is preferred
+  artifact. (`Word` is free to re-import from `decks/`.) Back it up with `pg_dump` (exact
+  commands in `notes/deploy.md`, which is gitignored along with the rest of `notes/`);
+  for long-term keeping, a `Word.guid`-keyed JSON export is preferred
   over a `.dump`, which is tied to the Postgres major version and schema. Dump files contain
   personal data and are gitignored (`/backups`).
   - **Prod is deliberately not backed up routinely**, to avoid Hobby-plan egress cost. The
@@ -986,6 +1001,12 @@ The route guard, session gate, and rate limiters described above all live in `pr
 
 ## 13. Milestones & rollout
 
+Completed phases are listed in the order they shipped, then the planned ones in intended
+order. That is why **Phase 3.5 appears before Phase 3**: grammar study was an unplanned
+interleave that shipped in June 2026, while Phase 3 (MC↔FSRS coupling) is still ahead. The
+half-step number is kept rather than renumbered so the decision log (§16) and TODO.md keep
+referring to the same thing.
+
 **Phase 1a — Playable slice (run locally, study ASAP) — ✅ done**
 - Postgres schema (incl. `ReviewLog`); seeded default `User` + `UserProfile`.
 - CSV import for **N3**; batch-seed N3 example sentences.
@@ -993,15 +1014,15 @@ The route guard, session gate, and rate limiters described above all live in `pr
 - Mobile-first card UI (flip / rate). Runs locally, end-to-end.
 
 **Phase 1b — Shippable (public): auth + deploy — ✅ done**
-- Magic-link auth (Auth.js + Resend, single-email allowlist) with §11.3 hardening and a
-  `proxy.ts` route guard.
+- Magic-link auth (Auth.js + Resend, email allowlist) with §11.3 hardening and a
+  root-level `proxy.ts` route guard (§11.9).
 - Deployed to Railway; N3 sentence cache transferred (by `Word.guid`, §12) rather than
   regenerated.
 
 **Phase 1c — Fill out content — ✅ done (generation)**
 - All levels (N5–N1, ≈8,100 words) batch-seeded; every word now has a cached sentence
   (§7.5). The on-demand `/api/generate` fallback is **no longer needed for coverage** and
-  has moved to Phase 3 (it returns there as a safety net for future additions).
+  has moved to Phase 4 (it returns there as a safety net for future additions).
 
 **Phase 2 — Quiz mode — ✅ functionally complete**
 - Gamified multiple-choice quiz (§8.2): `GET /api/quiz` with confusability-scored
@@ -1013,10 +1034,12 @@ The route guard, session gate, and rate limiters described above all live in `pr
   pagination, started-words-first, inline level switcher, lazy sentence per tap, §8.3),
   **basic stats** (`/stats` — started/total, due, recall rate),
   **default `newCardsPerDay` lowered 20 → 10** with a tap-to-open `InfoBubble` explanation
-  on the landing and home hub, **installable PWA** (pulled forward from Phase 5, §8.4).
-- MC↔FSRS coupling and Flashcard↔Quiz synergy **deferred by choice** (§15, §16) — revisit
-  once there is usage data to reason about.
-- First-run onboarding deferred → Phase 4 (§16).
+  on the landing and home hub, **installable PWA** (pulled forward from the enhancements
+  phase, §8.4).
+- MC↔FSRS coupling and Flashcard↔Quiz synergy **deferred by choice** (§15, §16); now
+  Phase 3 below.
+- First-run onboarding deferred → multi-user phase (§16), then partly pulled forward in
+  Phase 3.5 below.
 
 **Phase 2 addendum — Exam mode — ✅ done (2026-06-07)**
 - JLPT-style benchmark mode (§8.6): `GET /api/exam` with 10 × 問題１ (kanji reading in
@@ -1043,10 +1066,12 @@ The route guard, session gate, and rate limiters described above all live in `pr
   pattern) + comma-joined meanings + example sentence (pattern bolded in grape) + English
   translation. No undo in v1.
 - **`/grammar` hub page:** inline FSRS stats (total/started/mature/due); single "Grammar
-  Points" CTA; dedicated tab in `BottomNav`. Vocab stats remain on `/stats`.
+  Points" CTA. Vocab stats remain on `/stats`. Grammar also got a `BottomNav` tab here,
+  removed on 2026-07-25 when the mode grid on `/home` made it redundant (§8.5, §14.8).
 - **`/onboarding` page:** level-choice screen shown to any user whose `UserProfile.onboardedAt`
-  is unset (both magic-link sign-ups and demo visitors). Pulled forward from Phase 4 to
-  support the demo flow. The follow-on Quiz warm-up and guided tour remain Phase 4 (below).
+  is unset (both magic-link sign-ups and demo visitors). Pulled forward from the multi-user
+  phase to support the demo flow. The follow-on Quiz warm-up and guided tour stay there
+  (Phase 5 below).
 - **Demo session (`/api/demo/login`):** ephemeral try-without-signup path; creates a new
   `User` + `UserProfile`, signs the userId with HMAC-SHA256, sets a 7-day cookie, and
   redirects to `/onboarding`. Production-available; since hardened to POST-only with a
@@ -1074,7 +1099,18 @@ The route guard, session gate, and rate limiters described above all live in `pr
   any in-progress FSRS state on an orphaned point is lost — acceptable for a single-user
   app, chosen over leaving orphans so the DB stays an exact mirror of the source file.
 
-**Phase 3 — Admin audit + on-demand generation — next, after Quiz mode**
+**Phase 3 — MC↔FSRS coupling — ▶ next**
+- Make Quiz and Flashcard genuinely complementary rather than parallel: a multiple-choice
+  answer writes an FSRS rating (correct ≈ Good, wrong ≈ Again) through the existing
+  `POST /api/review`, and Quiz target selection is informed by FSRS state (a split between
+  near-due review words and never-seen ones). Resolves open question #1 (§15).
+- No schema change: reuses `ReviewState`, `ReviewLog`, and the existing review endpoint.
+  The calibration choice (correct → Good or Hard, given that multiple choice is recognition
+  rather than active recall) is to be recorded in §16 when it is made.
+- This also supersedes the "non-scheduling first-run warm-up" framing in §8.2: once the
+  first quiz session seeds FSRS, the warm-up *is* the coupling.
+
+**Phase 4 — Admin audit + on-demand generation**
 - **Admin review/audit page** (admin-gated via `UserProfile.role`): inspect each
   AI-generated example sentence and accept or reject it before it surfaces to learners
   (adds a review-status field to `ExampleSentence`; optionally generate several candidates
@@ -1082,7 +1118,7 @@ The route guard, session gate, and rate limiters described above all live in `pr
 - **On-demand `/api/generate`** + study-UI fetch-on-flip for any not-yet-seeded words, with
   the §11.4 guardrails (auth + rate-limit + cache-first + bounded `max_tokens`).
 
-**Phase 4 — Multi-user**
+**Phase 5 — Multi-user**
 - Widen/remove the email allowlist; real `User` rows; authorization checks scoping all
   reads/writes by `userId`.
 - Per-user settings are **intentionally minimal** (see §16); multi-user does not imply a
@@ -1095,11 +1131,11 @@ The route guard, session gate, and rate limiters described above all live in `pr
   column to branch first-time vs. returning. Deferred because the warm-up and tour only earn
   their keep once there are multiple real users to onboard (the sole author is already past it).
 
-**Phase 5 — Further enhancements**
-- Audio (TTS) for sentences, furigana rendering, streak/heatmap, sentence
-  regeneration/voting, export back to Anki. (Installable-PWA *basics* — manifest, icons,
-  fullscreen + safe-area — were pulled forward to 2026-06-04, §8.4/§16; the **offline
-  shell / service worker** is what remains here.)
+**Phase 6 — Further enhancements**
+- Audio (TTS) for sentences, furigana rendering, the full stats dashboard (streak/heatmap,
+  history, charts — §8.5), sentence regeneration/voting, export back to Anki.
+  (Installable-PWA *basics* — manifest, icons, fullscreen + safe-area — were pulled forward
+  to 2026-06-04, §8.4/§16; the **offline shell / service worker** is what remains here.)
 
 ---
 
@@ -1138,7 +1174,7 @@ needs **no** service worker, while a SW adds a real maintenance surface (cache-v
 and invalidation, stale-asset bugs, extra Turbopack/Next 16 integration risk) for little
 benefit on an always-online, single-user app. The manifest alone is enough for an Android
 install; iOS "Add to Home Screen" likewise needs no SW. Offline support can be added later
-(§13 Phase 5) once there is a concrete offline use case. Also considered and rejected for
+(§13 Phase 6) once there is a concrete offline use case. Also considered and rejected for
 the same release: the browser **Fullscreen API** (`requestFullscreen`) to force a single
 route truly fullscreen — it is unsupported on iPhone Safari, so it is not a portable answer,
 whereas the manifest `display` mode covers Android cleanly.
@@ -1201,7 +1237,10 @@ sub-page condition and was judged the smaller wart. Author decided.
 ## 15. Open questions
 
 - Should multiple-choice results feed the FSRS scheduler, or remain a separate,
-  non-scheduling mode? (§8.2)
+  non-scheduling mode? (§8.2; scheduled as Phase 3, §13, where the open part is the
+  calibration: correct → Good or Hard.)
+- Should Exam mode be timed? It is not today, and per-question feedback pulls it toward
+  study tool rather than mock sitting (§8.6).
 - Furigana: store the reading as plain kana (current) or as ruby-annotated markup?
 - MCQ distractor difficulty mix: how many confusable vs random distractors per question,
   and should the ratio adapt to the user's level/performance? When (if ever) should
@@ -1218,9 +1257,10 @@ whenever a decision is made or reversed — do not edit history in place.
 
 | Date | Decision | Context & rationale | Decided by | Ref |
 |------|----------|---------------------|------------|-----|
+| 2026-07-25 | **Documentation-consistency pass across all six committed docs; §13 phases renumbered.** Six claims were corrected against the implementation: (a) Exam mode was described as **timed** in §8.6 and in the README, and never has been (no timer exists in `exam-session.tsx`); the mode is now described as untimed and the question of adding one moved to §15. (b) §11.2/§11.3/§11.6 still specified a **single** allowlisted address compared with `email === AUTH_ALLOWED_EMAIL`, whereas the code has parsed the variable as a comma-separated `Set` since the access-and-demo work. (c) §9's route table omitted the implemented `GET /api/grammar/browse`. (d) §8's intro still described three modes, a `/study` entry point, and a two-mode picker, all superseded by §8.5 on 2026-07-25; it now states the four-mode set and defers routing to §8.5 instead of restating it. (e) §4 and CLAUDE.md pointed at a `decks/templates/` directory that is not in the repo. (f) TODO.md placed `proxy.ts` under `src/`, contradicting §11.9 and the 2026-06-05 entry below. **Renumbering:** MC↔FSRS coupling was tracked as "Phase 3, next" in TODO.md but had no §13 entry at all, while §13 gave "Phase 3" to the admin audit; §13 now carries the coupling as Phase 3, and admin audit / multi-user / enhancements shift to Phases 4 / 5 / 6. | Two docs drifting apart is a bug the same way code and schema drifting apart is: the README and ARCHITECTURE.md are the repo's public face, and a reader who checks a claim against the source and finds it false discounts every other claim in the file. The "timed" error is the clearest case, since it describes a feature that does not exist. Phase numbers were the systemic version of the same problem: two documents disagreeing on which work is next, with the number appearing in seven cross-references, so the coupling phase was inserted where the author was already tracking it rather than moving the work. Where a cross-reference names a phase that could shift again (the multi-user phase, the enhancements phase), it now uses the name rather than the number, to make the next renumber cheap. No behaviour, schema, or roadmap priority changed in this pass. | Author (pass requested; corrections follow the implementation, and the renumber follows TODO.md's existing labels) | §8, §8.6, §9, §11.2, §13, §15 |
 | 2026-07-25 | **Both session exits land on the public `/`, and the sign-in page's wordmark links home.** `demoSignOutAction` previously redirected to `/auth/signin` while `signOutAction` redirected to `/`; the demo exit now matches. The `/auth/signin` wordmark (parrot + logotype) is wrapped in a `<Link href="/">`. | Two exits with two destinations was an oversight rather than a distinction, and `/auth/signin` was the worse of the two: it is a dead end for anyone without an invite, since the allowlist admits a single address (§11.2), whereas `/` offers both doors — restart the demo, or sign in. Sign-out is a "leaving" gesture, not a "switch accounts" one; the account-switch argument for landing on the login form does not apply to a single-user allowlist. The sign-in page was also terminal in the other direction: a visitor who followed "Sign in" from `/`, then realised they had no invite, had only the browser back button to reach the demo CTA. Logo-goes-home is the near-universal convention, so it was preferred over an explicit "← Back" link, which would have competed with the page's two real CTAs on a small centred card. | Author (both the shared destination and logo-only-vs-explicit-back-link decided by the author) | §11.8, §11.2 |
 | 2026-07-25 | **CSP gains two development-only relaxations: `'unsafe-eval'` in `script-src` and `ws:`/`wss:` in `connect-src`**, both gated on `NODE_ENV === "development"` so the production header is byte-identical to before. | The CSP added on 2026-07-10 broke local development: React's development build calls `eval()` to reconstruct cross-environment callstacks for its error overlay, and Turbopack's HMR runtime evaluates hot-updated modules, so the dev server threw `eval() is not supported in this environment`. The alternatives were both worse: granting `'unsafe-eval'` in production would make any injected string executable and undo most of the policy's value, while dropping the CSP in dev would mean developing against a materially different security posture than production runs under (exactly how a CSP-violating dependency ships unnoticed). Gating the single directive that dev genuinely needs keeps the two environments as close as possible. `ws:`/`wss:` is named explicitly rather than relying on CSP 3's rule that `'self'` covers same-origin websockets, which browsers have implemented inconsistently. Note that `next.config.ts` changes require a dev-server restart to take effect. | Author | §11.3 |
-| 2026-07-25 | **`/home` restored as the post-login landing, and rebuilt as a light dashboard; both it and the public `/` revamped.** (a) *Routing*: sign-in `redirectTo`, the dev login, `/onboarding` completion, `/onboarding`'s already-onboarded bounce, the public `/` redirect, and the manifest `start_url` all resolve to `/home`, reversing the 2026-07-02 `/grammar` reprioritization. `/onboarding` completion previously went to `/quiz`, which meant a first-time user never saw the hub at all; that is fixed as part of the same change. (b) *Hub restructured* into four bands (Today panel → single routed CTA → 2×2 mode grid → inline level selector), with counts from a new purpose-built `getHomeSnapshot` (`src/lib/home.ts`) rather than `getLevelStats`, whose per-level word-id fetch and 30-day log scan the hub never renders. A new `pickNextAction` routes one primary CTA by priority (due vocab → due grammar → new vocab → Quiz) so more content on the page does not cost the one-tap start (§2). Grammar joins the mode grid. Mode order corrected to match §8.5 (Exam had been listed first). Level selector moved below the modes, on frequency-of-use grounds. (c) *`BottomNav` reduced to Home, Stats, Browse* — places, not modes (§14.8). (d) *Public `/` restructured* around the demo as the primary CTA: Bayana is invite-only, so a visitor without an invite previously had nothing to click but a sign-in form that would reject them, with the no-email demo path buried below the fold of `/auth/signin`. Added a deck-size proof strip, all four modes (Exam and Grammar shipped after the page was written and were never added, so it under-sold the app by half), a rendered example-sentence card, a three-step "how it works", and a closing CTA. `/` now recognises the demo cookie via a new non-redirecting `getOptionalUser()`, so returning demo visitors are sent to the app rather than shown the marketing page. (e) *Deck-size figure corrected* from "≈ 8,800 words" to 8,128 CSV rows / 8,101 imported words, in §3, the TL;DR, the README, and CLAUDE.md; §3's own per-level table had always summed to 8,128, so the total was an arithmetic error that had propagated into public-facing copy. | The 2026-07-02 landing change was explicitly framed as temporary, and its premise (that the hub cost a tap and showed nothing) was a property of the hub, not a permanent preference — so the fix was to make the hub worth landing on rather than to route around it. The hub is still deliberately not the Phase 4 dashboard: it gained status and a routed CTA, not charts or history. On the public page, the guiding constraint was that the demo is the only door an uninvited visitor can walk through, which makes it the primary CTA rather than a secondary option. Every hub number is derived from a live count for the same reason: a hardcoded subtitle is how a dashboard starts lying. The one deliberate scoping asymmetry (words-due is level-agnostic, matching `getStudyQueue`; the progress bar is level-scoped and labelled) is documented at both the call site and in §8.5. **Four defects found in a review of this same change and fixed before it landed:** (i) the Grammar tile was disabled on levels with no seeded deck, which — combined with the nav-tab removal in (c) — left `/grammar` and all existing grammar progress with no reachable UI path on any level but N3. No mode tile may be disabled, since each is the sole route to its mode. (ii) `/grammar` reported "All caught up" on levels with no deck, i.e. announced a non-existent deck as finished; it now distinguishes the empty-deck case. (iii) The hub's "done today" figure summed vocab *review events* (ReviewLog rows, several per card when a card is rated Again and cycles learning steps) with grammar *points touched* (GrammarProgress has no event log, so it can only report one per point), mixing units so that a bad vocab session inflated the number. It now counts distinct cards for both halves, via `distinct: ["wordId"]`. (iv) The Today panel's level chip sat in the panel header, implying all three stats were level-scoped when words-due deliberately is not; the chip moved onto the progress bar, which is the only genuinely level-scoped element. Also removed a `<dl>` on the landing whose `sr-only` `<dt>` duplicated the visible label, making screen readers announce every proof-strip label twice. | Author (page targets, revamp depth, demo-keeps-onboarding, and Grammar-tab removal all decided by the author) | §8.5, §3, §14.7, §14.8 |
+| 2026-07-25 | **`/home` restored as the post-login landing and rebuilt as a light dashboard; the public `/` revamped around the demo CTA.** (a) *Routing*: every post-auth entry point (sign-in, dev login, onboarding completion and its already-onboarded bounce, the public `/` redirect, the manifest `start_url`) resolves to `/home`, reversing the 2026-07-02 `/grammar` reprioritization; onboarding completion had gone to `/quiz`, so a first-time user never saw the hub at all. (b) *Hub* rebuilt in four bands with a single routed CTA, served by a new purpose-built `getHomeSnapshot` / `pickNextAction` (`src/lib/home.ts`) rather than by `getLevelStats`; specified in §8.5. (c) *`BottomNav` reduced to Home, Stats, Browse*, places rather than modes (§14.8). (d) *Public `/` restructured* around the demo as hero CTA, with a deck-size proof strip, all four modes (Exam and Grammar shipped after the page was written and had never been added, so it under-sold the app by half), a rendered example-sentence card, a three-step "how it works", and a closing CTA band; a new non-redirecting `getOptionalUser()` lets `/` recognise a demo cookie and send returning visitors into the app. (e) *Deck-size figure corrected* from "≈ 8,800 words" to 8,128 CSV rows / 8,101 imported words, in §3, the TL;DR, the README, and CLAUDE.md. | The 2026-07-02 landing change was explicitly framed as temporary, and its premise (that the hub cost a tap and told the user nothing) was a property of the hub rather than a permanent preference, so the fix was to make the hub worth landing on. It is still deliberately not the full dashboard: it gained status and a routed CTA, not charts or history. On the public page the guiding constraint was that Bayana is invite-only, so the demo is the only door an uninvited visitor can walk through. Every hub number is derived from a live count, because a hardcoded subtitle is how a dashboard starts lying. §3's per-level table had always summed to 8,128, so the old total was an arithmetic error that had reached public-facing copy. **A review of this change found four defects, all fixed before it landed.** Two became design rules and are stated in §8.5 (no mode tile may ever be disabled; `/grammar` must distinguish "no deck for this level" from "all caught up"). The other two are recorded only here: the "done today" figure summed vocab *review events* with grammar *points touched*, so a bad vocab session inflated it, and now counts distinct cards on both sides; and the Today panel's level chip sat in the panel header, implying all three stats were level-scoped when words-due deliberately is not, so it moved onto the progress bar. A landing-page `<dl>` whose `sr-only` `<dt>` duplicated the visible label, making screen readers announce every proof-strip label twice, was removed in the same pass. | Author (page targets, revamp depth, demo-keeps-onboarding, and Grammar-tab removal) | §8.5, §3, §14.7, §14.8 |
 | 2026-07-10 | **App-wide review run (security, UX, a11y) — hardening + robustness fixes shipped as one pass.** (a) *Demo login hardened*: `POST`-only (GET returns 405), same-origin check against the `AUTH_URL`-derived origin, dedicated per-IP (5/hr) + global (30/hr) rate limiters in `proxy.ts`, and opportunistic stale-demo-user cleanup on each login (§11.8, §14.5). (b) *Demo cookie time-bound*: the HMAC now signs `userId:expiresAtMs` and the server verifies the expiry after a constant-time HMAC check; pre-existing cookies in the old format fail verification (accepted — demo sessions are disposable). (c) *Security response headers* added in `next.config.ts` as §11.3 item 8: HSTS, CSP (external scripts/frames blocked; `'unsafe-inline'` retained for Next.js hydration; Google Fonts hosts allowed), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`. (d) *Review race fixed*: `reviewWord`, `undoLastReview`, and `reviewGrammarPoint` now run their read-compute-write inside `serializableTxn()` (SERIALIZABLE + bounded `P2034` retry, §14.6); double-undo no longer 500s (`P2025` maps to a "nothing to undo" 404). (e) *Study-session UX*: a failed queue load now shows a retry screen instead of a false "all caught up"; the last card can be un-rated from the completion screen; a request token discards stale queue responses. (f) *Accessibility*: `lang="ja"` on all Japanese text so screen readers pick a Japanese voice, and persistent `role="status"` live regions announce quiz/exam answer feedback. | The demo endpoint was the sole unauthenticated write path — as a GET it was triggerable cross-site with no rate bound, and its cookie never expired server-side. The review write path had a genuine lost-update window under `READ COMMITTED`. The remaining items were the highest-priority findings from the same review: silent data-loss UX (load failure indistinguishable from an empty queue), an undo dead-zone on the final card, and screen-reader gaps on the app's core interaction loop. Fixed in priority order as a single session so SPEC, code, and tests land together. | Author (fix list proposed by review, priority order approved) | §11.3, §11.8, §14.5, §14.6, §8.1 |
 | 2026-07-10 | **Vitest adopted as the test runner; first unit tests cover the FSRS adapter (`src/lib/fsrs.ts`).** Config maps the `@` alias manually rather than adding the `vite-tsconfig-paths` plugin (a dependency to avoid two lines of config); tests are colocated (`src/**/*.test.ts`) and run in the `node` environment. The adapter was chosen as the first target because it is the one module where a silent bug corrupts long-lived user data — a mis-mapped field computes wrong intervals for weeks before anyone notices — and it is pure (no DB, no I/O), making it the cheapest module to test. Strategy: round-tripping (`fromCard ∘ toCard` losslessness, all four FSRS states, log round-trip, and a full rate → persist → restore → `rollback()` cycle mirroring what `undoLastReview` relies on). Quiz/exam scoring helpers are the natural next target but are currently module-private; testing them requires an extraction refactor first (tracked in TODO.md). | Author | §13 |
 | 2026-07-02 | **`/grammar` becomes the post-login landing page, and the leftmost `BottomNav` tab, for now.** Sign-in (`redirectTo`), the public `/` redirect, `/onboarding`'s already-onboarded bounce, the dev-login route, and the PWA manifest's `start_url` all point to `/grammar` instead of `/home`. `BottomNav`'s tab order becomes Grammar, Home, Stats, Browse. `/home` (the vocab mode picker) is untouched otherwise — still fully functional, just no longer the first thing a returning user sees. | The author is deliberately prioritizing grammar study right now, and wants the app to open there by default rather than requiring an extra tap through the vocab hub each session. Framed as temporary ("for now") rather than a permanent architectural change — unlike the 2026-06-29 decision to keep grammar a *sibling* page rather than merge it into `/home`, which stands. | Author | §8.5, §13, §16 |
