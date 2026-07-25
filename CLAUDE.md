@@ -56,6 +56,7 @@ collaborative and explanatory.
 ## Project layout
 
 - `SPEC.md` — the design document. Start here.
+- `DECISIONS.md` — the dated, append-only decision log (extracted from SPEC §16).
 - `decks/*.csv` — the source JLPT vocabulary (MIT-licensed open-anki-jlpt-decks), one
   file per level. Committed. `decks/grammar-*.md` is **gitignored** (source not licensed
   for redistribution, SPEC.md §4.1), so grammar seeding needs a locally supplied deck.
@@ -65,25 +66,26 @@ collaborative and explanatory.
 - **Status:** live on Railway; Phases 1a through 3.5 are shipped and Phase 3 (MC↔FSRS
   coupling) is next. Current state is in [TODO.md](TODO.md), the plan in SPEC.md §13.
   Confirm scope against both before large changes.
-- **Track execution state in [TODO.md](TODO.md); keep it current.** It is the
-  cross-session "where we left off" checklist. Boundary: TODO.md holds *task state* only —
-  the plan/rationale stays in SPEC.md (§13 Milestones) and decisions go in SPEC.md §16,
+- **Track execution state in [TODO.md](TODO.md); keep it current.** It holds **open work
+  only**: delete an item in the commit that lands it rather than archiving it, since
+  shipped work is already recorded by SPEC.md §13 (design altitude), DECISIONS.md (why),
+  and git (detail). The plan/rationale stays in SPEC.md and decisions go in DECISIONS.md,
   never in TODO.md.
-- **Document decisions and tradeoffs in SPEC.md as part of the same change.** Whenever a
-  design choice is made or changed, record it in SPEC.md so the doc and code never drift —
-  and don't just record the *what*, capture the *why*: the reasoning, the options weighed,
-  and what was given up. Follow the doc's existing discipline:
-  - State the chosen approach where it lives (the relevant section), with a one-line
-    rationale.
-  - For any non-trivial fork, add (or update) an entry in **§14 Alternatives considered**
-    naming the rejected option and *why* it lost.
-  - Append a dated, newest-first row to the **§16 Decision log**. Entries may be *trimmed*
-    for brevity, but **never change an entry's date or reorder rows** — the chronology is
-    the record.
+- **Document decisions and tradeoffs as part of the same change.** Whenever a design
+  choice is made or changed, record it so the docs and code never drift — and don't just
+  record the *what*, capture the *why*: the reasoning, the options weighed, and what was
+  given up. All three steps, every time:
+  - State the chosen approach in SPEC.md where it lives (the relevant section), with a
+    one-line rationale.
+  - For any non-trivial fork, add (or update) an entry in **SPEC.md §14 Alternatives
+    considered** naming the rejected option and *why* it lost.
+  - Append a dated, newest-first row to **[DECISIONS.md](DECISIONS.md)**. Entries may be
+    *trimmed* for brevity, but **never change an entry's date or reorder rows** — the
+    chronology is the record. This step is not optional just because it is a second file.
   - Update the **Status / Last updated** header and, if scope shifts, the **Milestones**
     and **Open questions** sections.
 - **Keep SPEC.md in formal "Google-style" design-doc language** — neutral, precise prose,
-  including its decision logs (§14 and §16). The doc's register is part of the deliverable.
+  including §14 and DECISIONS.md. The register is part of the deliverable.
   - When a decision was the author's call (a fork surfaced per the learning goal above),
     note who decided and the deciding factor, so it isn't relitigated later.
 - **Security is not deferred** even though it's single-user: follow SPEC.md §11

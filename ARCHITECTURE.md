@@ -1,6 +1,6 @@
 # Architecture
 
-This is Bayana's technical brief: the six decisions that carry most of the codebase, each stated as the choice, the reasoning, and the trade-off accepted, with file paths throughout so nothing has to be taken on faith. [SPEC.md](SPEC.md) is the full design document, with the alternatives analysis (§14) and a dated decision log (§16); this file is the shorter read.
+This is Bayana's technical brief: the six decisions that carry most of the codebase, each stated as the choice, the reasoning, and the trade-off accepted, with file paths throughout so nothing has to be taken on faith. [SPEC.md](SPEC.md) is the full design document, with the alternatives analysis in §14 and the dated decision log in [DECISIONS.md](DECISIONS.md); this file is the shorter read.
 
 1. [One full-stack Next.js service](#one-full-stack-nextjs-service), instead of an API plus a frontend
 2. [The FSRS adapter is a pure translation layer](#the-fsrs-adapter-is-a-pure-translation-layer), shared by the vocabulary and grammar queues

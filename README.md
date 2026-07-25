@@ -79,7 +79,7 @@ One suite so far, aimed where a silent bug would do the most damage: [src/lib/fs
 
 ## Design docs
 
-[ARCHITECTURE.md](ARCHITECTURE.md) is the technical tour: six decisions, each stated as the choice, the reasoning, and the trade-off accepted, with file paths throughout. [SPEC.md](SPEC.md) is the full design document and the project's source of truth, including the alternatives analysis and a dated decision log. [BRAND.md](BRAND.md) owns the look: the palette, the typography, and Pī himself.
+[ARCHITECTURE.md](ARCHITECTURE.md) is the technical tour: six decisions, each stated as the choice, the reasoning, and the trade-off accepted, with file paths throughout. [SPEC.md](SPEC.md) is the full design document and the project's source of truth, including the alternatives analysis; [DECISIONS.md](DECISIONS.md) is the dated log of every decision that got it there. [BRAND.md](BRAND.md) owns the look: the palette, the typography, and Pī himself.
 
 ## Credits
 
