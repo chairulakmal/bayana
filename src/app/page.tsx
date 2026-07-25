@@ -245,7 +245,7 @@ export default async function Home() {
                   example card
                 </span>
               </div>
-              <p lang="ja" className="jp mt-4 text-[40px] leading-tight" style={{ fontWeight: 800 }}>
+              <p lang="ja" className="jp mt-4 text-[40px] leading-tight" style={{ fontWeight: 700 }}>
                 約束
               </p>
               <p lang="ja" className="jp mt-1 text-[18px]" style={{ color: "var(--mag-500)", fontWeight: 700 }}>

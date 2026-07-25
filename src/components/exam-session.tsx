@@ -125,9 +125,9 @@ export function ExamSession({ level }: { level: string }) {
         {/* No fontFamily override here. It used to force --f-display, but Fredoka carries
             no CJK glyphs at all, so 問題２ silently fell through the stack to system-ui:
             the section header was the one heading not in the brand's Japanese face. The
-            .jp class alone is correct, and M PLUS genuinely has the 800 that Fredoka
-            (which stops at 700) could only fake. */}
-        <p lang="ja" className="jp text-5xl" style={{ fontWeight: 800, color: "var(--ink)" }}>
+            .jp class alone is correct. Weight is 700, the heaviest JP weight the app
+            loads — see BRAND.md §4 on why a third Japanese weight is not worth its cost. */}
+        <p lang="ja" className="jp text-5xl" style={{ fontWeight: 700, color: "var(--ink)" }}>
           問題２
         </p>
         <p className="mt-2 text-[15px]" style={{ color: "var(--ink-soft)" }}>

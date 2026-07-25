@@ -6,7 +6,7 @@
 |---|---|
 | **Status** | Living document; Phases 1a through 3.5 implemented and deployed (§13) |
 | **Author** | Chairul Akmal |
-| **Last updated** | 2026-07-26 (font weights trimmed to what the app renders and Japanese text returned to the Japanese face at nine sites, with the `next/font` deferral in §14.12. Same day: accessibility floors added to §8.4 with the alternatives in §14.11, following a BRAND.md review: contrast and keyboard-focus defects fixed in the session chrome, the level pickers, and the browse inputs; `--ink-faint` darkened to clear AA; BRAND.md resynced against `globals.css`. Same day: planned scope added in §2, §4.2, §13, §14.9/§14.10 and §15: the Kalima mock-exam absorption and the bayan/zaka consumer role, neither built yet. Same day: §16 decision log extracted to [DECISIONS.md](DECISIONS.md), leaving a pointer. 2026-07-25, documentation-consistency pass: §8 intro, §8.6, §9, §11.2/§11.3/§11.6 and §13 corrected against the implementation; §13 phases renumbered to admit the MC↔FSRS coupling phase. Earlier the same day: §8.5 rewritten for the `/home` landing and the revamped public `/`; §14.7/§14.8 added; deck-size figure corrected in §3) |
+| **Last updated** | 2026-07-26 (brand fonts self-hosted with `next/font` and the Japanese face cut to two weights: §8.4 gains a font-delivery bullet, §11.3 records a CSP with no third-party origin left in it, and §14.12 is rewritten from a deferral into the decision and its rejected alternatives. Same day: font weights trimmed to what the app renders and Japanese text returned to the Japanese face at nine sites. Same day: accessibility floors added to §8.4 with the alternatives in §14.11, following a BRAND.md review: contrast and keyboard-focus defects fixed in the session chrome, the level pickers, and the browse inputs; `--ink-faint` darkened to clear AA; BRAND.md resynced against `globals.css`. Same day: planned scope added in §2, §4.2, §13, §14.9/§14.10 and §15: the Kalima mock-exam absorption and the bayan/zaka consumer role, neither built yet. Same day: §16 decision log extracted to [DECISIONS.md](DECISIONS.md), leaving a pointer. 2026-07-25, documentation-consistency pass: §8 intro, §8.6, §9, §11.2/§11.3/§11.6 and §13 corrected against the implementation; §13 phases renumbered to admit the MC↔FSRS coupling phase. Earlier the same day: §8.5 rewritten for the `/home` landing and the revamped public `/`; §14.7/§14.8 added; deck-size figure corrected in §3) |
 | **Target platform** | Mobile-first responsive web (Next.js 16, deployed on Railway) |
 
 ---
@@ -703,6 +703,13 @@ screens; the bulk of study happens on mobile.
 - **Visual language** — palette, typography (Fredoka / Nunito / M PLUS Rounded 1c), the
   mascot Pī, and components — is specified in **[BRAND.md](BRAND.md)** (design tokens in its
   §8); the iPhone SE baseline above is the shared design target for both docs.
+- **Font delivery.** The three faces are declared in `src/app/fonts.ts`, downloaded from
+  Google at build time by `next/font/google`, and served from our own origin out of
+  `/_next/static/media`; nothing is fetched from Google at runtime. Each declaration
+  exposes a CSS custom property that `globals.css` maps onto the brand tokens
+  (`--f-display`, `--f-body`, `--f-jp`), so call sites name roles rather than families.
+  The Japanese face sets `preload: false`, which is load-bearing rather than incidental
+  (§14.12).
 
 ### 8.5 Onboarding & session flows
 Two user stories drive entry into the app. Both reach the same level-scoped engines
@@ -911,7 +918,11 @@ A magic link is a bearer token in transit; the implementation **must** enforce:
    dynamic-rendering cost for an app with no third-party scripts), `frame-ancestors
    'none'`/`X-Frame-Options: DENY` (clickjacking), `X-Content-Type-Options: nosniff`,
    and `Referrer-Policy: strict-origin-when-cross-origin` (keeps magic-link URLs out
-   of third-party Referer logs).
+   of third-party Referer logs). Since the `next/font` migration (§14.12) the policy
+   names **no third-party origin at all**: `style-src` and `font-src` dropped
+   `fonts.googleapis.com` and `fonts.gstatic.com`, so every directive is now `'self'`
+   plus, where unavoidable, `'unsafe-inline'`. A reintroduced `@import` of Google Fonts
+   would therefore fail closed rather than quietly re-adding a third-party dependency.
 
    **Two development-only relaxations**, gated on `process.env.NODE_ENV === "development"`
    so the production policy is unaffected: `'unsafe-eval'` in `script-src`, and `ws:`/`wss:`
@@ -1397,26 +1408,86 @@ the browse picker needed the same map. Rather than copy it, both now import
 `src/components/level-chip.ts`. A duplicated contrast rule is a contrast bug with a delay
 on it: the second copy is the one nobody updates.
 
-### 14.12 Migrating fonts to `next/font` in the same pass as the weight trim
+### 14.12 Font delivery, and the alternatives rejected on the way to `next/font`
 
-**Deferred (not rejected).** The fonts are loaded by an `@import` at the top of
-`globals.css`, which is the slowest available entry point: the browser cannot request the
-Google stylesheet until `globals.css` has downloaded and parsed, so the font files land on
-a third hop, and both `fonts.googleapis.com` and `fonts.gstatic.com` need entries in the
-CSP (§11.3). `next/font/google` fixes all of that structurally, by downloading the faces at
-build time and serving them same-origin with the `@font-face` rules inlined into the page,
-which removes the separate stylesheet request entirely and allows `adjustFontFallback` to
-cut layout shift during `swap`.
+**Decided: self-host via `next/font/google` (landed 2026-07-26).** The chosen design is
+stated in §8.4; this section records what it was chosen over. Measurements below come from
+production builds of the commit before and the commit after the migration.
 
-It was deferred out of the 2026-07-26 pass for two reasons. First, the weight trim in that
-pass is a one-line change with a measured 30 KB gzip saving and no behavioural risk, while
-the migration touches the CSP, the build, and every font-family declaration; bundling them
-would mean one change could not be reverted without the other. Second, the migration has a
-genuine unknown on this project specifically: `next/font` preloads the subsets it is given,
-and M PLUS Rounded 1c's Japanese subset is ~126 chunked files, so eagerly preloading it
-would plausibly be *worse* than the current on-demand fetching. The JP face likely wants
-`preload: false`, but that is a claim to verify against a real build with before/after
-numbers, not to assume. Tracked in TODO.md as its own change.
+| | Before (`@import`) | After (`next/font`) |
+|---|---|---|
+| Page CSS, gzipped | 6.0 KB | 72.8 KB |
+| Third-party stylesheet, gzipped | 91.5 KB | none |
+| Total render-blocking CSS | 97.5 KB | 72.8 KB |
+| Serial steps to first font byte | 4 | 2 |
+| Third-party origins contacted | 2 | 0 |
+| `@font-face` rules served | 405 | 260 |
+| `.next/static` | 807 KB | 4.4 MB |
+
+**Keeping the `@import` in `globals.css` (the status quo) was rejected.** It is the slowest
+available entry point: the browser cannot discover the fonts until `globals.css` has itself
+downloaded and parsed, so the sequence was HTML, then our CSS, then the
+`fonts.googleapis.com` stylesheet, then the `fonts.gstatic.com` files, with a DNS and TLS
+setup for each of the two third-party origins. Google also serves that stylesheet
+`cache-control: private, max-age=86400`, so a returning visitor re-fetched 91.5 KB gzipped
+before a single font byte could be requested, and `private` prevents any shared cache from
+absorbing it. The frequently cited counter-argument, that visitors arrive with Google Fonts
+already cached from other sites, has not held since HTTP cache partitioning shipped in 2020.
+
+**Bundling this migration into the 2026-07-26 weight trim was rejected** (historical; the
+constraint no longer applies). The trim was a one-line change with a measured saving and no
+behavioural risk, while the migration touches the CSP, the build, and every font
+declaration. Landing them together would have meant neither could be reverted alone.
+
+**Preloading the Japanese subset was rejected.** `next/font` emits a `<link rel="preload">`
+for every file belonging to a declared subset, and Google chunks CJK into roughly 126
+`unicode-range` slices per weight. Preloading them would have the browser eagerly fetch the
+entire Japanese range on every page in order to paint a handful of glyphs, which is
+materially worse than the on-demand fetching the migration replaced. The JP face therefore
+sets `preload: false`, verified against the build: `next-font-manifest.json` lists exactly
+two preloadable files (the Latin faces of Fredoka and Nunito) and no Japanese file.
+
+A related unknown recorded here because it cost investigation time and reads the other way
+round from the documentation: `next/font` never sends a `subset` parameter to Google. It
+requests the full stylesheet and self-hosts **every** face in the response, so `subsets`
+selects only what is preloaded. This is why the JP face can omit `subsets` entirely, which
+matters because next/font's bundled metadata for M PLUS Rounded 1c does not list `japanese`
+as a subset at all: naming it is a build error, and omitting it costs nothing once
+preloading is off.
+
+**Listing static weights for Fredoka and Nunito was rejected** in favour of their variable
+fonts. Both families ship a variable version (weight axes 300 to 700 and 200 to 1000
+respectively), so omitting `weight` yields one file per subset covering the whole range
+instead of the four and three static instances previously requested. This also retires the
+maintenance burden the trim created for the Latin faces: any weight in range now works
+without a corresponding entry in a request URL. Fredoka's `wdth` axis is excluded, since
+next/font omits non-weight axes unless they are named and the design never varies width.
+
+**A third Japanese weight was rejected** (author's call, taken in this pass; the question
+was left open by the previous one). M PLUS Rounded 1c 800 was loaded and used at five
+display sites. Dropping it removes about 126 `@font-face` rules, roughly a third of the
+Japanese CSS, and those five sites moved to 700. Retaining it would have been the more
+expensive half of the JP face for a difference visible only on large headwords. The five
+sites had to move rather than merely lose the weight: a `font-weight: 800` with only 400
+and 700 loaded is synthesised by the browser as a faux-bold off 700, which is worse than
+700 itself.
+
+**One expected benefit is not currently realised, and the design does not depend on it.**
+`adjustFontFallback` is documented to emit a metric-matched `local("Arial")` fallback face
+carrying `size-adjust` and `ascent-override`, which would reduce layout shift when a face
+swaps in. Verified against a real Next 16.2.7 build, the Turbopack implementation of
+`next/font` emits no such face (and, unlike the webpack code path, does not hash family
+names). The option is left at its default so the benefit accrues automatically if Turbopack
+gains it, but the case for the migration rests on the request-chain and caching results
+above, not on layout shift.
+
+**Accepted costs.** `.next/static` grows from 807 KB to 4.4 MB, because all 261 self-hosted
+`.woff2` files ship in the image whether or not a given deploy serves them; this is
+negligible against a Node image and is not transferred to the browser, which still fetches
+only the chunks a page needs. The build also acquires a network dependency on Google, since
+the faces are downloaded during `next build`; Next caches them under `.next/cache`, so the
+exposure is cold builds. Both were judged acceptable against removing a runtime third-party
+dependency from every page load.
 
 ---
 

@@ -144,7 +144,7 @@ export function QuizSession({ level }: { level: string }) {
               What does this mean?
             </p>
           )}
-          <div lang="ja" className={answered ? "jp text-6xl" : "jp mt-3 text-6xl"} style={{ fontWeight: 800, color: "var(--ink)", lineHeight: 1.1 }}>
+          <div lang="ja" className={answered ? "jp text-6xl" : "jp mt-3 text-6xl"} style={{ fontWeight: 700, color: "var(--ink)", lineHeight: 1.1 }}>
             {current.expression}
           </div>
           {answered && (

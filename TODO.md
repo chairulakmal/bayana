@@ -202,12 +202,12 @@ capacity allows.
   module-private) so they can be unit-tested; then test them + the highlighted-sentence
   token pipeline.
 - [ ] Log hygiene: audit `console.error` calls for payloads that shouldn't be logged.
-- [ ] Migrate to `next/font` (self-hosted); also lets CSP drop the Google Fonts hosts.
-  Rationale and the deferral reason are in SPEC §14.12. Current cost after the 2026-07-26
-  weight trim: 358.8 KB / 405 `@font-face` rules, fetched on a third hop because
-  `globals.css` reaches it via `@import`. Set `preload: false` on the JP face and verify
-  with a real before/after build: `next/font` preloads the subsets it is given, and M PLUS
-  Rounded 1c's Japanese subset is ~126 chunked files.
+- [ ] Japanese font payload: 252 of the 260 `@font-face` rules the app serves are M PLUS
+  Rounded 1c, ~66 KB gzipped of inlined CSS on every page (SPEC §14.12). Self-subsetting
+  the JP face to the ~2,500 characters the deck actually uses, via `next/font/local`,
+  would collapse that to a handful of rules. Needs a `fonttools` step in the build and a
+  rule for what happens when a generated sentence contains a kanji outside the subset, so
+  it is a real project rather than a config change.
 
 ### Local environment
 - [ ] `.env` pins `NODE_OPTIONS=--max-old-space-size=256`, which OOM-kills `next build`'s

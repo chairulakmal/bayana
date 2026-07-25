@@ -174,15 +174,17 @@ than renamed.
 
 ## 4. Typography
 
-| Role | Family | Token | Weights loaded | Notes |
-|------|--------|-------|----------------|-------|
-| Display / UI labels | **Fredoka** | `--f-display` | 400, 500, 600, 700 | Headings, buttons, chips, stats. Tight tracking (`-0.01em`). **Fredoka stops at 700**; asking for 800 gets a synthesised faux-bold. |
-| Body | **Nunito** | `--f-body` | 400, 600, 700 | Paragraphs, glosses, secondary text. |
-| Japanese | **M PLUS Rounded 1c** | `--f-jp` | 400, 700, 800 | All kana/kanji, rounded to match the Latin voice. Fallback `"Hiragino Maru Gothic ProN"`. |
+| Role | Family | Token | Weights available | Notes |
+|------|--------|-------|-------------------|-------|
+| Display / UI labels | **Fredoka** | `--f-display` | 300–700 (variable) | Headings, buttons, chips, stats. Tight tracking (`-0.01em`). **Fredoka stops at 700**; asking for 800 gets a synthesised faux-bold. |
+| Body | **Nunito** | `--f-body` | 200–1000 (variable) | Paragraphs, glosses, secondary text. |
+| Japanese | **M PLUS Rounded 1c** | `--f-jp` | 400, 700 | All kana/kanji, rounded to match the Latin voice. No variable version exists, so each weight is a separate download. Fallback `"Hiragino Maru Gothic ProN"`. |
 
-The weight lists are exactly what the app renders, and they are the request in
-`globals.css`. Keep them in sync in both directions: a weight used but not loaded is
-faux-bolded by the browser, and a weight loaded but not used is dead payload.
+The faces are declared in `src/app/fonts.ts` and self-hosted by `next/font` (SPEC §14.12),
+not requested from Google at runtime. The two Latin families load as **variable** fonts, so
+any weight inside their range is free: use whatever the design calls for without editing
+anything. **The Japanese family is the opposite**, and the rest of this section is about
+why.
 
 **Japanese always uses `--f-jp`, even inline within English.** This is the rule most often
 broken, because breaking it looks *almost* right: **neither Fredoka nor Nunito contains a
@@ -199,11 +201,23 @@ than a `string`: a bare string can only carry one face. Where a label is concept
 value with two scripts (the JLPT level names, the exam prompts), store the halves
 separately rather than concatenating them.
 
-**Adding a Japanese weight is expensive; adding a Latin one is not.** Google splits CJK
+**Adding a Japanese weight is expensive; adding a Latin one is free.** Google splits CJK
 into ~126 `unicode-range` chunks, so each M PLUS weight costs ~126 `@font-face` rules and
-roughly 30 KB gzipped *in the stylesheet itself*, before any glyph is painted. Trimming
-three unused weights took the served CSS from 479 KB / 541 rules to 359 KB / 405 rules.
-Justify a fourth JP weight before adding it.
+roughly 30 KB gzipped *in the CSS itself*, before any glyph is painted. That CSS is now
+inlined into the page, so the cost is paid on the critical path of every page load rather
+than in a separate request. The app loads two Japanese weights, and 252 of the 260
+`@font-face` rules it serves are M PLUS. **Do not add a third without a specific reason**:
+the 800 that used to be loaded was dropped precisely because it was one third of the
+Japanese payload for a difference only visible on large headwords.
+
+The two constraints interact, so keep them straight:
+
+- **A Latin weight the app uses but does not "load" is fine.** The variable fonts cover
+  their whole range; nothing needs to be declared.
+- **A Japanese weight used but not loaded is a defect.** The browser synthesises a
+  faux-bold from the nearest loaded weight, which is heavier and blurrier than the real
+  face. If a design needs JP 800, the choice is to add it in `fonts.ts` and accept ~126
+  more rules, or to use 700. Silently requesting it is the one option that is always wrong.
 
 Headings are rounded and friendly, never thin or condensed.
 
@@ -344,9 +358,9 @@ canonical tokens in a gitignored file.) Use these verbatim when building the UI.
   /* shape & type */
   --r-lg:28px; --r-md:18px; --r-sm:12px;
   --shadow:0 14px 34px -16px rgba(52,24,50,.32);
-  --f-display:"Fredoka", system-ui, sans-serif;
-  --f-body:"Nunito", system-ui, sans-serif;
-  --f-jp:"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", sans-serif;
+  --f-display:var(--font-fredoka);
+  --f-body:var(--font-nunito);
+  --f-jp:var(--font-m-plus-rounded);
 }
 ```
 
@@ -358,7 +372,9 @@ token layer.
 and nothing consumed. Width capping is done with Tailwind: `max-w-md` for app screens (the
 mobile-first column) and `max-w-5xl` for the marketing page.
 
-Fonts load from Google Fonts via an `@import` at the top of `globals.css`: `Fredoka`
-(400/500/600/700), `Nunito` (400/600/700), `M PLUS Rounded 1c` (400/700/800). Those are the
-weights §4 lists, and nothing else. Self-hosting them with `next/font` (fewer network hops,
-no third-party origins in the CSP) is deferred, not rejected: TODO.md and SPEC §14.12.
+**The three type tokens are indirections, not families.** The `--font-*` properties they
+point at are defined by `next/font` in [src/app/fonts.ts](src/app/fonts.ts) and applied to
+`<html>` by the root layout; each already carries its own fallback chain, which is why the
+tokens above declare no stack of their own. Nothing is fetched from Google at runtime, and
+the CSP no longer permits it (SPEC §11.3, §14.12). To change a face, edit `fonts.ts`: the
+~200 call sites reference `--f-display` / `--f-body` / `--f-jp` and never a family name.
