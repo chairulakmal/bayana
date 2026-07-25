@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import { fontVariables } from "./fonts";
 import "./globals.css";
-
-// Brand fonts (Fredoka / Nunito / M PLUS Rounded 1c) load via @import in globals.css so
-// the JP face ships its kana glyphs — see BRAND.md §4.
 
 export const metadata: Metadata = {
   // `template` is used by sub-pages later (e.g. "Browse · Bayana").
@@ -35,7 +33,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
+    // The font classes each define one CSS custom property (see fonts.ts). Putting them
+    // on <html> is what makes --font-fredoka / --font-nunito / --font-m-plus-rounded
+    // resolvable everywhere, which is where globals.css picks them up as brand tokens.
+    <html lang="en" className={`${fontVariables} h-full antialiased`}>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

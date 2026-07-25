@@ -251,7 +251,7 @@ export function GrammarSession({ level }: { level: string }) {
           {/* Front: grammar pattern in large Japanese type */}
           <div
             lang="ja" className="jp text-5xl"
-            style={{ fontWeight: 800, color: "var(--ink)", lineHeight: 1.2 }}
+            style={{ fontWeight: 700, color: "var(--ink)", lineHeight: 1.2 }}
           >
             {current.pattern}
           </div>

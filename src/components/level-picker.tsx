@@ -12,16 +12,19 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Level } from "@/generated/prisma/enums";
 import { setActiveLevel } from "@/app/home/actions";
+// N1 at top (hardest / the goal), N5 at bottom (easiest / the start): the shared order.
+import { LEVELS } from "@/components/level-chip";
 
-// N1 at top (hardest / the goal), N5 at bottom (easiest / the start).
-const LEVELS = ["N1", "N2", "N3", "N4", "N5"] as const;
-
-const LEVEL_LABEL: Record<string, string> = {
-  N1: "匠 · the artisan",
-  N2: "流暢へ · the expert",
-  N3: "上達 · the journeyman",
-  N4: "頑張れ · the practitioner",
-  N5: "はじめよう · the apprentice",
+// Split rather than one "匠 · the artisan" string: the row renders in --f-display, and
+// Fredoka has no CJK glyphs, so a combined label put every Japanese name in the system
+// font while the English half stayed on-brand. The two halves need different faces
+// (BRAND.md §4), which a single string cannot express.
+const LEVEL_LABEL: Record<string, { ja: string; en: string }> = {
+  N1: { ja: "匠", en: "the artisan" },
+  N2: { ja: "流暢へ", en: "the expert" },
+  N3: { ja: "上達", en: "the journeyman" },
+  N4: { ja: "頑張れ", en: "the practitioner" },
+  N5: { ja: "はじめよう", en: "the apprentice" },
 };
 
 export function LevelPicker({ current }: { current: string }) {
@@ -62,15 +65,14 @@ export function LevelPicker({ current }: { current: string }) {
               opacity: pending && !active ? 0.4 : 1,
             }}
           >
-            {/* Level chip — brand colour at full opacity regardless of active state */}
+            {/* Level chip, always at full opacity. Inactive rows used to dim theirs to
+                0.55, which composited the white-on-colour chips (N5, N2) down to ~3.2:1;
+                the chip *is* the row's label, so that was the one element that could not
+                afford to fade. The row already reads as inactive from its cream fill and
+                --ink-soft label, so the opacity was redundant as well as harmful. */}
             <span
               className={`chip chip-${lvl.toLowerCase()}`}
-              style={{
-                fontSize: "12px",
-                padding: "3px 10px",
-                flexShrink: 0,
-                opacity: active ? 1 : 0.55,
-              }}
+              style={{ fontSize: "12px", padding: "3px 10px", flexShrink: 0 }}
             >
               {lvl}
             </span>
@@ -84,7 +86,10 @@ export function LevelPicker({ current }: { current: string }) {
                 color: active ? "var(--ink)" : "var(--ink-soft)",
               }}
             >
-              {LEVEL_LABEL[lvl]}
+              <span lang="ja" className="jp">
+                {LEVEL_LABEL[lvl].ja}
+              </span>{" "}
+              · {LEVEL_LABEL[lvl].en}
             </span>
 
             {/* Active indicator — green check, right-aligned */}

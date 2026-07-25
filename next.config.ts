@@ -34,12 +34,13 @@ const securityHeaders = [
       // policy keeps script-src strict — which matters, because 'unsafe-eval' would undo
       // much of what this CSP is for by making any injected string executable.
       isDev ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self' 'unsafe-inline'",
-      // globals.css @imports Google Fonts at runtime: the stylesheet comes from
-      // fonts.googleapis.com and the font files from fonts.gstatic.com. If we
-      // later migrate to next/font (self-hosted), both hosts can be dropped.
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      // No third-party hosts here: next/font downloads the brand faces at build time and
+      // serves them from /_next/static/media, so neither fonts.googleapis.com (stylesheet)
+      // nor fonts.gstatic.com (font files) is contacted at runtime any more (SPEC §14.12).
+      // Keep it that way: a stray @import of Google Fonts will now be blocked outright.
+      "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data:",
-      "font-src 'self' https://fonts.gstatic.com",
+      "font-src 'self'",
       // Dev also needs the HMR websocket. CSP 3 says 'self' covers ws:// on the same
       // origin, but browser behaviour here has been inconsistent, so name it explicitly
       // rather than leave hot reload dependent on that detail.

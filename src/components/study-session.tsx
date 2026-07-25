@@ -302,7 +302,7 @@ export function StudySession({ level }: { level: string }) {
             cursor: flipped ? "default" : "pointer",
           }}
         >
-          <div lang="ja" className="jp text-6xl" style={{ fontWeight: 800, color: "var(--ink)", lineHeight: 1.1 }}>
+          <div lang="ja" className="jp text-6xl" style={{ fontWeight: 700, color: "var(--ink)", lineHeight: 1.1 }}>
             {current.expression}
           </div>
 

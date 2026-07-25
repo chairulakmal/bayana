@@ -174,17 +174,24 @@ capacity allows.
   abort a whole batch collection.
 
 ### UX / UI
-- [ ] Touch targets below 44px: session-header buttons, user-menu avatar (36px), browse
-  pagination + clear-search, home-link pill. (Level-picker rows fixed 2026-07-25.)
+- [ ] Touch targets below 44px: user-menu avatar (36px), browse pagination + clear-search,
+  home-link pill. Use `.tap-44` (BRAND.md §7). (Level-picker rows fixed 2026-07-25;
+  session-header pills and both level-picker chip rows fixed 2026-07-26.)
 - [ ] Root `error.tsx` / `loading.tsx` / `not-found.tsx` (currently unstyled defaults).
 - [ ] Grammar hub: inline level switcher (currently vocab-hub-only).
-- [ ] Dark mode: decide (support or explicit non-goal) and log it in DECISIONS.md.
+- [ ] Decide whether M PLUS Rounded 1c needs three weights. It loads 400/700/800; the big
+  kanji use 800. Collapsing 800 into 700 saves ~126 `@font-face` rules and ~30 KB gzip
+  (BRAND.md §4 on why JP weights cost what they do). Design call, not a perf call.
+- [ ] Dark mode: decide (support or explicit non-goal) and log it in DECISIONS.md. Interim
+  state as of 2026-07-26: light-only, now *declared* via `color-scheme: light` so UA chrome
+  can't render dark against the cream surfaces. That fixes the leak, not the question.
 
 ### Accessibility
 - [ ] User-menu keyboard/focus management (Escape to close, focus trap/return).
 - [ ] Info-bubble: proper disclosure pattern (button + `aria-expanded`).
 - [ ] Browse accordions: `aria-expanded` on lesson toggles.
-- [ ] Search inputs: `aria-label`s; result counts in an `aria-live` region.
+- [ ] Search inputs: `aria-label`s; result counts in an `aria-live` region. (Focus rings
+  fixed 2026-07-26 via `.focus-ring`.)
 
 ### Code quality / tests
 - [ ] Dedup session components: byte-identical `Centered` in 4 files, duplicated
@@ -195,7 +202,12 @@ capacity allows.
   module-private) so they can be unit-tested; then test them + the highlighted-sentence
   token pipeline.
 - [ ] Log hygiene: audit `console.error` calls for payloads that shouldn't be logged.
-- [ ] Migrate to `next/font` (self-hosted) — also lets CSP drop the Google Fonts hosts.
+- [ ] Japanese font payload: 252 of the 260 `@font-face` rules the app serves are M PLUS
+  Rounded 1c, ~66 KB gzipped of inlined CSS on every page (SPEC §14.12). Self-subsetting
+  the JP face to the ~2,500 characters the deck actually uses, via `next/font/local`,
+  would collapse that to a handful of rules. Needs a `fonttools` step in the build and a
+  rule for what happens when a generated sentence contains a kanji outside the subset, so
+  it is a real project rather than a config change.
 
 ### Local environment
 - [ ] `.env` pins `NODE_OPTIONS=--max-old-space-size=256`, which OOM-kills `next build`'s

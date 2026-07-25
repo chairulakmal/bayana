@@ -1,10 +1,22 @@
 /* Bayana global styles — brand foundation (BRAND.md).
-   Google Fonts must be @imported before any other rules. */
-@import url("https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800;900&family=M+PLUS+Rounded+1c:wght@400;500;700;800&display=swap");
+
+   The brand faces are NOT loaded here. They are declared in app/fonts.ts, downloaded at
+   build time by next/font and served from our own origin, and their @font-face rules are
+   inlined into the page CSS. This file only maps the brand tokens onto the custom
+   properties those declarations expose (see --f-display / --f-body / --f-jp below).
+   Do not reintroduce an @import of fonts.googleapis.com: it would restore the four-step
+   request chain that migration removed, and the CSP no longer allows the host anyway.
+   Rationale in SPEC §14.12, weight policy in BRAND.md §4. */
 @import "tailwindcss";
 
 /* ── Design tokens (BRAND.md §8) ───────────────────────────────────────────── */
 :root {
+  /* The app is light-only by design (BRAND.md §3 is a single light palette; there is no
+     dark ramp). Declaring the scheme stops a phone in dark mode from painting UA-owned
+     chrome (form controls, the browse search field, scrollbars) in dark styling against
+     our cream surfaces, which is the one place a light-only app still leaks dark UI. */
+  color-scheme: light;
+
   /* hero palette */
   --magenta:#ff61f8; --pink:#ffa6fb; --yellow:#ffea6c; --cream:#fffba7;
 
@@ -24,7 +36,12 @@
 
   /* action / neutrals */
   --grape:#b717b2; --grape-edge:#7c0079; --grape-hi:#cf1fc9; --yel-edge:#d9c24a;
-  --ink:#341832; --ink-soft:#684e65; --ink-faint:#9a8597;
+  /* Three-step text ramp on --paper: 15.2:1 / 7.0:1 / 4.8:1, all clearing WCAG AA (4.5:1)
+     for normal-size text. --ink-faint was #9a8597 (3.25:1), which BRAND.md described as a
+     "disabled / hints" value but the app actually uses as its tertiary *content* colour:
+     furigana readings, stat labels, tile subtitles. Darkened rather than renamed, because
+     the ~60 call sites all want "quiet secondary", not "disabled". */
+  --ink:#341832; --ink-soft:#684e65; --ink-faint:#7d6a7a;
   --paper:#fcfaf1; --surface:#ffffff; --surface-cream:#fff7e4; --line:#efe4e9;
 
   /* functional */
@@ -33,9 +50,14 @@
   /* shape & type */
   --r-lg:28px; --r-md:18px; --r-sm:12px;
   --shadow:0 14px 34px -16px rgba(52,24,50,.32);
-  --f-display:"Fredoka", system-ui, sans-serif;
-  --f-body:"Nunito", system-ui, sans-serif;
-  --f-jp:"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", sans-serif;
+  /* Brand faces, via the custom properties app/fonts.ts defines on <html>. Each --font-*
+     value already carries its own fallback chain (the `fallback` arrays in fonts.ts), so
+     these tokens need no stack of their own. The extra hop exists so the ~200 call sites
+     keep naming brand roles rather than families: swapping a face is then one edit in
+     fonts.ts, and nothing here depends on what next/font names its output. */
+  --f-display:var(--font-fredoka);
+  --f-body:var(--font-nunito);
+  --f-jp:var(--font-m-plus-rounded);
 }
 
 /* Expose a couple of tokens to Tailwind's theme so utilities stay on-brand. */
@@ -135,6 +157,40 @@ body {
 .opt:disabled { cursor: default; }
 .opt-correct { background: #eafaf1; border-color: var(--good); color: var(--good-edge); box-shadow: 0 3px 0 var(--good-edge); }
 .opt-wrong   { background: #ffe9ee; border-color: var(--bad);  color: #b12a44;        box-shadow: 0 3px 0 #d63a55; }
+
+/* ── Accessibility utilities ─────────────────────────────────────────────────
+   Two cross-cutting helpers. Both exist because the obvious inline fix doesn't work:
+   an element with `style={{ border: ... }}` beats any Tailwind `focus:border-*` class,
+   and a control that must stay visually small can't simply be padded to 44px. */
+
+/* Visible keyboard focus for inputs that suppress the UA outline. Carried on box-shadow,
+   not border-color, precisely because box-shadow is not set inline on those fields, so
+   nothing overrides it. :focus-visible (not :focus) keeps the ring off pointer taps. */
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--mag-300);
+  border-color: var(--magenta);
+}
+
+/* Raises a deliberately small control to the 44px hit-target floor (BRAND.md platform
+   focus) without growing its painted box, using the standard "expand the touch target past
+   the visual bounds" technique. Session-header pills and JLPT level chips are small on
+   purpose: chrome that competes with the card is a design regression, but an 18px tap
+   target is an accessibility one, and this resolves the two.
+
+   Vertical only, by design. `inset: 50% 0 auto 0` pins the overlay to the control's own
+   width, so adjacent chips in a row can never overlap each other's hit areas: a
+   mis-tap between two *different* level buttons is worse than a slightly narrow one.
+   Horizontal reach is handled per-component, by giving chip rows real padding. */
+.tap-44 { position: relative; }
+.tap-44::after {
+  content: "";
+  position: absolute;
+  inset: 50% 0 auto 0;
+  transform: translateY(-50%);
+  height: 100%;
+  min-height: 44px;
+}
 
 /* Honor reduced-motion: keep the press functional, drop the spring (BRAND.md §7, SPEC §8.2). */
 @media (prefers-reduced-motion: reduce) {
