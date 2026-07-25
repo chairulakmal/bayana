@@ -61,6 +61,12 @@ collaborative and explanatory.
   file per level. Committed. `decks/grammar-*.md` is **gitignored** (source not licensed
   for redistribution, SPEC.md §4.1), so grammar seeding needs a locally supplied deck.
 
+**Sibling projects** (separate repos, not derivable from this codebase): **Kalima**, whose
+JLPT mock exam is being absorbed into this app, and **bayan/zaka**, a published question
+dataset this app is becoming the reference consumer of. Planned, not built: scope in
+SPEC.md §2/§4.2, milestone in §13, checklist in TODO.md, and Kalima's own porting
+checklist in that repo.
+
 ## Working agreements
 
 - **Status:** live on Railway; Phases 1a through 3.5 are shipped and Phase 3 (MC↔FSRS

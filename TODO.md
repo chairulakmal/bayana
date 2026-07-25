@@ -9,6 +9,9 @@ for why it was done that way, and git for the detail. Decisions do **not** go he
 **Now: Phase 3** — MC↔FSRS coupling for Quiz mode (planned, not started).
 **Next: Phase 4** — Admin sentence audit + on-demand generation. Then Phase 5 (multi-user)
 and Phase 6 (further enhancements), both tracked only in SPEC.md §13 for now.
+**Unsequenced:** Kalima absorption + bayan/zaka consumer (section below). New scope, decided
+2026-07-26. Recorded as an unnumbered SPEC §13 milestone; not yet slotted against Phases 3
+to 6, and note it is coupled to Phase 4 (Kalima's rank review folds into that admin page).
 
 ---
 
@@ -54,6 +57,91 @@ existing POST `/api/review` endpoint.
   review-status field to `ExampleSentence`; accept/reject generated sentences (SPEC §13)
 - [ ] On-demand `/api/generate` + study-UI fetch-on-flip, with §11.4 guardrails:
   auth + per-user rate-limit + cache-first + bounded `max_tokens`
+
+---
+
+## Kalima absorption + bayan/zaka consumer (new scope, 2026-07-26)
+
+Kalima's JLPT mock exam moves into Bayana, and Bayana replaces Kalima as the named reference
+consumer of the bayan/zaka dataset. Both land in the same new table, so they are one piece of
+work, not two: Kalima's 496 seeded N3 vocabulary questions and bayan's published releases are
+the same kind of row from different sources.
+
+Why Bayana rather than Kalima, in one line each: Kalima is N3 vocabulary only across five
+question types, while this app already models N5 to N1, holds ~8,100 words plus a grammar
+table whose `pattern` matches bayan's `grammar_points`, and can grade an exported question
+into a learner's FSRS state. Full reasoning belongs in SPEC §14 and DECISIONS.md (see the
+housekeeping items below); the porting checklist for Kalima's side is in that repo's TODO.md.
+
+### Part A — the question store (decide before writing any of it)
+- [ ] **Shape the table like bayan's `ExportedQuestion`, not like Kalima's `ExamQuestion`.**
+  Kalima's five types are a subset of bayan's 22-value `question_type` enum (`reading` to
+  `read-kanji`, `orthography` to `pick-spelling`, `contextual` to `word-choice`, `synonym` to
+  `same-meaning`, `usage` to `right-sentence`). Keep bayan's `source` field to distinguish the
+  Kalima seed rows from dataset releases, and leave room for `stimuli` and `provenance` so
+  reading and listening need no second migration.
+- [ ] **Decide the overlap with Exam mode.** `src/lib/exam.ts` already builds 問題１/問題２ with
+  algorithmic confusability distractors and no FSRS coupling. Either it stays as the quick
+  benchmark while the imported pool powers a timed mock exam, or one of the two retires.
+  Log the choice in DECISIONS.md; do not leave both undocumented.
+- [ ] Write the Prisma migration. Note this repo uses real migrations (`prisma migrate dev`),
+  unlike Kalima's `db push` on boot, so the schema arrives as a reviewed migration.
+- [ ] Vocab crosswalk for bayan imports: match on expression plus reading, and keep it on this
+  side. Bayan deliberately cannot carry an Anki identifier (its Hard legal rule #4 rests on the
+  word lists having no third-party deck in the chain), so the join cannot come from there.
+
+### Part B — port from Kalima
+- [ ] Answer secrecy: `toClientQuestion` stripping, opaque choice IDs, answers resolved only
+  after submit. This is the property the mock exam is built around; port it first, not last.
+- [ ] The four session endpoints (`prepare` / `submit` / `results` / `analysis`) as route
+  handlers. Nitro's `defineEventHandler` maps onto `Request`/`NextResponse` mechanically.
+- [ ] Atomic `consumeBudget()` upsert plus the per-IP throttle for the analysis call. This repo
+  currently has only the in-memory limiter in `src/lib/rate-limit.ts`, which does not survive a
+  restart and cannot bound spend across replicas.
+- [ ] Timed 35-question vocabulary session (8-6-11-5-5, 30-minute timer) and the per-type
+  accuracy radar, rewritten in React. The radar is polar math plus SVG, so it ports nearly intact.
+- [ ] Wrong-answer review queue, rehomed from Kalima's localStorage onto per-user rows. Consider
+  whether it should feed `ReviewState` rather than living beside it.
+- [ ] Remap `wordId` from Kalima's cuids to `Word.id` via the shared Anki guid. Kalima's
+  `words/*.json` is already an export of this corpus, so the guid joins cleanly.
+- [ ] Carry `prisma/seed-data/passages-n3.json` across (20 short, 10 medium, 5 long, 10 info,
+  already generated and audited). Paid AI output that will otherwise be regenerated.
+- [ ] Fold Kalima's S-F rank review into the Phase 4 admin page under `UserProfile.role = ADMIN`
+  rather than porting its `ADMIN_PASSWORD` HMAC path. These two admin surfaces should be one.
+
+### Part C — access decision
+- [ ] Decide whether the mock exam is public. Kalima's homepage is deliberately open for
+  recruiters, which is most of its value; this app gates everything through `proxy.ts` except an
+  explicit list. If it stays public, add exact paths (not a prefix) to that list, consistent with
+  the `/api/demo/login` precedent in SPEC §11.8.
+
+### Part D — bayan/zaka consumer
+- [ ] Import path for a pinned `export.json` release tag: fetch, validate against a copy of
+  bayan's Zod schema, insert with `source` set. Pin a dated tag, never "latest".
+- [ ] CC BY 4.0 attribution surface for imported questions. This is a license obligation, not a
+  nicety.
+- [ ] Grade an imported question into `ReviewState` end to end. This is the behaviour that makes
+  Bayana worth naming as the reference consumer, so it is the acceptance test for Part D.
+
+### Part E — doc housekeeping
+
+Done 2026-07-26, before any code: SPEC §2 (scope change), §3 (terms), §4.2 (the third
+source-data class and its CC BY 4.0 obligation), §13 (unnumbered milestone), §14.9/§14.10
+(both resolved forks), §15 (two open forks), and the DECISIONS.md row. Remaining:
+
+- [ ] SPEC §13: give the milestone a phase number once it is sequenced.
+- [ ] SPEC §6 + §9: the question-store model and the session routes, both deliberately
+  deferred until the Exam-mode fork in §15 is resolved, since that answer changes the shape.
+- [ ] DECISIONS.md: a row for the Exam-mode overlap resolution, and one for the public-access
+  decision (Part C), when each is made.
+- [ ] **Claims that go false when this ships; flip each in the same commit as the code:**
+  SPEC §11.4 ("no web-reachable route that spends Anthropic tokens") and ARCHITECTURE's
+  "generation is a seeding pipeline, not a request-time feature", both broken by the analysis
+  endpoint; SPEC §12 (`ExampleSentence` as "the only paid, hard-to-regenerate artifact"),
+  broken by the passage set; SPEC §8's four-mode count; README's mode table and Credits
+  section, which owes the CC BY 4.0 attribution.
+- [ ] README + ARCHITECTURE truth pass once the mock exam is live, per the standing rule that
+  both must be true of the code in the same commit.
 
 ---
 
