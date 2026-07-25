@@ -15,12 +15,16 @@ import { setActiveLevel } from "@/app/home/actions";
 // N1 at top (hardest / the goal), N5 at bottom (easiest / the start): the shared order.
 import { LEVELS } from "@/components/level-chip";
 
-const LEVEL_LABEL: Record<string, string> = {
-  N1: "匠 · the artisan",
-  N2: "流暢へ · the expert",
-  N3: "上達 · the journeyman",
-  N4: "頑張れ · the practitioner",
-  N5: "はじめよう · the apprentice",
+// Split rather than one "匠 · the artisan" string: the row renders in --f-display, and
+// Fredoka has no CJK glyphs, so a combined label put every Japanese name in the system
+// font while the English half stayed on-brand. The two halves need different faces
+// (BRAND.md §4), which a single string cannot express.
+const LEVEL_LABEL: Record<string, { ja: string; en: string }> = {
+  N1: { ja: "匠", en: "the artisan" },
+  N2: { ja: "流暢へ", en: "the expert" },
+  N3: { ja: "上達", en: "the journeyman" },
+  N4: { ja: "頑張れ", en: "the practitioner" },
+  N5: { ja: "はじめよう", en: "the apprentice" },
 };
 
 export function LevelPicker({ current }: { current: string }) {
@@ -82,7 +86,10 @@ export function LevelPicker({ current }: { current: string }) {
                 color: active ? "var(--ink)" : "var(--ink-soft)",
               }}
             >
-              {LEVEL_LABEL[lvl]}
+              <span lang="ja" className="jp">
+                {LEVEL_LABEL[lvl].ja}
+              </span>{" "}
+              · {LEVEL_LABEL[lvl].en}
             </span>
 
             {/* Active indicator — green check, right-aligned */}

@@ -6,7 +6,7 @@
 |---|---|
 | **Status** | Living document; Phases 1a through 3.5 implemented and deployed (§13) |
 | **Author** | Chairul Akmal |
-| **Last updated** | 2026-07-26 (accessibility floors added to §8.4 with the alternatives in §14.11, following a BRAND.md review: contrast and keyboard-focus defects fixed in the session chrome, the level pickers, and the browse inputs; `--ink-faint` darkened to clear AA; BRAND.md resynced against `globals.css`. Same day: planned scope added in §2, §4.2, §13, §14.9/§14.10 and §15: the Kalima mock-exam absorption and the bayan/zaka consumer role, neither built yet. Same day: §16 decision log extracted to [DECISIONS.md](DECISIONS.md), leaving a pointer. 2026-07-25, documentation-consistency pass: §8 intro, §8.6, §9, §11.2/§11.3/§11.6 and §13 corrected against the implementation; §13 phases renumbered to admit the MC↔FSRS coupling phase. Earlier the same day: §8.5 rewritten for the `/home` landing and the revamped public `/`; §14.7/§14.8 added; deck-size figure corrected in §3) |
+| **Last updated** | 2026-07-26 (font weights trimmed to what the app renders and Japanese text returned to the Japanese face at nine sites, with the `next/font` deferral in §14.12. Same day: accessibility floors added to §8.4 with the alternatives in §14.11, following a BRAND.md review: contrast and keyboard-focus defects fixed in the session chrome, the level pickers, and the browse inputs; `--ink-faint` darkened to clear AA; BRAND.md resynced against `globals.css`. Same day: planned scope added in §2, §4.2, §13, §14.9/§14.10 and §15: the Kalima mock-exam absorption and the bayan/zaka consumer role, neither built yet. Same day: §16 decision log extracted to [DECISIONS.md](DECISIONS.md), leaving a pointer. 2026-07-25, documentation-consistency pass: §8 intro, §8.6, §9, §11.2/§11.3/§11.6 and §13 corrected against the implementation; §13 phases renumbered to admit the MC↔FSRS coupling phase. Earlier the same day: §8.5 rewritten for the `/home` landing and the revamped public `/`; §14.7/§14.8 added; deck-size figure corrected in §3) |
 | **Target platform** | Mobile-first responsive web (Next.js 16, deployed on Railway) |
 
 ---
@@ -1396,6 +1396,27 @@ The onboarding picker had already discovered this and carried a local `RING_COLO
 the browse picker needed the same map. Rather than copy it, both now import
 `src/components/level-chip.ts`. A duplicated contrast rule is a contrast bug with a delay
 on it: the second copy is the one nobody updates.
+
+### 14.12 Migrating fonts to `next/font` in the same pass as the weight trim
+
+**Deferred (not rejected).** The fonts are loaded by an `@import` at the top of
+`globals.css`, which is the slowest available entry point: the browser cannot request the
+Google stylesheet until `globals.css` has downloaded and parsed, so the font files land on
+a third hop, and both `fonts.googleapis.com` and `fonts.gstatic.com` need entries in the
+CSP (§11.3). `next/font/google` fixes all of that structurally, by downloading the faces at
+build time and serving them same-origin with the `@font-face` rules inlined into the page,
+which removes the separate stylesheet request entirely and allows `adjustFontFallback` to
+cut layout shift during `swap`.
+
+It was deferred out of the 2026-07-26 pass for two reasons. First, the weight trim in that
+pass is a one-line change with a measured 30 KB gzip saving and no behavioural risk, while
+the migration touches the CSP, the build, and every font-family declaration; bundling them
+would mean one change could not be reverted without the other. Second, the migration has a
+genuine unknown on this project specifically: `next/font` preloads the subsets it is given,
+and M PLUS Rounded 1c's Japanese subset is ~126 chunked files, so eagerly preloading it
+would plausibly be *worse* than the current on-demand fetching. The JP face likely wants
+`preload: false`, but that is a claim to verify against a real build with before/after
+numbers, not to assume. Tracked in TODO.md as its own change.
 
 ---
 

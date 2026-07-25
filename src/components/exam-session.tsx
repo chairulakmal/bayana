@@ -122,23 +122,25 @@ export function ExamSession({ level }: { level: string }) {
   if (showBreak) {
     return (
       <Centered>
-        <p
-          lang="ja" className="jp text-5xl"
-          style={{ fontFamily: "var(--f-display)", fontWeight: 800, color: "var(--ink)" }}
-        >
+        {/* No fontFamily override here. It used to force --f-display, but Fredoka carries
+            no CJK glyphs at all, so 問題２ silently fell through the stack to system-ui:
+            the section header was the one heading not in the brand's Japanese face. The
+            .jp class alone is correct, and M PLUS genuinely has the 800 that Fredoka
+            (which stops at 700) could only fake. */}
+        <p lang="ja" className="jp text-5xl" style={{ fontWeight: 800, color: "var(--ink)" }}>
           問題２
         </p>
         <p className="mt-2 text-[15px]" style={{ color: "var(--ink-soft)" }}>
-          漢字の書き方 — pick the kanji form
+          <span lang="ja" className="jp">漢字の書き方</span> — pick the kanji form
         </p>
         <p className="mt-4 text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 700 }}>
-          問題１ score: {readingScore} / {readingTotal}
+          <span lang="ja" className="jp">問題１</span> score: {readingScore} / {readingTotal}
         </p>
         <button
           onClick={() => setShowBreak(false)}
           className="btn btn-primary mt-6"
         >
-          Start 問題２
+          Start <span lang="ja" className="jp">問題２</span>
         </button>
       </Centered>
     );
@@ -156,11 +158,13 @@ export function ExamSession({ level }: { level: string }) {
         </p>
         <div className="mt-3 flex flex-col gap-1 text-[14px]" style={{ color: "var(--ink-soft)" }}>
           <p>
-            問題１ 読み方：{readingScore} / {readingTotal}
+            <span lang="ja" className="jp">問題１ 読み方：</span>
+            {readingScore} / {readingTotal}
           </p>
           {writingTotal > 0 && (
             <p>
-              問題２ 書き方：{writingScore} / {writingTotal}
+              <span lang="ja" className="jp">問題２ 書き方：</span>
+              {writingScore} / {writingTotal}
             </p>
           )}
         </div>
@@ -208,11 +212,14 @@ export function ExamSession({ level }: { level: string }) {
     current.type === "reading" ? index + 1 : index - readingTotal + 1;
   const sectionTotal = current.type === "reading" ? readingTotal : writingTotal;
 
-  // Prompt wording differs by question type.
-  const prompt =
+  // Prompt wording differs by question type. Split into its Japanese and English halves
+  // rather than one string: the two need different faces (BRAND.md §4, Japanese always
+  // renders in --f-jp, even inline within English), and a single string can only carry one.
+  const promptJa = current.type === "reading" ? "どう読みますか？" : "どう書きますか？";
+  const promptEn =
     current.type === "reading"
-      ? "どう読みますか？ (How is the underlined word read?)"
-      : "どう書きますか？ (What is the kanji for the underlined word?)";
+      ? "How is the underlined word read?"
+      : "What is the kanji for the underlined word?";
 
   return (
     <main className="flex h-svh flex-col pt-safe">
@@ -243,7 +250,7 @@ export function ExamSession({ level }: { level: string }) {
           {/* Prompt instruction — hidden once answered (no longer the focus) */}
           {!answered && (
             <p className="mt-1 text-[12px]" style={{ color: "var(--ink-faint)" }}>
-              {prompt}
+              <span lang="ja" className="jp">{promptJa}</span> ({promptEn})
             </p>
           )}
 

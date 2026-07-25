@@ -174,14 +174,38 @@ than renamed.
 
 ## 4. Typography
 
-| Role | Family | Token | Notes |
-|------|--------|-------|-------|
-| Display / UI labels | **Fredoka** (600) | `--f-display` | Headings, buttons, chips, stats. Tight tracking (`-0.01em`). |
-| Body | **Nunito** (400/700/800) | `--f-body` | Paragraphs, glosses, secondary text. |
-| Japanese | **M PLUS Rounded 1c** (500/700/800) | `--f-jp` | All kana/kanji — rounded to match the Latin voice. Fallback `"Hiragino Maru Gothic ProN"`. |
+| Role | Family | Token | Weights loaded | Notes |
+|------|--------|-------|----------------|-------|
+| Display / UI labels | **Fredoka** | `--f-display` | 400, 500, 600, 700 | Headings, buttons, chips, stats. Tight tracking (`-0.01em`). **Fredoka stops at 700**; asking for 800 gets a synthesised faux-bold. |
+| Body | **Nunito** | `--f-body` | 400, 600, 700 | Paragraphs, glosses, secondary text. |
+| Japanese | **M PLUS Rounded 1c** | `--f-jp` | 400, 700, 800 | All kana/kanji, rounded to match the Latin voice. Fallback `"Hiragino Maru Gothic ProN"`. |
 
-Japanese always uses `--f-jp`, even inline within English. Headings are rounded and
-friendly, never thin or condensed.
+The weight lists are exactly what the app renders, and they are the request in
+`globals.css`. Keep them in sync in both directions: a weight used but not loaded is
+faux-bolded by the browser, and a weight loaded but not used is dead payload.
+
+**Japanese always uses `--f-jp`, even inline within English.** This is the rule most often
+broken, because breaking it looks *almost* right: **neither Fredoka nor Nunito contains a
+single CJK glyph**, so Japanese set in them does not fail visibly. It silently falls
+through the font stack to `system-ui`, and the text renders in the reader's OS font next to
+brand-face Latin. Any string mixing scripts has to mark up its Japanese run:
+
+```jsx
+<span lang="ja" className="jp">問題１</span> score: {readingScore} / {readingTotal}
+```
+
+That is also why a component prop holding mixed-script copy should be a `ReactNode` rather
+than a `string`: a bare string can only carry one face. Where a label is conceptually one
+value with two scripts (the JLPT level names, the exam prompts), store the halves
+separately rather than concatenating them.
+
+**Adding a Japanese weight is expensive; adding a Latin one is not.** Google splits CJK
+into ~126 `unicode-range` chunks, so each M PLUS weight costs ~126 `@font-face` rules and
+roughly 30 KB gzipped *in the stylesheet itself*, before any glyph is painted. Trimming
+three unused weights took the served CSS from 479 KB / 541 rules to 359 KB / 405 rules.
+Justify a fourth JP weight before adding it.
+
+Headings are rounded and friendly, never thin or condensed.
 
 ---
 
@@ -334,5 +358,7 @@ token layer.
 and nothing consumed. Width capping is done with Tailwind: `max-w-md` for app screens (the
 mobile-first column) and `max-w-5xl` for the marketing page.
 
-Fonts load from Google Fonts: `Fredoka` (400–700), `Nunito` (400–900), `M PLUS Rounded 1c`
-(400–800).
+Fonts load from Google Fonts via an `@import` at the top of `globals.css`: `Fredoka`
+(400/500/600/700), `Nunito` (400/600/700), `M PLUS Rounded 1c` (400/700/800). Those are the
+weights §4 lists, and nothing else. Self-hosting them with `next/font` (fewer network hops,
+no third-party origins in the CSP) is deferred, not rejected: TODO.md and SPEC §14.12.

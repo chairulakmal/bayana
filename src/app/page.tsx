@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getOptionalUser } from "@/lib/current-user";
@@ -194,7 +195,13 @@ export default async function Home() {
             <Feature
               emoji="📝"
               title="Exam"
-              body="JLPT-style 漢字の読み方 and 漢字の書き方 sections, with distractors picked to be genuinely confusable. A benchmark, not a grind."
+              body={
+                <>
+                  JLPT-style <span lang="ja" className="jp">漢字の読み方</span> and{" "}
+                  <span lang="ja" className="jp">漢字の書き方</span> sections, with distractors
+                  picked to be genuinely confusable. A benchmark, not a grind.
+                </>
+              }
             />
             <Feature
               emoji="✏️"
@@ -414,8 +421,10 @@ function Metric({ value, label }: { value: string; label: string }) {
   );
 }
 
-/** One feature card: white surface, rounded, with a soft brand shadow (BRAND.md §7). */
-function Feature({ emoji, title, body }: { emoji: string; title: string; body: string }) {
+/** One feature card: white surface, rounded, with a soft brand shadow (BRAND.md §7).
+ *  `body` is a ReactNode, not a string, so a card can mark up its Japanese runs with
+ *  `.jp`: the card text is Nunito, which has no CJK glyphs (BRAND.md §4). */
+function Feature({ emoji, title, body }: { emoji: string; title: string; body: ReactNode }) {
   return (
     <div
       className="rounded-[var(--r-lg)] p-5"

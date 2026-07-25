@@ -179,6 +179,9 @@ capacity allows.
   session-header pills and both level-picker chip rows fixed 2026-07-26.)
 - [ ] Root `error.tsx` / `loading.tsx` / `not-found.tsx` (currently unstyled defaults).
 - [ ] Grammar hub: inline level switcher (currently vocab-hub-only).
+- [ ] Decide whether M PLUS Rounded 1c needs three weights. It loads 400/700/800; the big
+  kanji use 800. Collapsing 800 into 700 saves ~126 `@font-face` rules and ~30 KB gzip
+  (BRAND.md §4 on why JP weights cost what they do). Design call, not a perf call.
 - [ ] Dark mode: decide (support or explicit non-goal) and log it in DECISIONS.md. Interim
   state as of 2026-07-26: light-only, now *declared* via `color-scheme: light` so UA chrome
   can't render dark against the cream surfaces. That fixes the leak, not the question.
@@ -199,7 +202,12 @@ capacity allows.
   module-private) so they can be unit-tested; then test them + the highlighted-sentence
   token pipeline.
 - [ ] Log hygiene: audit `console.error` calls for payloads that shouldn't be logged.
-- [ ] Migrate to `next/font` (self-hosted) — also lets CSP drop the Google Fonts hosts.
+- [ ] Migrate to `next/font` (self-hosted); also lets CSP drop the Google Fonts hosts.
+  Rationale and the deferral reason are in SPEC §14.12. Current cost after the 2026-07-26
+  weight trim: 358.8 KB / 405 `@font-face` rules, fetched on a third hop because
+  `globals.css` reaches it via `@import`. Set `preload: false` on the JP face and verify
+  with a real before/after build: `next/font` preloads the subsets it is given, and M PLUS
+  Rounded 1c's Japanese subset is ~126 chunked files.
 
 ### Local environment
 - [ ] `.env` pins `NODE_OPTIONS=--max-old-space-size=256`, which OOM-kills `next build`'s

@@ -1,6 +1,22 @@
 /* Bayana global styles — brand foundation (BRAND.md).
-   Google Fonts must be @imported before any other rules. */
-@import url("https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800;900&family=M+PLUS+Rounded+1c:wght@400;500;700;800&display=swap");
+   Google Fonts must be @imported before any other rules.
+
+   Request only weights the app actually renders. This is not micro-optimisation: Google
+   splits Japanese into ~126 unicode-range chunks, so every M PLUS weight adds ~126
+   @font-face rules to this stylesheet whether or not a glyph from it is ever painted.
+   Dropping three unused weights (Nunito 800/900, M PLUS 500) took the served CSS from
+   479 KB / 541 rules to 359 KB / 405 rules, about 30 KB gzipped off the critical path.
+
+   Weights in use, verified against the source: Fredoka 400/500/600/700 (Fredoka stops at
+   700, so asking for 800 gets a synthesised faux-bold), Nunito 400/600/700, M PLUS 400
+   (inherited by .jp text with no explicit weight) / 700 / 800. Adding a weight here is
+   cheap for the Latin faces and expensive for the Japanese one; check before you do.
+
+   This @import is also the slowest possible entry point: the browser cannot request the
+   Google stylesheet until this file has downloaded and parsed, putting the font files on
+   a third hop. Migrating to next/font (self-hosted, same-origin, no separate stylesheet)
+   is tracked in TODO.md and deferred here; see SPEC §14.12. */
+@import url("https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700&family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap");
 @import "tailwindcss";
 
 /* ── Design tokens (BRAND.md §8) ───────────────────────────────────────────── */
