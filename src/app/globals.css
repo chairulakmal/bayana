@@ -158,6 +158,32 @@ body {
 .opt-correct { background: #eafaf1; border-color: var(--good); color: var(--good-edge); box-shadow: 0 3px 0 var(--good-edge); }
 .opt-wrong   { background: #ffe9ee; border-color: var(--bad);  color: #b12a44;        box-shadow: 0 3px 0 #d63a55; }
 
+/* Keycap badge for the study-mode keyboard shortcuts (SPEC §8.4). A shortcut nobody can
+   discover is dead weight, so each key is printed on the control it drives rather than
+   documented on a help screen the user would have to go looking for.
+
+   Hidden unless the device has a precise pointer, which is the closest proxy the platform
+   offers for "there is probably a physical keyboard attached". Deliberately not a width
+   breakpoint: a 768px touch tablet has no keys to press, and the 375px baseline this app
+   is designed against (BRAND.md platform note) must render byte-identically to before.
+
+   Colour is `currentColor` at full opacity, never a faded one. The badge sits on four
+   different button fills (coral, yellow, green, grape), and fading a passing pair with
+   alpha is exactly the composite BRAND.md §3 forbids; inheriting the label's own colour
+   means it can only ever be as legible as the label beside it. It is aria-hidden at every
+   call site, since it duplicates a key binding rather than carrying information. */
+.kbd-hint {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--f-body); font-weight: 700; font-size: 10px; line-height: 1;
+  padding: 3px 5px; border-radius: 4px;
+  border: 1px solid currentColor;
+}
+@media (hover: hover) and (pointer: fine) {
+  .kbd-hint { display: inline-flex; }
+}
+
 /* ── Accessibility utilities ─────────────────────────────────────────────────
    Two cross-cutting helpers. Both exist because the obvious inline fix doesn't work:
    an element with `style={{ border: ... }}` beats any Tailwind `focus:border-*` class,

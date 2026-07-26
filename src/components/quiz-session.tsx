@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Parrot } from "@/components/parrot";
 import { SessionHeader, SessionHeaderLink } from "@/components/session-header";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 
 type Option = { meaning: string; correct: boolean };
 type Question = {
@@ -51,6 +52,51 @@ export function QuizSession({ level }: { level: string }) {
     void load();
   }, [load]);
 
+  // --- derived state and actions ---
+  //
+  // These sit above the early returns below rather than beside the markup that uses them,
+  // because the keyboard hook closes over them and hooks must run on every render (the
+  // rules of hooks): a `useKeyboardShortcuts` call placed after `if (questions === null)
+  // return …` would silently unbind itself whenever the queue was loading. Hoisting them
+  // also lines this component up with study-session.tsx, which already reads state →
+  // actions → render branches.
+  const total = questions?.length ?? 0;
+  const current = questions && index < total ? questions[index] : null;
+  const answered = picked !== null;
+  const correctIndex = current ? current.options.findIndex((o) => o.correct) : -1;
+
+  // Self-guarding so the keyboard map can bind all four digits unconditionally: a "4"
+  // pressed on a three-option question, or any key after the answer is in, is a no-op.
+  const choose = useCallback(
+    (i: number) => {
+      if (!current || picked !== null || i >= current.options.length) return;
+      setPicked(i);
+      if (current.options[i].correct) setScore((s) => s + 1);
+    },
+    [current, picked],
+  );
+
+  const next = useCallback(() => {
+    setPicked(null);
+    setIndex((i) => i + 1);
+  }, []);
+
+  // --- keyboard shortcuts (SPEC §8.4) ---
+  //
+  // Digits pick an option, Space/Enter continues once answered. Disabled on the loading,
+  // empty and summary screens, all of which set `current` to null.
+  useKeyboardShortcuts(
+    {
+      "1": () => choose(0),
+      "2": () => choose(1),
+      "3": () => choose(2),
+      "4": () => choose(3),
+      space: answered ? next : undefined,
+      enter: answered ? next : undefined,
+    },
+    current !== null,
+  );
+
   // --- render states ---
 
   if (questions === null) {
@@ -81,10 +127,10 @@ export function QuizSession({ level }: { level: string }) {
     );
   }
 
-  const total = questions.length;
-
-  // Round complete → summary.
-  if (index >= total) {
+  // Round complete → summary. Branching on `current` rather than on `index >= total`
+  // (the two are equivalent here) is what narrows `current` to non-null for the rest of
+  // the function, so the active-question markup below needs no assertion.
+  if (current === null) {
     return (
       <Centered>
         <Parrot expr="wow" title="Pī cheering" style={{ width: 124, height: 138 }} />
@@ -105,20 +151,6 @@ export function QuizSession({ level }: { level: string }) {
       </Centered>
     );
   }
-
-  const current = questions[index];
-  const answered = picked !== null;
-  const correctIndex = current.options.findIndex((o) => o.correct);
-
-  const choose = (i: number) => {
-    if (answered) return;
-    setPicked(i);
-    if (current.options[i].correct) setScore((s) => s + 1);
-  };
-  const next = () => {
-    setPicked(null);
-    setIndex((i) => i + 1);
-  };
 
   return (
     <main className="flex h-svh flex-col pt-safe">
@@ -190,7 +222,15 @@ export function QuizSession({ level }: { level: string }) {
             else if (answered && i === picked) cls += " opt-wrong";
             return (
               <button key={i} className={cls} disabled={answered} onClick={() => choose(i)}>
-                <span>{o.meaning}</span>
+                {/* Keycap and label are grouped so .opt keeps exactly two flex children.
+                    Its `justify-content: space-between` is what pins the ✓/✕ to the right
+                    edge, and a third top-level child would push the label to the middle. */}
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="kbd-hint" aria-hidden>
+                    {i + 1}
+                  </span>
+                  <span>{o.meaning}</span>
+                </span>
                 {answered && i === correctIndex && <span aria-hidden>✓</span>}
                 {answered && i === picked && i !== correctIndex && <span aria-hidden>✕</span>}
               </button>
@@ -200,6 +240,9 @@ export function QuizSession({ level }: { level: string }) {
         {answered && (
           <button onClick={next} className="btn btn-primary mt-3 w-full">
             {index + 1 === total ? "See results" : "Continue"}
+            <span className="kbd-hint" aria-hidden>
+              Space
+            </span>
           </button>
         )}
       </footer>

@@ -15,6 +15,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Parrot } from "@/components/parrot";
 import { SessionHeader, SessionHeaderLink } from "@/components/session-header";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 
 type Option = { text: string; correct: boolean };
 
@@ -80,6 +81,66 @@ export function ExamSession({ level }: { level: string }) {
     void load();
   }, [load]);
 
+  // --- Derived state and actions ---
+  //
+  // Hoisted above the early returns for the same reason as in quiz-session.tsx: the
+  // keyboard hook closes over them and has to run on every render.
+  const total = questions?.length ?? 0;
+  // The split point is where 問題２ begins (first writing question index).
+  const writingStart = questions ? questions.findIndex((q) => q.type === "writing") : -1;
+  // If all questions are one type, writingStart is -1 — treat as past the end.
+  const readingTotal = writingStart === -1 ? total : writingStart;
+  const writingTotal = total - readingTotal;
+
+  const current = questions && index < total ? questions[index] : null;
+  const answered = picked !== null;
+  const correctIndex = current ? current.options.findIndex((o) => o.correct) : -1;
+
+  // Self-guarding, so the keyboard map can bind all four digits unconditionally.
+  const choose = useCallback(
+    (i: number) => {
+      if (!current || picked !== null || i >= current.options.length) return;
+      setPicked(i);
+      if (current.options[i].correct) {
+        if (current.type === "reading") setReadingScore((s) => s + 1);
+        else setWritingScore((s) => s + 1);
+      }
+    },
+    [current, picked],
+  );
+
+  const next = useCallback(() => {
+    setPicked(null);
+    const nextIndex = index + 1;
+    // Trigger the section break when crossing from reading to writing.
+    if (writingStart !== -1 && nextIndex === writingStart) {
+      setShowBreak(true);
+    }
+    setIndex(nextIndex);
+  }, [index, writingStart]);
+
+  // --- Keyboard shortcuts (SPEC §8.4) ---
+  //
+  // The section break gets Space/Enter too. Without it the keyboard flow would hit a wall
+  // exactly once per round, halfway through, which is worse than having no shortcuts at
+  // all: the user learns the keys, then gets stranded on a screen that ignores them.
+  useKeyboardShortcuts(
+    showBreak
+      ? {
+          space: () => setShowBreak(false),
+          enter: () => setShowBreak(false),
+        }
+      : {
+          "1": () => choose(0),
+          "2": () => choose(1),
+          "3": () => choose(2),
+          "4": () => choose(3),
+          space: answered ? next : undefined,
+          enter: answered ? next : undefined,
+        },
+    current !== null,
+  );
+
   // --- Loading / empty / error states ---
 
   if (questions === null) {
@@ -110,13 +171,6 @@ export function ExamSession({ level }: { level: string }) {
     );
   }
 
-  const total = questions.length;
-  // The split point is where 問題２ begins (first writing question index).
-  const writingStart = questions.findIndex((q) => q.type === "writing");
-  // If all questions are one type, writingStart is -1 — treat as past the end.
-  const readingTotal = writingStart === -1 ? total : writingStart;
-  const writingTotal = total - readingTotal;
-
   // --- Section break screen between 問題１ and 問題２ ---
 
   if (showBreak) {
@@ -141,14 +195,21 @@ export function ExamSession({ level }: { level: string }) {
           className="btn btn-primary mt-6"
         >
           Start <span lang="ja" className="jp">問題２</span>
+          <span className="kbd-hint" aria-hidden>
+            Space
+          </span>
         </button>
       </Centered>
     );
   }
 
   // --- Summary screen ---
+  //
+  // Branching on `current` rather than `index >= total` (equivalent here) narrows it to
+  // non-null for the active-question markup below, which would otherwise need an assertion
+  // now that `current` is computed up top for the keyboard hook.
 
-  if (index >= total) {
+  if (current === null) {
     const totalScore = readingScore + writingScore;
     return (
       <Centered>
@@ -181,30 +242,6 @@ export function ExamSession({ level }: { level: string }) {
   }
 
   // --- Active question ---
-
-  const current = questions[index];
-  const answered = picked !== null;
-  const correctIndex = current.options.findIndex((o) => o.correct);
-
-  const choose = (i: number) => {
-    if (answered) return;
-    setPicked(i);
-    const correct = current.options[i].correct;
-    if (correct) {
-      if (current.type === "reading") setReadingScore((s) => s + 1);
-      else setWritingScore((s) => s + 1);
-    }
-  };
-
-  const next = () => {
-    setPicked(null);
-    const nextIndex = index + 1;
-    // Trigger the section break when crossing from reading to writing.
-    if (writingStart !== -1 && nextIndex === writingStart) {
-      setShowBreak(true);
-    }
-    setIndex(nextIndex);
-  };
 
   // Determine display question number within its section.
   const sectionLabel = current.type === "reading" ? "問題１" : "問題２";
@@ -321,7 +358,13 @@ export function ExamSession({ level }: { level: string }) {
                 disabled={answered}
                 onClick={() => choose(i)}
               >
-                <span>{o.text}</span>
+                {/* Grouped so .opt keeps two flex children (see quiz-session.tsx). */}
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="kbd-hint" aria-hidden>
+                    {i + 1}
+                  </span>
+                  <span>{o.text}</span>
+                </span>
                 {answered && i === correctIndex && <span aria-hidden>✓</span>}
                 {answered && i === picked && i !== correctIndex && <span aria-hidden>✕</span>}
               </button>
@@ -331,6 +374,9 @@ export function ExamSession({ level }: { level: string }) {
         {answered && (
           <button onClick={next} className="btn btn-primary mt-3 w-full">
             {index + 1 === total ? "See results" : "Continue"}
+            <span className="kbd-hint" aria-hidden>
+              Space
+            </span>
           </button>
         )}
       </footer>

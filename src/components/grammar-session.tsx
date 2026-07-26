@@ -12,6 +12,7 @@ import Link from "next/link";
 import { Parrot } from "@/components/parrot";
 import { SessionHeader, SessionHeaderLink } from "@/components/session-header";
 import { HighlightedSentence } from "@/components/highlighted-sentence";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 
 // --- shapes returned by GET /api/grammar/queue ---
 
@@ -138,6 +139,26 @@ export function GrammarSession({ level }: { level: string }) {
       }
     },
     [current, cards, index, busy],
+  );
+
+  // --- keyboard shortcuts (SPEC §8.4) ---
+  //
+  // Identical map to study-session.tsx minus `u`, since grammar has no undo yet (see the
+  // header comment above, and the TODO item that would add it). Keeping the two maps
+  // otherwise the same matters more than it looks: the whole value of a shortcut is that
+  // it transfers, and a learner moving between the vocab and grammar queues in one sitting
+  // should not have to remember which one 3 means "Good" in.
+  const cardVisible = current !== null && !sessionDone && !loadFailed;
+  useKeyboardShortcuts(
+    {
+      space: flipped ? undefined : () => setFlipped(true),
+      enter: flipped ? undefined : () => setFlipped(true),
+      "1": flipped ? () => void rate(1) : undefined,
+      "2": flipped ? () => void rate(2) : undefined,
+      "3": flipped ? () => void rate(3) : undefined,
+      "4": flipped ? () => void rate(4) : undefined,
+    },
+    cardVisible,
   );
 
   // --- render states ---
@@ -315,12 +336,18 @@ export function GrammarSession({ level }: { level: string }) {
                 className={`rate ${r.cls}`}
               >
                 {r.label}
+                <span className="kbd-hint ml-1.5" aria-hidden>
+                  {r.value}
+                </span>
               </button>
             ))}
           </div>
         ) : (
           <button onClick={() => setFlipped(true)} className="btn btn-primary w-full">
             Show answer
+            <span className="kbd-hint" aria-hidden>
+              Space
+            </span>
           </button>
         )}
       </footer>

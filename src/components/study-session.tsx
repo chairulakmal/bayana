@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Parrot } from "@/components/parrot";
 import { SessionHeader, SessionHeaderLink, SessionHeaderButton } from "@/components/session-header";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 
 // --- shapes returned by GET /api/cards/queue ---
 type QueueWord = {
@@ -172,6 +173,31 @@ export function StudySession({ level }: { level: string }) {
     }
   }, [busy, reviewed]);
 
+  // --- keyboard shortcuts (SPEC §8.4) ---
+  //
+  // Bound only while a card is actually on screen. The loading, load-failure and
+  // session-complete screens are ordinary two-or-three-button layouts reachable by Tab;
+  // a global Space handler over them would be a surprise, not a shortcut.
+  //
+  // Space/Enter reveals and then deliberately goes inert: Anki maps Space to "Good" once
+  // the answer is showing, and this app does not (SPEC §14.18). Rating is 1–4 only, so a
+  // reflexive Space can never schedule a card the user had not finished reading.
+  const cardVisible = current !== null && !sessionDone && !loadFailed;
+  useKeyboardShortcuts(
+    {
+      space: flipped ? undefined : () => setFlipped(true),
+      enter: flipped ? undefined : () => setFlipped(true),
+      "1": flipped ? () => void rate(1) : undefined,
+      "2": flipped ? () => void rate(2) : undefined,
+      "3": flipped ? () => void rate(3) : undefined,
+      "4": flipped ? () => void rate(4) : undefined,
+      // No `flipped` guard: undo self-guards on `busy` and an empty history, and the
+      // whole point of undo is that it is reachable the instant you realise the mistake.
+      u: () => void undo(),
+    },
+    cardVisible,
+  );
+
   // --- render states ---
 
   if (cards === null) {
@@ -278,8 +304,15 @@ export function StudySession({ level }: { level: string }) {
             {remaining} left
           </>
         }
+        /* Undo advertises its shortcut via `title` rather than a .kbd-hint keycap: this
+           pill is deliberately the quietest control on the screen (BRAND.md §7 session
+           chrome), and a badge here would cost more than the hint is worth. */
         right={
-          <SessionHeaderButton onClick={undo} disabled={busy || reviewed.length === 0}>
+          <SessionHeaderButton
+            onClick={undo}
+            disabled={busy || reviewed.length === 0}
+            title="Undo last rating (U)"
+          >
             Undo
           </SessionHeaderButton>
         }
@@ -356,12 +389,20 @@ export function StudySession({ level }: { level: string }) {
             {RATINGS.map((r) => (
               <button key={r.value} onClick={() => rate(r.value)} disabled={busy} className={`rate ${r.cls}`}>
                 {r.label}
+                {/* .rate has no flex gap of its own (unlike .btn), so the badge brings its
+                    own spacing. It collapses with the badge when display:none applies. */}
+                <span className="kbd-hint ml-1.5" aria-hidden>
+                  {r.value}
+                </span>
               </button>
             ))}
           </div>
         ) : (
           <button onClick={() => setFlipped(true)} className="btn btn-primary w-full">
             Show answer
+            <span className="kbd-hint" aria-hidden>
+              Space
+            </span>
           </button>
         )}
       </footer>
