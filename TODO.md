@@ -4,7 +4,7 @@ Open work only: what is planned, in flight, or found-but-not-fixed. This file is
 
 **Now: Phase 3.** MC↔FSRS coupling for Quiz mode (planned, not started).
 
-**Alongside it: the UI/UX + performance workstream** (next section). Feature-independent, so it interleaves with any phase rather than queueing behind one.
+**Parked: the UI/UX + performance workstream** (next section). Everything reachable on a finished page has landed; the two items left are both deferred by decision on 2026-07-26, so this no longer interleaves with the phases the way it did.
 
 **Next: Phase 4.** Admin sentence audit + on-demand generation. Then Phase 5 (multi-user) and Phase 6 (further enhancements), both tracked only in SPEC.md §13 for now.
 
@@ -14,23 +14,24 @@ Open work only: what is planned, in flight, or found-but-not-fixed. This file is
 
 ## ▶ UI/UX + performance workstream
 
-Everything user-facing that is known-wrong or known-missing, promoted out of the review backlog into one ordered list. The app is live and mobile-first, so these are not cosmetic leftovers: a visitor meets them before meeting any feature. Ordered by user-visible impact, and each item is independent, so any one can land on its own.
+Everything user-facing that is known-wrong or known-missing. Originally an ordered list worked top-down; the items reachable on pages that are otherwise finished (route states, hit targets, keyboard and screen-reader gaps, navigation parity) all landed on 2026-07-26 and were deleted as they did.
 
-Re-verified against the code 2026-07-26; sizes below are measured, not estimated, and items the font/accessibility work already closed were deleted rather than re-listed.
+**Both remaining items are deferred, and neither is waiting on capacity.** One is blocked on other work, the other on a decision that was explicitly postponed. Do not pull either in as filler.
 
-### 1. Performance: subset the Japanese face
+### 1. Performance: subset the Japanese face — blocked on bayan
+
+**Deferred 2026-07-26: starts only once bayan is finished.** Not a capacity call. The sibling bayan/zaka dataset is the nearer-term commitment, and this is a self-contained build-pipeline project that will still be worth exactly as much later.
 
 - [ ] `src/app/fonts.ts` now self-hosts M PLUS Rounded 1c at 400/700 with `preload: false`, but Google still slices Japanese into ~126 `unicode-range` chunks *per weight*, so ~252 `@font-face` rules are inlined into every page's CSS for glyphs that page will never use. Serving a `fonttools` subset of the ~2,500 characters the deck actually uses via `next/font/local` collapses that to a handful of rules.
   - **Re-measure before starting.** The ~66 KB-gzipped figure in SPEC §14.12 predates dropping weight 800 and moving both Latin faces to variable fonts, so the current cost is unknown.
   - Still a real project rather than a config change: it needs a build step plus a decided answer for what happens when a generated sentence contains a kanji outside the subset.
+  - **Note the interaction with the Kalima/bayan work**, which is the thing it waits on: imported questions and the N3 passage set introduce Japanese text this app did not author, so the "kanji outside the subset" question has a wider blast radius after that lands than before. Deciding it first would have meant deciding it twice.
 
-### 2. UX correctness
+### 2. UX correctness: day boundaries — deferred pending a timezone decision
 
-- [ ] Day boundaries use local-*server* midnight (`setHours(0,0,0,0)`) in `getGrammarStats` and in `startOfToday` (`src/lib/home.ts`, which powers the hub's "done today"), so a user in another timezone can watch the count reset mid-session. Wire in a per-user timezone / day-start; the hub's helper is centralised, so the fix is one function.
+**Deferred 2026-07-26.** The fix is small; what it needs first is a decision on where a user's timezone comes from (profile field, browser-reported, or a fixed offset), and that was postponed rather than made.
 
-### 3. Open design question
-
-- [ ] Dark mode: support it or declare it an explicit non-goal, and log the call in DECISIONS.md. Interim state as of 2026-07-26 is light-only, now *declared* via `color-scheme: light` (`globals.css:18`) so UA chrome cannot paint dark against the cream surfaces. That closes the leak, not the question.
+- [ ] Day boundaries use local-*server* midnight (`setHours(0,0,0,0)`) in `getGrammarStats` and in `startOfToday` (`src/lib/home.ts`, which powers the hub's "done today"), so a user in another timezone can watch the count reset mid-session. The hub's helper is centralised, so the code change is one function; the open part is the source of truth for the offset.
 
 ---
 
