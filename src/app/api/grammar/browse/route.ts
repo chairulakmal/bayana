@@ -1,24 +1,26 @@
 // GET /api/grammar/browse?level=N3
 //
 // Returns every GrammarPoint for one level, grouped by lesson, for the /grammar/browse
-// reference view. Unlike /api/browse (vocab), sentences are included directly in the
-// payload rather than lazy-loaded per row — the grammar deck is two orders of magnitude
-// smaller (~220 rows vs ~8,800 words), so there's no size/cost reason to defer them.
+// reference view. The payload is built by `buildGrammarBrowse` (`lib/grammar-browse.ts`),
+// which documents the shape and why sentences and per-user status are both inline.
 //
-// Each point also carries a `status` ("new" | "started" | "mature") derived from the
-// user's GrammarProgress, mirroring /api/browse's `started` flag — the reference view is
-// otherwise just a static list, and a learner scanning ~220 points before an exam needs a
-// way to tell what's already solid vs. what's new without switching to study mode.
-// "mature" reuses getGrammarStats' threshold (scheduledDays >= 21).
+// **The page no longer calls this.** `/grammar/browse` builds its lessons during the server
+// render (SPEC §9.3), so nothing in the app fetches this route today. It survives on purpose,
+// as the documented, cacheable HTTP surface the reads-stay-route-handlers convention asks reads
+// to keep (SPEC §9.2, §14.16), and because delegating to the shared builder costs almost
+// nothing, whereas re-deriving this payload later would cost the drift. If it is ever deleted,
+// delete it deliberately rather than as cleanup: the page's data shape is the contract, and this
+// is the only thing asserting it is expressible over HTTP.
 //
-// Cache-Control: grammar points are seeded once from decks/grammar-*.md and change only
-// when that file is re-seeded, but the response is now user-specific (status depends on
-// GrammarProgress) — same reasoning /api/browse gives for staying `private` rather than a
-// shared CDN cache.
+// Cache-Control: grammar points are seeded once from decks/grammar-*.md and change only when
+// that file is re-seeded, but the response is user-specific (status depends on
+// GrammarProgress), so it stays `private` with the shorter of the two browse lifetimes. This is
+// the coupling `/api/browse` was split to escape (see `lib/browse.ts`); it is left alone here
+// because ~220 rows do not justify a second round trip to decouple.
 
 import { NextResponse } from "next/server";
 import { getCurrentUserId } from "@/lib/current-user";
-import { db } from "@/lib/db";
+import { buildGrammarBrowse } from "@/lib/grammar-browse";
 import { GRAMMAR_LEVELS } from "@/lib/grammar-review";
 
 export const runtime = "nodejs";
@@ -36,71 +38,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: `Unknown level "${level}"` }, { status: 400 });
   }
 
-  // Fetch the point list and the user's progress on this level in parallel — two cheap
-  // queries, same pattern as /api/browse's words + startedRows.
-  const [points, progressRows] = await Promise.all([
-    db.grammarPoint.findMany({
-      where: { level },
-      orderBy: [{ lesson: "asc" }, { position: "asc" }],
-      select: {
-        id: true,
-        lesson: true,
-        lessonTitle: true,
-        position: true,
-        pattern: true,
-        reading: true,
-        meanings: true,
-        exampleJp: true,
-        exampleEn: true,
-      },
-    }),
-    db.grammarProgress.findMany({
-      where: { userId, grammarPoint: { level } },
-      select: { grammarPointId: true, scheduledDays: true },
-    }),
-  ]);
-
-  const matureIds = new Set(
-    progressRows.filter((r) => r.scheduledDays >= 21).map((r) => r.grammarPointId),
-  );
-  const startedIds = new Set(progressRows.map((r) => r.grammarPointId));
-
-  function statusFor(pointId: string): "new" | "started" | "mature" {
-    if (matureIds.has(pointId)) return "mature";
-    if (startedIds.has(pointId)) return "started";
-    return "new";
-  }
-
-  // Group into lesson buckets. Points are already ordered by lesson/position, so a
-  // single linear pass (rather than a second sort) is enough to build the groups.
-  type PointRow = {
-    id: string;
-    position: number;
-    pattern: string;
-    reading: string;
-    meanings: string[];
-    exampleJp: string;
-    exampleEn: string;
-    status: "new" | "started" | "mature";
-  };
-  const lessons: { lesson: number; title: string; points: PointRow[] }[] = [];
-  for (const p of points) {
-    let bucket = lessons[lessons.length - 1];
-    if (!bucket || bucket.lesson !== p.lesson) {
-      bucket = { lesson: p.lesson, title: p.lessonTitle, points: [] };
-      lessons.push(bucket);
-    }
-    bucket.points.push({
-      id: p.id,
-      position: p.position,
-      pattern: p.pattern,
-      reading: p.reading,
-      meanings: p.meanings,
-      exampleJp: p.exampleJp,
-      exampleEn: p.exampleEn,
-      status: statusFor(p.id),
-    });
-  }
+  const lessons = await buildGrammarBrowse(userId, level);
 
   return NextResponse.json(
     { level, lessons },

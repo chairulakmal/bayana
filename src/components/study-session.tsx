@@ -192,7 +192,7 @@ export function StudySession({
   // commit can cut a screen reader off mid-sentence. Rating keys work from anywhere, so nothing is
   // lost by staying put.
   const showAnswerRef = useRef<HTMLButtonElement>(null);
-  const doneRef = useRef<HTMLParagraphElement>(null);
+  const doneRef = useRef<HTMLHeadingElement>(null);
   const focusTarget = sessionDone || !current ? doneRef : flipped ? null : showAnswerRef;
   useFocusOnTransition(focusTarget, `${index}:${flipped}:${sessionDone}`);
 
@@ -225,6 +225,21 @@ export function StudySession({
   //
   // There is no loading branch. The first queue arrives as a prop, and the wait that used to
   // live here is now `<Suspense>`'s fallback in `app/study/page.tsx` (`SessionLoading`).
+  //
+  // **Every branch below renders exactly one `<h1>`**, and this is the pattern all four
+  // session components follow (SPEC §8.4). The branches are mutually exclusive renders of
+  // the same route, so "one `<h1>` per page" means one per branch, not one per file.
+  //
+  //   - The load-failure and session-complete screens already had a display-type headline;
+  //     it is now marked up as the heading it visually is. On the complete screen that is
+  //     the same element that already carries `ref` + `tabIndex={-1}`, so the two mechanisms
+  //     coincide rather than competing: focus lands on the heading, which is exactly what a
+  //     screen reader wants read out on arrival.
+  //   - The *active* card screen has no visible headline by design — the card is the
+  //     content, and a title bar above it would be chrome competing with recall. It gets a
+  //     visually-hidden `<h1>` instead, so heading navigation finds the screen without
+  //     changing a pixel. Naming the level in it ("Flashcards · N3") means the heading also
+  //     answers "which deck am I in?", which the level chip answers for sighted users.
 
   // Refetch failure: we no longer know what is due, so offer a retry rather than the
   // misleading "All caught up!" empty state. Only reachable from `loadQueue`: a failed
@@ -233,9 +248,9 @@ export function StudySession({
     return (
       <Centered>
         <Parrot expr="sleepy" title="Pī looking concerned" style={{ width: 124, height: 138 }} />
-        <p className="mt-4 text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
+        <h1 className="mt-4 text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
           Couldn&apos;t load
-        </p>
+        </h1>
         <p className="mt-1" style={{ color: "var(--ink-soft)" }}>
           {error ?? "Something went wrong loading your study queue."}
         </p>
@@ -267,15 +282,16 @@ export function StudySession({
           style={{ width: 124, height: 138 }}
         />
         {/* tabIndex={-1}: focusable by script, not by Tab. The standard way to land a screen
-            reader on "where you now are" without adding a tab stop that does nothing. */}
-        <p
+            reader on "where you now are" without adding a tab stop that does nothing. It is
+            an <h1> as well as the focus target — see the render-states comment above. */}
+        <h1
           ref={doneRef}
           tabIndex={-1}
           className="mt-4 text-2xl"
           style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}
         >
           {allCaughtUp ? "All caught up! 🎉" : "Session done! 🎉"}
-        </p>
+        </h1>
         <p className="mt-1" style={{ color: "var(--ink-soft)" }}>
           {allCaughtUp ? (
             <>No cards are due right now. <span lang="ja" className="jp">またね！</span></>
@@ -326,6 +342,7 @@ export function StudySession({
     // h-svh: same fix as quiz-session — pins to chrome-visible viewport so the footer
     // rating buttons are never hidden under the browser tab bar. See quiz-session.tsx.
     <main className="flex h-svh flex-col pt-safe">
+      <h1 className="sr-only">Flashcards · {level}</h1>
       {/* Top bar: progress bar + count + undo */}
       <SessionHeader
         progress={progress}

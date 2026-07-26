@@ -1,34 +1,44 @@
 // GET /api/browse?level=N3
 //
-// Returns the full word list for one JLPT level (id + expression + reading + meaning +
-// started) — no sentences. Intentionally omits sentences so the initial payload stays
-// small (~100 KB gzipped for N1); sentences are lazy-loaded per word on tap.
+// Returns the full word list for one JLPT level (id + expression + reading + meaning) for the
+// /browse reference view. Filtering, ordering and pagination all happen on the client, so the
+// whole level ships in one response, which is what makes in-memory search per keystroke
+// possible without a request.
 //
-// Ordering: words the user has already started reviewing appear first (most relevant to
-// their current study), then unstarted words — both groups sorted alphabetically by
-// expression. This makes the default first page show the words they're actively studying.
+// **This response carries no per-user data, and that is deliberate.** It used to include a
+// `started` flag per word and sort started words first, which meant a payload of ~2,700
+// immutable deck rows expired as soon as the user rated a single card. The per-user half now
+// arrives with the page render instead (`getStartedWordIds`, read in `app/browse/page.tsx`),
+// leaving this route as pure deck data. Rationale and the alternative considered: SPEC §9.3
+// and §14.25.
 //
-// `started: boolean` is included so the client can render a per-row indicator without
-// a second request.
+// Cache-Control: `max-age=86400` (a day, up from an hour) with a week of
+// stale-while-revalidate. Words change only when `decks/*.csv` is re-seeded, which is a
+// deploy-time event, so a day-old copy is a day-old copy of something that did not change. The
+// old TTL was not a judgement about deck data at all: it was the freshness the *ordering*
+// needed, and the ordering has moved.
 //
-// Cache-Control: word data is seeded once and changes ~never. `private` keeps CDNs out
-// (auth-gated). max-age=3600: fresh for 1 hr. stale-while-revalidate=86400: serve stale
-// for up to a day while revalidating in the background.
+// Still `private`, and still auth-gated. A `public` value would let a shared cache serve it,
+// but nothing sits in front of this app on Railway that would use one, so `public` would buy
+// nothing while turning an authenticated endpoint into an unauthenticated one that hits the
+// database, which is a security-surface change (SPEC §11.8) in exchange for zero measured benefit.
 //
-// Note: the response is now user-specific (ordering depends on ReviewState), so a shared
-// CDN cache would serve the wrong order to another user. `private` is correct here.
+// Sentences are intentionally omitted; they are lazy-fetched per word on tap via
+// GET /api/words/:id/sentence. Reads stay route handlers per SPEC §9.2.
 
 import { NextResponse } from "next/server";
 import { getCurrentUserId } from "@/lib/current-user";
-import { db } from "@/lib/db";
+import { getLevelWords } from "@/lib/browse";
 import { Level } from "@/generated/prisma/enums";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  let userId: string;
   try {
-    userId = await getCurrentUserId();
+    // Called for the auth check alone: the response body no longer depends on who is asking.
+    // Still required: this is deck data behind an invite-only app, and an endpoint that runs
+    // a query for anyone is the thing the gate exists to prevent.
+    await getCurrentUserId();
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -40,36 +50,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: `Unknown level "${levelParam}"` }, { status: 400 });
   }
 
-  // Fetch the word list and the user's started set in parallel — two cheap queries.
-  const [words, startedRows] = await Promise.all([
-    db.word.findMany({
-      where: { level: levelParam as Level },
-      select: { id: true, expression: true, reading: true, meaning: true },
-    }),
-    db.reviewState.findMany({
-      where: { userId, word: { level: levelParam as Level } },
-      select: { wordId: true },
-    }),
-  ]);
-
-  const startedIds = new Set(startedRows.map((r) => r.wordId));
-
-  // Sort: started words first (alphabetical within), then unstarted (alphabetical within).
-  // Using Japanese locale for localeCompare gives correct kana/kanji collation order.
-  words.sort((a, b) => {
-    const aS = startedIds.has(a.id);
-    const bS = startedIds.has(b.id);
-    if (aS !== bS) return aS ? -1 : 1;
-    return a.expression.localeCompare(b.expression, "ja");
-  });
-
-  const payload = words.map((w) => ({ ...w, started: startedIds.has(w.id) }));
+  const words = await getLevelWords(levelParam as Level);
 
   return NextResponse.json(
-    { level: levelParam, words: payload },
+    { level: levelParam, words },
     {
       headers: {
-        "Cache-Control": "private, max-age=3600, stale-while-revalidate=86400",
+        "Cache-Control": "private, max-age=86400, stale-while-revalidate=604800",
       },
     },
   );

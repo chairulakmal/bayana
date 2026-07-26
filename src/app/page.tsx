@@ -398,6 +398,27 @@ export default async function Home() {
             >
               MIT License
             </a>
+            {/* The policy pages sit on their own line, deliberately not run together with the
+                MIT link above: MIT covers the source code and the terms cover use of the
+                hosted service, and putting all three in one run of text is exactly how a
+                reader comes away thinking the licence *is* the terms. Internal links, so they
+                stay in the same tab. */}
+            <br />
+            <Link
+              href="/privacy"
+              className="font-semibold underline decoration-2 underline-offset-2"
+              style={{ color: "var(--grape)" }}
+            >
+              Privacy
+            </Link>{" "}
+            ·{" "}
+            <Link
+              href="/terms"
+              className="font-semibold underline decoration-2 underline-offset-2"
+              style={{ color: "var(--grape)" }}
+            >
+              Terms of use
+            </Link>
           </p>
         </div>
       </footer>

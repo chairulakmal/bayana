@@ -14,6 +14,7 @@
 // indirection.
 
 import { getStudyQueue } from "@/lib/review";
+import { defaultDeps, type Deps } from "@/lib/deps";
 import type { Level } from "@/generated/prisma/client";
 
 /** One card exactly as the session renders it. No scheduling internals by design. */
@@ -72,8 +73,9 @@ function toStudyCard(word: WordWithSentences): StudyCard {
 export async function buildSession(
   userId: string,
   opts: { level?: Level; sessionLimit?: number } = {},
+  deps: Deps = defaultDeps,
 ): Promise<StudySessionPayload> {
-  const { due, newWords, totalDue } = await getStudyQueue(userId, opts);
+  const { due, newWords, totalDue } = await getStudyQueue(userId, opts, deps);
   return {
     cards: [...due.map((d) => toStudyCard(d.word)), ...newWords.map(toStudyCard)],
     totalDue,

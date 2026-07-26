@@ -5,7 +5,7 @@
 // mutation — just counts plus one small log scan. The day streak is intentionally left out
 // for now (it needs timezone + day-rollover math) and will be a focused follow-up.
 
-import { db } from "@/lib/db";
+import { defaultDeps, type Deps } from "@/lib/deps";
 import { FsrsState, type Level } from "@/generated/prisma/enums";
 
 /** Window (in days) the recall rate is measured over. Recent enough to reflect current form. */
@@ -36,6 +36,7 @@ export async function getLevelStats(
   userId: string,
   level: Level,
   now: Date = new Date(),
+  { db }: Deps = defaultDeps,
 ): Promise<LevelStats> {
   const since = new Date(now.getTime() - RECALL_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
@@ -55,8 +56,16 @@ export async function getLevelStats(
   // Scope recall to this level by keeping only logs for words in the level.
   const levelWordIds = new Set(levelWords.map((w) => w.id));
   const levelLogs = recentLogs.filter((l) => levelWordIds.has(l.wordId));
-  // "Recalled" = rated anything but Again 1 or Hard 2: Hard/Good/Easy all mean you produced the
-  // answer. This is a coarse recall proxy, not FSRS's retrievability — good enough for a
+  // "Recalled" = rated Good (3) or Easy (4). Hard (2) counts as a miss.
+  //
+  // The comment here used to describe `rating >= 2` ("Hard/Good/Easy all mean you produced the
+  // answer") while the code said `>= 3`; corrected to the code on 2026-07-27, when a
+  // characterization test made the disagreement visible. The code is what users' displayed
+  // recall rates have always been computed from, so it is the behaviour, and changing it would
+  // silently move every number on /stats. Which of the two is the *better* proxy is a separate
+  // question, left open (SPEC §15).
+  //
+  // Either way this is a coarse proxy, not FSRS's retrievability — good enough for a
   // motivating headline number.
   const recalled = levelLogs.filter((l) => l.rating >= 3).length;
   const recallRate = levelLogs.length > 0 ? recalled / levelLogs.length : null;

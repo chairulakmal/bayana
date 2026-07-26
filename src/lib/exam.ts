@@ -16,11 +16,20 @@
 //   問題２ — distractors are expressions of words whose readings sound similar to the
 //            target (reading similarity is the primary signal; shared kanji are a bonus).
 //
-// Utility functions (kanjiOf, jaccard, readingSimilarity, levenshtein, shuffle, sample)
-// are duplicated from quiz.ts to keep both modules self-contained. A shared util is the
-// natural next step if a third consumer appears.
+// The scoring utilities (kanjiOf, jaccard, readingSimilarity, levenshtein, okurigana,
+// shuffle, sample) used to be duplicated here from quiz.ts, with a note that a shared module
+// was "the natural next step if a third consumer appears". It appeared — the test suite — so
+// they now live in `word-similarity.ts` and both builders import them.
 
-import { db } from "@/lib/db";
+import { defaultDeps, type Deps } from "@/lib/deps";
+import {
+  jaccard,
+  kanjiOf,
+  okurigana,
+  readingSimilarity,
+  sample,
+  shuffle,
+} from "@/lib/word-similarity";
 import type { Level } from "@/generated/prisma/enums";
 
 // ---------------------------------------------------------------------------
@@ -76,7 +85,9 @@ export type ExamQuestion = ReadingQuestion | WritingQuestion;
 
 const OPTIONS_PER_QUESTION = 4;
 
-type PoolWord = { id: string; expression: string; reading: string; meaning: string };
+/** The four fields a candidate word contributes to scoring. Exported for the tests, which
+ *  exercise the two pickers directly rather than through a database. */
+export type PoolWord = { id: string; expression: string; reading: string; meaning: string };
 
 type SentenceRow = { wordId: string; japanese: string; reading: string; english: string };
 
@@ -109,6 +120,7 @@ const MIN_EXAM_COUNT = 2;
 export async function buildExamRound(
   level: Level,
   count: number = DEFAULT_EXAM_COUNT,
+  deps: Deps = defaultDeps,
 ): Promise<ExamQuestion[]> {
   const safeCount = Number.isFinite(count)
     ? Math.min(Math.max(MIN_EXAM_COUNT, Math.trunc(count)), MAX_EXAM_COUNT)
@@ -116,7 +128,7 @@ export async function buildExamRound(
   // Ceil to reading, floor to writing: an odd count gives 問題１ the spare question. Reading
   // is the section with no sentence-substitution constraint (see `buildExam`), so it is the
   // one that can always be filled.
-  return buildExam(level, Math.ceil(safeCount / 2), Math.floor(safeCount / 2));
+  return buildExam(level, Math.ceil(safeCount / 2), Math.floor(safeCount / 2), deps);
 }
 
 /**
@@ -133,6 +145,7 @@ export async function buildExam(
   level: Level,
   readingCount: number,
   writingCount: number,
+  { db }: Deps = defaultDeps,
 ): Promise<ExamQuestion[]> {
   const pool: PoolWord[] = await db.word.findMany({
     where: { level },
@@ -264,7 +277,7 @@ const SHORTLIST_K = 10; // randomise among this many top-scoring candidates for 
  * don't match — the student guesses by pattern, not by knowing the kanji. Falls back to
  * unconstrained selection when the pool is too small to fill `n` okurigana-matched slots.
  */
-function pickReadingDistractors(target: PoolWord, pool: PoolWord[], n: number): PoolWord[] {
+export function pickReadingDistractors(target: PoolWord, pool: PoolWord[], n: number): PoolWord[] {
   const targetKanji = kanjiOf(target.expression);
   const okuri = okurigana(target.expression);
 
@@ -305,7 +318,7 @@ function pickReadingDistractors(target: PoolWord, pool: PoolWord[], n: number): 
  * eliminate options by checking whether the okurigana in the expression matches the kana
  * shown in the sentence — a pattern-match giveaway, not a vocabulary test.
  */
-function pickWritingDistractors(target: PoolWord, pool: PoolWord[], n: number): PoolWord[] {
+export function pickWritingDistractors(target: PoolWord, pool: PoolWord[], n: number): PoolWord[] {
   const targetKanji = kanjiOf(target.expression);
   const okuri = okurigana(target.expression);
 
@@ -369,88 +382,4 @@ function pickFromEligible(
   if (chosen.length < n) take(shuffle(eligible.map((e) => e.word)));
 
   return chosen;
-}
-
-// ---------------------------------------------------------------------------
-// String / scoring helpers (duplicated from quiz.ts — see module header note)
-// ---------------------------------------------------------------------------
-
-/**
- * Extracts the okurigana — the hiragana suffix that follows the final kanji in a word.
- * e.g. 主に → "に", 食べる → "べる", 聞こえる → "こえる", 学校 → "", たべる → ""
- *
- * Returns "" when there is no trailing hiragana after a kanji (pure-kanji words like 学校,
- * or pure-kana words like たべる where no okurigana constraint is meaningful — the visible
- * hiragana IS the whole word, so there's nothing to constrain distractors on).
- */
-function okurigana(expression: string): string {
-  // Walk backwards collecting trailing hiragana.
-  let i = expression.length - 1;
-  while (i >= 0 && isHiragana(expression[i])) i--;
-  // i is now pointing at the last non-hiragana character (or -1 if all hiragana).
-  if (i < 0) return ""; // pure-kana expression — no meaningful okurigana
-  if (!isKanji(expression[i])) return ""; // trailing hiragana not preceded by a kanji
-  return expression.slice(i + 1); // the hiragana suffix
-}
-
-/** True if `ch` is a hiragana character (U+3041–U+3096). */
-function isHiragana(ch: string): boolean {
-  const c = ch.charCodeAt(0);
-  return c >= 0x3041 && c <= 0x3096;
-}
-
-/** True if `ch` is a CJK kanji (BMP Unified + Extension A). */
-function isKanji(ch: string): boolean {
-  const c = ch.charCodeAt(0);
-  return (c >= 0x4e00 && c <= 0x9fff) || (c >= 0x3400 && c <= 0x4dbf);
-}
-
-/** Distinct kanji (Han chars, BMP CJK Unified + Extension A) in a string. */
-function kanjiOf(expression: string): Set<string> {
-  return new Set(expression.match(/[一-鿿㐀-䶿]/g) ?? []);
-}
-
-/** Jaccard overlap of two sets: |A∩B| / |A∪B|, in [0,1]. Returns 0 when either set is empty. */
-function jaccard<T>(a: Set<T>, b: Set<T>): number {
-  if (a.size === 0 || b.size === 0) return 0;
-  let inter = 0;
-  for (const x of a) if (b.has(x)) inter++;
-  return inter / (a.size + b.size - inter);
-}
-
-/** Reading similarity in [0,1] = 1 − (Levenshtein / longer length). */
-function readingSimilarity(a: string, b: string): number {
-  const max = Math.max(a.length, b.length);
-  return max === 0 ? 0 : 1 - levenshtein(a, b) / max;
-}
-
-/** Levenshtein edit distance, single-row DP. */
-function levenshtein(a: string, b: string): number {
-  const n = b.length;
-  let prev = Array.from({ length: n + 1 }, (_, j) => j);
-  const curr = new Array<number>(n + 1);
-  for (let i = 1; i <= a.length; i++) {
-    curr[0] = i;
-    for (let j = 1; j <= n; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
-    }
-    prev = curr.slice();
-  }
-  return prev[n];
-}
-
-/** Fisher–Yates shuffle (returns a new array; input untouched). */
-function shuffle<T>(arr: readonly T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-/** `n` random distinct elements from `arr`. */
-function sample<T>(arr: readonly T[], n: number): T[] {
-  return shuffle(arr).slice(0, n);
 }

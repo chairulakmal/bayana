@@ -9,6 +9,11 @@ import { OnboardingClient } from "@/components/onboarding-client";
 //
 // Deliberately minimal: one question (level), one button, then straight to the hub.
 // No skip — a level choice is required for any part of the app to work.
+// The title names the *task*, not the route: "Get started · Bayana" is what a returning
+// tab, a bookmark and a browser-history entry all show, and "Onboarding" is our word for
+// this screen, not the user's.
+export const metadata = { title: "Get started" };
+
 export default async function OnboardingPage() {
   const { userId } = await requireAuth();
   if (await hasOnboarded(userId)) redirect("/home");

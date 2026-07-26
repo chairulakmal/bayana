@@ -4,6 +4,10 @@
 // started/total progress bar, mature count) and a CTA card to start a study session.
 // Vocab stats stay on /stats — this page is self-contained for the grammar queue.
 // Requires auth (same as /home).
+//
+// Heading structure mirrors the home hub: the "Grammar · N3" line is the `<h1>` and the
+// LEVEL label is an `<h2>`. Both were `<p>` elements, which left the page with no heading
+// at all. See `app/home/page.tsx` for the reasoning.
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -15,6 +19,8 @@ import { UserMenu } from "@/components/user-menu";
 import { LevelPicker } from "@/components/level-picker";
 import { LEVELS } from "@/components/level-chip";
 import { Parrot } from "@/components/parrot";
+
+export const metadata = { title: "Grammar" };
 
 export default async function GrammarPage() {
   const { userId, email, isDemo } = await requireAuth();
@@ -62,9 +68,9 @@ export default async function GrammarPage() {
             <p lang="ja" className="jp text-[15px]" style={{ color: "var(--ink-soft)" }}>
               文法
             </p>
-            <p className="text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
+            <h1 className="text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
               Grammar · {grammarLevel}
-            </p>
+            </h1>
           </div>
         </div>
         <UserMenu email={email ?? ""} isDemo={isDemo} />
@@ -200,7 +206,7 @@ export default async function GrammarPage() {
           Rows for unseeded levels are marked, not disabled: this sets the *global* active
           level, so choosing N5 from here is a legitimate act that re-scopes vocabulary
           study. The marker says the grammar deck is missing, not that the level is. */}
-      <p
+      <h2
         className="mt-7 text-[11px] font-semibold"
         style={{
           color: "var(--ink-faint)",
@@ -209,7 +215,7 @@ export default async function GrammarPage() {
         }}
       >
         LEVEL
-      </p>
+      </h2>
       <div className="mt-2">
         <LevelPicker
           current={grammarLevel}

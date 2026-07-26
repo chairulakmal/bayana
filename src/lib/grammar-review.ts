@@ -22,10 +22,11 @@
 // UI now advances optimistically without disabling its rating buttons, concurrent writes for one
 // card are a supported interaction rather than an abuse case.
 
-import { db, serializableTxn } from "@/lib/db";
+import { defaultDeps, type Deps } from "@/lib/deps";
 import { getStudySettings } from "@/lib/profile";
 import { schedulerFor, toCard, fromCard, fromLog, toLog } from "@/lib/fsrs";
 import type { Grade } from "ts-fsrs";
+import { shuffle } from "@/lib/word-similarity";
 import { Prisma } from "@/generated/prisma/client";
 
 // Grammar levels are plain strings (not the vocab `Level` enum) so new levels need no
@@ -40,11 +41,13 @@ export async function reviewGrammarPoint(
   userId: string,
   grammarPointId: string,
   rating: number,
+  deps: Deps = defaultDeps,
 ) {
+  const { serializableTxn } = deps;
   const now = new Date();
 
   // Per-user config, not per-card state — safe to read outside the transaction.
-  const profile = await getStudySettings(userId);
+  const profile = await getStudySettings(userId, deps);
 
   // Read-compute-write as one atomic unit, same reasoning as reviewWord (review.ts):
   // concurrent ratings of the same card would otherwise lose one update.
@@ -80,8 +83,13 @@ export async function reviewGrammarPoint(
  *  deliberate at this size: the two differ only in the table and key names, but factoring them
  *  together would mean passing Prisma delegates around, which costs more in readability than
  *  the ~20 shared lines are worth. If a third queue ever appears, revisit. */
-export async function undoLastGrammarReview(userId: string, grammarPointId: string) {
-  const profile = await getStudySettings(userId);
+export async function undoLastGrammarReview(
+  userId: string,
+  grammarPointId: string,
+  deps: Deps = defaultDeps,
+) {
+  const { serializableTxn } = deps;
+  const profile = await getStudySettings(userId, deps);
 
   try {
     return await serializableTxn(async (tx) => {
@@ -136,10 +144,12 @@ export async function undoLastGrammarReview(userId: string, grammarPointId: stri
 export async function getGrammarQueue(
   userId: string,
   opts: { level?: string; sessionLimit?: number } = {},
+  deps: Deps = defaultDeps,
 ) {
+  const { db } = deps;
   const sessionLimit = opts.sessionLimit ?? 20;
   const now = new Date();
-  const profile = await getStudySettings(userId);
+  const profile = await getStudySettings(userId, deps);
 
   const [totalDue, due] = await Promise.all([
     db.grammarProgress.count({ where: { userId, due: { lte: now } } }),
@@ -192,7 +202,11 @@ export async function getGrammarQueue(
  *                  counts *points touched*, not review events, because GrammarProgress
  *                  holds only the latest review per point (there is no grammar ReviewLog).
  */
-export async function getGrammarStats(userId: string, level: string) {
+export async function getGrammarStats(
+  userId: string,
+  level: string,
+  { db }: Deps = defaultDeps,
+) {
   const now = new Date();
   const startOfToday = new Date(now);
   startOfToday.setHours(0, 0, 0, 0);
@@ -226,15 +240,10 @@ export async function getGrammarStats(userId: string, level: string) {
  *
  * @returns the set of level strings ("N3", …) with at least one GrammarPoint
  */
-export async function getSeededGrammarLevels(): Promise<Set<string>> {
+export async function getSeededGrammarLevels(
+  { db }: Deps = defaultDeps,
+): Promise<Set<string>> {
   const rows = await db.grammarPoint.groupBy({ by: ["level"] });
   return new Set(rows.map((row) => row.level));
 }
 
-function shuffle<T>(arr: T[]): T[] {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}

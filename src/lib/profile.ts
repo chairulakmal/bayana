@@ -6,7 +6,7 @@
 // `getProfile` for why `cache()` is the right scope for this.
 
 import { cache } from "react";
-import { db } from "@/lib/db";
+import { defaultDeps, type Deps } from "@/lib/deps";
 import { Level } from "@/generated/prisma/enums";
 import type { UserProfile } from "@/generated/prisma/client";
 
@@ -49,10 +49,14 @@ import type { UserProfile } from "@/generated/prisma/client";
  * reading, and the two login routes create the row and redirect (a fresh request, hence a
  * fresh cache). Adding a read-before-write (the obvious shape of a "skip the update if
  * unchanged" optimization) is what would break it.
+ *
+ * `deps` is the database seam (see `lib/deps.ts`). It is a *keyed* argument as far as
+ * `cache()` is concerned, so callers must not construct a fresh object per call — production
+ * passes the module-level `defaultDeps`, and a test passes one fake for the whole test.
  */
 export const getProfile = cache(
-  async (userId: string): Promise<UserProfile | null> =>
-    db.userProfile.findUnique({ where: { userId } }),
+  async (userId: string, deps: Deps = defaultDeps): Promise<UserProfile | null> =>
+    deps.db.userProfile.findUnique({ where: { userId } }),
 );
 
 /**
@@ -85,8 +89,11 @@ const DEFAULT_STUDY_SETTINGS: StudySettings = {
  * The FSRS services call this rather than reading the profile themselves, which is what
  * keeps the whole request on one query.
  */
-export async function getStudySettings(userId: string): Promise<StudySettings> {
-  return (await getProfile(userId)) ?? DEFAULT_STUDY_SETTINGS;
+export async function getStudySettings(
+  userId: string,
+  deps: Deps = defaultDeps,
+): Promise<StudySettings> {
+  return (await getProfile(userId, deps)) ?? DEFAULT_STUDY_SETTINGS;
 }
 
 /**
@@ -94,16 +101,22 @@ export async function getStudySettings(userId: string): Promise<StudySettings> {
  * starting point — until the user picks a level on the home hub. Read by `/study` and
  * `/quiz` so each session is scoped to one level.
  */
-export async function getActiveLevel(userId: string): Promise<Level> {
-  return (await getProfile(userId))?.activeLevel ?? Level.N5;
+export async function getActiveLevel(
+  userId: string,
+  deps: Deps = defaultDeps,
+): Promise<Level> {
+  return (await getProfile(userId, deps))?.activeLevel ?? Level.N5;
 }
 
 /**
  * True once the user has completed first-run onboarding (chosen their starting level).
  * `onboardedAt` is null for a brand-new account. Used to gate the home hub redirect.
  */
-export async function hasOnboarded(userId: string): Promise<boolean> {
-  return !!(await getProfile(userId))?.onboardedAt;
+export async function hasOnboarded(
+  userId: string,
+  deps: Deps = defaultDeps,
+): Promise<boolean> {
+  return !!(await getProfile(userId, deps))?.onboardedAt;
 }
 
 /**
@@ -111,6 +124,11 @@ export async function hasOnboarded(userId: string): Promise<boolean> {
  * next to an explanation of the "ten words a day" pace. Falls back to the schema default
  * (10) if the profile is somehow missing.
  */
-export async function getNewCardsPerDay(userId: string): Promise<number> {
-  return (await getProfile(userId))?.newCardsPerDay ?? DEFAULT_STUDY_SETTINGS.newCardsPerDay;
+export async function getNewCardsPerDay(
+  userId: string,
+  deps: Deps = defaultDeps,
+): Promise<number> {
+  return (
+    (await getProfile(userId, deps))?.newCardsPerDay ?? DEFAULT_STUDY_SETTINGS.newCardsPerDay
+  );
 }

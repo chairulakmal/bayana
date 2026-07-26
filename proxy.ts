@@ -91,12 +91,17 @@ export function proxy(req: NextRequest) {
     if (blocked) return tooMany(blocked.retryAfterSeconds, "demo sessions");
   }
 
-  // Public: the marketing homepage, the sign-in page, all Auth.js endpoints, and the
-  // demo login route (it creates the session, so it must be reachable without one) —
-  // the exact path only, so future /api/demo/* additions don't silently ship public.
+  // Public: the marketing homepage, the sign-in page, all Auth.js endpoints, the two policy
+  // pages, and the demo login route (it creates the session, so it must be reachable without
+  // one). The policy pages and the demo route are matched as EXACT paths rather than
+  // prefixes, so a future /privacy/* or /api/demo/* route cannot ship public by inheritance
+  // (SPEC §11.8). /privacy and /terms in particular have to be readable *before* signing in —
+  // a policy a visitor can only see after handing over an address is not a policy.
   // The dev-login bypass is only outside production (SPEC §11.7).
   const isPublic =
     pathname === "/" ||
+    pathname === "/privacy" ||
+    pathname === "/terms" ||
     pathname.startsWith("/auth") ||
     pathname.startsWith("/api/auth") ||
     pathname === "/api/demo/login" ||

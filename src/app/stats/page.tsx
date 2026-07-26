@@ -5,10 +5,20 @@ import { getLevelStats } from "@/lib/stats";
 import { HomeLink } from "@/components/home-link";
 import { UserMenu } from "@/components/user-menu";
 import { BottomNav } from "@/components/bottom-nav";
+import { LevelPicker } from "@/components/level-picker";
 
 // Light stats page (SPEC §13 "basic stats"; full dashboard is Phase 4, §16). Shows a few
 // per-active-level numbers — progress, due, recall — linked from the home hub. Server
 // component: it reads the DB directly, so the numbers are always fresh on navigation.
+//
+// Every number on this page is scoped to the active level, so the level control belongs
+// here for the same reason it was added to the grammar hub: without it, "how am I doing at
+// N4?" costs a round trip through /home and back. It is the *same* `LevelPicker` component
+// both hubs mount, not a third variant — the level is global state (SPEC §14.9), and one
+// control for it means one place for the behaviour to be right. `setActiveLevel` already
+// revalidates `/stats`, so switching re-renders these numbers in the same round trip.
+export const metadata = { title: "Your progress" };
+
 export default async function StatsPage() {
   const { userId, email, isDemo } = await requireAuth();
   const level = await getActiveLevel(userId);
@@ -86,6 +96,23 @@ export default async function StatsPage() {
       <Link href="/study" className="btn btn-primary mt-8 w-full">
         Study now
       </Link>
+
+      {/* Level, below the action — the same ordering both hubs use, and for the same reason:
+          the level is set rarely, the action is taken every visit. */}
+      <h2
+        className="mt-7 text-[11px] font-semibold"
+        style={{
+          color: "var(--ink-faint)",
+          fontFamily: "var(--f-display)",
+          letterSpacing: ".12em",
+        }}
+      >
+        LEVEL
+      </h2>
+      <div className="mt-2">
+        <LevelPicker current={level} />
+      </div>
+
       <BottomNav />
     </main>
   );

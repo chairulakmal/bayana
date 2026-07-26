@@ -130,7 +130,7 @@ export function ExamSession({
   // the break screen exists to be acknowledged and holds exactly one control.
   const promptRef = useRef<HTMLDivElement>(null);
   const continueRef = useRef<HTMLButtonElement>(null);
-  const summaryRef = useRef<HTMLParagraphElement>(null);
+  const summaryRef = useRef<HTMLHeadingElement>(null);
   const breakRef = useRef<HTMLButtonElement>(null);
   const focusTarget = showBreak
     ? breakRef
@@ -171,9 +171,10 @@ export function ExamSession({
     return (
       <Centered>
         <Parrot expr="sleepy" title="Pī looking concerned" style={{ width: 124, height: 138 }} />
-        <p className="mt-4 text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
+        {/* One <h1> per branch, per the pattern documented in study-session.tsx. */}
+        <h1 className="mt-4 text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
           Couldn&apos;t load
-        </p>
+        </h1>
         <p className="mt-1" style={{ color: "var(--ink-soft)" }}>
           {error ?? "Something went wrong loading the exam."}
         </p>
@@ -195,9 +196,9 @@ export function ExamSession({
     return (
       <Centered>
         <Parrot expr="sleepy" style={{ width: 110, height: 123 }} />
-        <p className="mt-4 text-xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
+        <h1 className="mt-4 text-xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
           No exam available
-        </p>
+        </h1>
         <p className="mt-1" style={{ color: "var(--ink-soft)" }}>
           Not enough words at this level yet.
         </p>
@@ -218,9 +219,9 @@ export function ExamSession({
             the section header was the one heading not in the brand's Japanese face. The
             .jp class alone is correct. Weight is 700, the heaviest JP weight the app
             loads — see BRAND.md §4 on why a third Japanese weight is not worth its cost. */}
-        <p lang="ja" className="jp text-5xl" style={{ fontWeight: 700, color: "var(--ink)" }}>
+        <h1 lang="ja" className="jp text-5xl" style={{ fontWeight: 700, color: "var(--ink)" }}>
           問題２
-        </p>
+        </h1>
         <p className="mt-2 text-[15px]" style={{ color: "var(--ink-soft)" }}>
           <span lang="ja" className="jp">漢字の書き方</span> — pick the kanji form
         </p>
@@ -253,14 +254,14 @@ export function ExamSession({
       <Centered>
         <Parrot expr="wow" title="Pī cheering" style={{ width: 124, height: 138 }} />
         {/* tabIndex={-1}: focusable by script, not by Tab. See quiz-session.tsx. */}
-        <p
+        <h1
           ref={summaryRef}
           tabIndex={-1}
           className="mt-4 text-3xl"
           style={{ fontFamily: "var(--f-display)", fontWeight: 700 }}
         >
           {totalScore} / {total} 🎉
-        </p>
+        </h1>
         <div className="mt-3 flex flex-col gap-1 text-[14px]" style={{ color: "var(--ink-soft)" }}>
           <p>
             <span lang="ja" className="jp">問題１ 読み方：</span>
@@ -313,6 +314,7 @@ export function ExamSession({
 
   return (
     <main className="flex h-svh flex-col pt-safe">
+      <h1 className="sr-only">Exam · {level}</h1>
       <SessionHeader
         progress={Math.round((index / total) * 100)}
         level={level}

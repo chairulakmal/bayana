@@ -18,20 +18,27 @@
 // likely than when this was written, not less. Do not relax the isolation level here on the
 // grounds that the client "wouldn't do that": the client is designed to do that.
 
-import { db, serializableTxn } from "@/lib/db";
+import { defaultDeps, type Deps } from "@/lib/deps";
 import { getStudySettings } from "@/lib/profile";
 import { schedulerFor, toCard, fromCard, fromLog, toLog } from "@/lib/fsrs";
 import type { Grade } from "ts-fsrs";
+import { shuffle } from "@/lib/word-similarity";
 import { Prisma, type Level } from "@/generated/prisma/client";
 
 /** Apply a rating (1=Again, 2=Hard, 3=Good, 4=Easy) to a (user, word).
  *  Persists the updated scheduling state and appends an immutable review-log row. */
-export async function reviewWord(userId: string, wordId: string, rating: number) {
+export async function reviewWord(
+  userId: string,
+  wordId: string,
+  rating: number,
+  deps: Deps = defaultDeps,
+) {
+  const { serializableTxn } = deps;
   const now = new Date();
 
   // The profile holds the user's FSRS tuning — per-user config, not per-card state,
   // so it's safe to read outside the transaction (it isn't part of the race).
-  const profile = await getStudySettings(userId);
+  const profile = await getStudySettings(userId, deps);
 
   // Read the card's current state, compute the next state, and write it back as one
   // atomic unit. `existing` is null the very first time this word is seen.
@@ -57,8 +64,13 @@ export async function reviewWord(userId: string, wordId: string, rating: number)
 
 /** Undo the most recent review for a (user, word): roll the card back to its prior
  *  state and delete that log row. Returns null if there is nothing to undo. */
-export async function undoLastReview(userId: string, wordId: string) {
-  const profile = await getStudySettings(userId);
+export async function undoLastReview(
+  userId: string,
+  wordId: string,
+  deps: Deps = defaultDeps,
+) {
+  const { serializableTxn } = deps;
+  const profile = await getStudySettings(userId, deps);
 
   try {
     return await serializableTxn(async (tx) => {
@@ -110,12 +122,14 @@ export async function undoLastReview(userId: string, wordId: string) {
 export async function getStudyQueue(
   userId: string,
   opts: { level?: Level; now?: Date; sessionLimit?: number } = {},
+  deps: Deps = defaultDeps,
 ) {
+  const { db } = deps;
   // sessionLimit caps the total cards shown in one sitting (due first, then new).
   // Default 20 matches the Anki community norm for a focused daily session.
   const sessionLimit = opts.sessionLimit ?? 20;
   const now = opts.now ?? new Date();
-  const profile = await getStudySettings(userId);
+  const profile = await getStudySettings(userId, deps);
 
   // Two narrow queries instead of one fat one. We need both the slice we'll show AND the
   // total-waiting count, but materializing every due row (with its word + sentence joined)
@@ -167,11 +181,3 @@ export async function getStudyQueue(
   return { due, newWords, totalDue };
 }
 
-/** In-place Fisher–Yates shuffle. Returns the same array for chaining. */
-function shuffle<T>(arr: T[]): T[] {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}

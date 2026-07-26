@@ -29,8 +29,11 @@
 //     mint rows, since each request inserts a User + UserProfile.
 //
 // Cleanup: expired demo users are deleted opportunistically on each new demo
-// login (bounded by the same TTL the cookie enforces), so the table cannot grow
-// forever. See `deleteStaleDemoUsers` for why the filter is deliberately narrow.
+// login, as a backstop. The sweep that actually keeps the privacy policy's
+// 14-day retention promise is the scheduled one (scripts/cleanup-demo-users.ts);
+// this call is redundant with it and kept because it costs one indexed DELETE on
+// a path that already writes. See `src/lib/demo-cleanup.ts` for the rule itself
+// and for why the filter is deliberately narrow.
 //
 // The identity check happens in getCurrentUserId() / requireAuth()
 // (src/lib/current-user.ts), which verifies the HMAC and the signed expiry
@@ -43,33 +46,9 @@ import {
   DEMO_COOKIE_NAME,
   DEMO_COOKIE_TTL_MS,
 } from "@/lib/current-user";
+import { deleteStaleDemoUsers } from "@/lib/demo-cleanup";
 
 export const runtime = "nodejs";
-
-/**
- * Deletes demo users whose cookies have certainly expired. Narrow on purpose —
- * a wrong match here cascade-deletes real study progress (every relation is
- * `onDelete: Cascade`), so each condition removes a class of non-demo user:
- *   - `email: null` — demo users never get an email; magic-link users always do.
- *   - `sessions: none` — demo sessions are cookie-only; any user with an Auth.js
- *     Session row is a real sign-in.
- *   - `createdAt < now − TTL` — older than the longest a demo cookie can live,
- *     so the rows are provably unreachable (the signed expiry has passed).
- *   - `id ≠ DEFAULT_USER_ID` — the seed script (scripts/seed-user.ts) can leave
- *     a null-email user when AUTH_ALLOWED_EMAIL isn't set; never touch it.
- */
-async function deleteStaleDemoUsers(): Promise<void> {
-  const cutoff = new Date(Date.now() - DEMO_COOKIE_TTL_MS);
-  const pinnedId = process.env.DEFAULT_USER_ID || undefined;
-  await db.user.deleteMany({
-    where: {
-      email: null,
-      createdAt: { lt: cutoff },
-      sessions: { none: {} },
-      ...(pinnedId ? { id: { not: pinnedId } } : {}),
-    },
-  });
-}
 
 export async function POST(request: Request) {
   // Use AUTH_URL for the public origin. In Railway, `request.url` reflects the
@@ -86,8 +65,11 @@ export async function POST(request: Request) {
     return new NextResponse("Forbidden", { status: 403 });
   }
 
-  // Opportunistic cleanup before creating a new row — keeps the demo-user table
-  // bounded without a separate cron. Failures here must never block the login.
+  // Opportunistic cleanup before creating a new row. This is the *backstop*; the
+  // scheduled sweep is what keeps the retention promise (see the header). It stays
+  // because it costs one indexed DELETE on a path that already writes, and it means
+  // a paused or unconfigured cron still leaves the table bounded. Failures here must
+  // never block the login.
   try {
     await deleteStaleDemoUsers();
   } catch (err) {

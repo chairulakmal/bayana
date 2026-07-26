@@ -13,7 +13,8 @@
 // the round the user actually sees) and `GET /api/quiz` (which now only serves "Play again").
 // One definition of a round means the two cannot drift on its size (SPEC §9).
 
-import { db } from "@/lib/db";
+import { defaultDeps, type Deps } from "@/lib/deps";
+import { jaccard, kanjiOf, readingSimilarity, sample, shuffle } from "@/lib/word-similarity";
 import type { Level } from "@/generated/prisma/enums";
 
 export type QuizOption = { meaning: string; correct: boolean };
@@ -26,7 +27,9 @@ export type QuizQuestion = {
   options: QuizOption[]; // 4, shuffled, exactly one `correct`
 };
 
-type PoolWord = { id: string; expression: string; reading: string; meaning: string };
+/** The four fields a candidate word contributes to scoring. Exported for the tests, which
+ *  exercise `pickDistractors` directly rather than through a database. */
+export type PoolWord = { id: string; expression: string; reading: string; meaning: string };
 
 const OPTIONS_PER_QUESTION = 4;
 
@@ -57,11 +60,12 @@ const MAX_QUIZ_COUNT = 20;
 export async function buildQuizRound(
   level: Level,
   count: number = DEFAULT_QUIZ_COUNT,
+  deps: Deps = defaultDeps,
 ): Promise<QuizQuestion[]> {
   const safeCount = Number.isFinite(count)
     ? Math.min(Math.max(1, Math.trunc(count)), MAX_QUIZ_COUNT)
     : DEFAULT_QUIZ_COUNT;
-  return buildQuiz(level, safeCount);
+  return buildQuiz(level, safeCount, deps);
 }
 
 /**
@@ -71,7 +75,11 @@ export async function buildQuizRound(
  * Prefer `buildQuizRound` as the entry point; this stays exported for the tests and for any
  * caller that genuinely wants an exact, already-validated count.
  */
-export async function buildQuiz(level: Level, count: number): Promise<QuizQuestion[]> {
+export async function buildQuiz(
+  level: Level,
+  count: number,
+  { db }: Deps = defaultDeps,
+): Promise<QuizQuestion[]> {
   // One cheap fetch of the level's pool (~700–2,700 rows) — used both to choose targets
   // and to draw distractors. Sentences are fetched separately, only for the chosen targets.
   const pool: PoolWord[] = await db.word.findMany({
@@ -136,7 +144,7 @@ const MEANING_GUARD_JACCARD = 0.5; // reject a distractor whose gloss tokens ove
  * kanji/reading-confusable words available, sampled from the top `SHORTLIST_K` for variety,
  * with a random fallback when confusable candidates run out (so a full question always builds).
  */
-function pickDistractors(target: PoolWord, pool: PoolWord[], n: number): PoolWord[] {
+export function pickDistractors(target: PoolWord, pool: PoolWord[], n: number): PoolWord[] {
   const targetKanji = kanjiOf(target.expression);
   const targetMeaningTokens = meaningTokens(target.meaning);
   const targetMeaning = normalizeMeaning(target.meaning);
@@ -179,47 +187,15 @@ function pickDistractors(target: PoolWord, pool: PoolWord[], n: number): PoolWor
   return chosen;
 }
 
-// --- string / meaning helpers ------------------------------------------------
+// --- meaning helpers ------------------------------------------------------------
+//
+// The kanji/reading/set-similarity half of the scoring now lives in `word-similarity.ts`,
+// shared with Exam mode. What stays here is the meaning *guard*, which is Quiz-specific:
+// Exam mode never compares glosses, because its options are readings and kanji forms.
 
 /** Compare meanings case-insensitively so "Vocabulary" and "vocabulary" don't both appear. */
-function normalizeMeaning(meaning: string): string {
+export function normalizeMeaning(meaning: string): string {
   return meaning.trim().toLowerCase();
-}
-
-/** Distinct kanji (Han chars) in a string; kana/punctuation ignored. Empty for kana-only words.
- *  Explicit BMP ranges (CJK Unified + Extension A) avoid needing the regex `u`-flag/ES2018. */
-function kanjiOf(expression: string): Set<string> {
-  return new Set(expression.match(/[一-鿿㐀-䶿]/g) ?? []);
-}
-
-/** Jaccard overlap of two sets: |A∩B| / |A∪B|, in [0,1]. Defined as 0 when either is empty. */
-function jaccard<T>(a: Set<T>, b: Set<T>): number {
-  if (a.size === 0 || b.size === 0) return 0;
-  let inter = 0;
-  for (const x of a) if (b.has(x)) inter++;
-  return inter / (a.size + b.size - inter);
-}
-
-/** Reading similarity in [0,1] = 1 − (edit distance / longer length). Operates on kana chars. */
-function readingSimilarity(a: string, b: string): number {
-  const max = Math.max(a.length, b.length);
-  return max === 0 ? 0 : 1 - levenshtein(a, b) / max;
-}
-
-/** Levenshtein edit distance, single-row DP (cheap — readings are only a few characters). */
-function levenshtein(a: string, b: string): number {
-  const n = b.length;
-  let prev = Array.from({ length: n + 1 }, (_, j) => j);
-  const curr = new Array<number>(n + 1);
-  for (let i = 1; i <= a.length; i++) {
-    curr[0] = i;
-    for (let j = 1; j <= n; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
-    }
-    prev = curr.slice();
-  }
-  return prev[n];
 }
 
 // English words too generic to signal a shared meaning (glosses are full of them).
@@ -229,7 +205,7 @@ const MEANING_STOPWORDS = new Set([
 ]);
 
 /** Content tokens of an English gloss: lowercased words, minus parentheticals and stopwords. */
-function meaningTokens(meaning: string): Set<string> {
+export function meaningTokens(meaning: string): Set<string> {
   const cleaned = meaning
     .toLowerCase()
     .replace(/\([^)]*\)/g, " ") // drop "(...)" clarifications
@@ -242,22 +218,7 @@ function meaningTokens(meaning: string): Set<string> {
  * answer (e.g. "to look" vs "to look up"). Token-overlap only — it catches shared *words*,
  * not pure synonyms ("big"/"large"), which would need embeddings; that limit is accepted.
  */
-function meaningTooClose(a: Set<string>, b: Set<string>): boolean {
+export function meaningTooClose(a: Set<string>, b: Set<string>): boolean {
   if (a.size === 0 || b.size === 0) return false; // nothing to compare → leave to other guards
   return jaccard(a, b) >= MEANING_GUARD_JACCARD;
-}
-
-/** Fisher–Yates shuffle (returns a new array; input untouched). */
-function shuffle<T>(arr: readonly T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-/** `n` random distinct elements. */
-function sample<T>(arr: readonly T[], n: number): T[] {
-  return shuffle(arr).slice(0, n);
 }
