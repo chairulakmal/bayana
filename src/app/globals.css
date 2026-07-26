@@ -192,10 +192,37 @@ body {
   min-height: 44px;
 }
 
-/* Honor reduced-motion: keep the press functional, drop the spring (BRAND.md §7, SPEC §8.2). */
+/* ── Loading skeletons ───────────────────────────────────────────────────────
+   The placeholder block used by the route-level `loading.tsx` fallbacks. One class,
+   defined once, because a skeleton that differs per page reads as four different
+   loading states rather than one app waiting.
+
+   The fill is --cream-100, which is already this palette's "not filled in yet"
+   value: it is the unfilled track behind every progress bar on the hub and stats
+   pages. Reusing it means the meaning is inherited rather than newly asserted, and
+   it avoids importing a neutral grey that exists nowhere else in the brand.
+
+   The pulse animates opacity rather than sweeping a gradient across the block. A
+   shimmer sweep repaints a large area every frame, which is precisely the wrong
+   work to hand a cheap phone while the server response it is masking is still in
+   flight — the animation would compete with the page it is waiting for. */
+.skel {
+  background: var(--cream-100);
+  border-radius: var(--r-sm);
+  animation: skel-pulse 1.6s ease-in-out infinite;
+}
+@keyframes skel-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .45; }
+}
+
+/* Honor reduced-motion: keep the press functional, drop the spring (BRAND.md §7, SPEC §8.2).
+   Skeletons hold at a settled opacity rather than vanishing: the block must still read as
+   a placeholder, it just stops breathing. */
 @media (prefers-reduced-motion: reduce) {
   .btn, .rate, .opt { transition: none; }
   .btn:active, .rate:active, .opt:active { transform: none; }
+  .skel { animation: none; opacity: .75; }
 }
 
 /* Hide native number-input spinners globally — we provide Prev/Next + JS clamping instead.

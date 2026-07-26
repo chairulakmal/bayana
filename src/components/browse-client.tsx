@@ -17,6 +17,7 @@
 // they're actively studying.
 
 import { useEffect, useRef, useState } from "react";
+import { WordListSkeleton } from "@/components/word-list-skeleton";
 
 type Word = {
   id: string;
@@ -125,11 +126,18 @@ export function BrowseClient({ level }: { level: string }) {
     );
   }
 
+  // The long wait: the whole level's word list over the network. Renders the same skeleton
+  // `app/browse/loading.tsx` used for the server render that just finished, so the two waits
+  // read as one continuous load rather than the page regressing from a laid-out placeholder
+  // to a line of centred text.
   if (words === null) {
     return (
-      <p className="mt-10 text-center text-[14px]" style={{ color: "var(--ink-faint)" }}>
-        Loading words…
-      </p>
+      <>
+        <WordListSkeleton />
+        <span className="sr-only" role="status" aria-live="polite">
+          Loading words
+        </span>
+      </>
     );
   }
 
