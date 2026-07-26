@@ -80,12 +80,54 @@ type PoolWord = { id: string; expression: string; reading: string; meaning: stri
 
 type SentenceRow = { wordId: string; japanese: string; reading: string; english: string };
 
+/** Round size when a caller does not ask for one. Was the route handler's `DEFAULT_COUNT`. */
+export const DEFAULT_EXAM_COUNT = 20;
+/** Upper bound on a round, since `count` can arrive from a query string. */
+const MAX_EXAM_COUNT = 40;
+/** Floor of 2, so the ceil/floor split below can never starve a section to zero. */
+const MIN_EXAM_COUNT = 2;
+
+/**
+ * Build one Exam round from a single total question count: the payload shape both callers hand
+ * to `ExamSession`.
+ *
+ * **The section split lives here rather than in the route handler, and that is the point of the
+ * function.** `ExamSession` does not receive section boundaries; it recovers them from the
+ * question *order*, by finding the first `type: "writing"` index and treating everything before
+ * it as 問題１ (which is what drives the progress counter, the per-section scores and the
+ * section-break screen). So the ceil/floor split is a contract between the builder and the
+ * component, not an implementation detail of one transport. With two callers (the `/exam` page
+ * render and `GET /api/exam` for "Try again"), a split that differed between them would not
+ * error; it would quietly hand the component a round whose break screen falls in the wrong
+ * place, or never fires. Having one definition is what makes that unrepresentable.
+ *
+ * @param level JLPT level to draw from; callers validate it with `Object.hasOwn(Level, …)`.
+ * @param count total questions across both sections; clamped to [2, 40], defaults to 20.
+ * @returns `ceil(count/2)` 問題１ questions followed by `floor(count/2)` 問題２ questions, or
+ *   `[]` when the level's pool is too small (see `buildExam`).
+ */
+export async function buildExamRound(
+  level: Level,
+  count: number = DEFAULT_EXAM_COUNT,
+): Promise<ExamQuestion[]> {
+  const safeCount = Number.isFinite(count)
+    ? Math.min(Math.max(MIN_EXAM_COUNT, Math.trunc(count)), MAX_EXAM_COUNT)
+    : DEFAULT_EXAM_COUNT;
+  // Ceil to reading, floor to writing: an odd count gives 問題１ the spare question. Reading
+  // is the section with no sentence-substitution constraint (see `buildExam`), so it is the
+  // one that can always be filled.
+  return buildExam(level, Math.ceil(safeCount / 2), Math.floor(safeCount / 2));
+}
+
 /**
  * Build an exam round for `level`. Returns `readingCount` 問題１ questions followed by
  * `writingCount` 問題２ questions. Returns `[]` if the pool is too small.
  *
  * Targets are sampled without replacement across both sections so the same word cannot
  * appear as both a 問題１ and 問題２ target in the same round.
+ *
+ * Prefer `buildExamRound`, which owns the total-to-sections split; this stays exported for the
+ * tests and for a caller that wants explicit per-section counts.
  */
 export async function buildExam(
   level: Level,

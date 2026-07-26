@@ -5,39 +5,31 @@
 // Card shape: front shows the grammar pattern in Japanese; tap to reveal meanings
 // (comma-separated), the Japanese example sentence, and its English translation.
 // Same flip-and-rate loop as study-session.tsx but operates on GrammarPoint /
-// GrammarProgress. No undo in v1 (grammar cards are lighter-weight).
+// GrammarProgress.
+//
+// **The first queue is built by the server** (`app/grammar/study/page.tsx`) and arrives in
+// `initial`, so this component has no loading state and never fetches on mount. It keeps
+// `loadQueue` for the imperative refetches only ("Check for more", "Another session?", and the
+// retry after a failed refetch), which stay a `GET` route handler (§14.16). Writes go to the
+// Server Actions in `app/grammar/actions.ts`.
+//
+// **Undo now exists here.** It was called a v1 omission on the grounds that grammar cards are
+// lighter-weight, which did not survive examination: a mis-tapped "Easy" is exactly as
+// unrecoverable as the last-card vocab case that was already worth fixing, and `u` was the one
+// key where the two queues' shortcut maps disagreed, against the parity SPEC §8.4 calls
+// deliberate. What it needed was somewhere to roll back *to*, since `GrammarProgress` stores only
+// the latest state; `GrammarReviewLog` is that, and `undoLastGrammarReview` uses the same ts-fsrs
+// `rollback()` vocab has always used.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { Parrot } from "@/components/parrot";
-import { SessionHeader, SessionHeaderLink } from "@/components/session-header";
+import { SessionHeader, SessionHeaderLink, SessionHeaderButton } from "@/components/session-header";
 import { HighlightedSentence } from "@/components/highlighted-sentence";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
-
-// --- shapes returned by GET /api/grammar/queue ---
-
-type GrammarPoint = {
-  id: string;
-  pattern: string;
-  reading: string;
-  meanings: string[];
-  exampleJp: string;
-  exampleEn: string;
-  lesson: number;
-};
-
-type DueCard = { grammarPoint: GrammarPoint };
-type QueueResponse = { due: DueCard[]; newPoints: GrammarPoint[]; totalDue: number };
-
-// Normalized card for the session.
-type GrammarCard = {
-  grammarPointId: string;
-  pattern: string;
-  reading: string;
-  meanings: string[];
-  exampleJp: string;
-  exampleEn: string;
-};
+import { useFocusOnTransition } from "@/hooks/use-focus-on-transition";
+import { rateGrammarPoint, undoGrammarRating } from "@/app/grammar/actions";
+import type { GrammarCard, GrammarSessionPayload } from "@/lib/grammar-cards";
 
 type Rating = 1 | 2 | 3 | 4;
 
@@ -48,34 +40,41 @@ const RATINGS: { value: Rating; label: string; cls: string }[] = [
   { value: 4, label: "Easy", cls: "rate-easy" },
 ];
 
-function toCard(point: GrammarPoint): GrammarCard {
-  return {
-    grammarPointId: point.id,
-    pattern: point.pattern,
-    reading: point.reading,
-    meanings: point.meanings,
-    exampleJp: point.exampleJp,
-    exampleEn: point.exampleEn,
-  };
-}
-
-export function GrammarSession({ level }: { level: string }) {
-  const [cards, setCards] = useState<GrammarCard[] | null>(null);
+export function GrammarSession({
+  level,
+  initial,
+}: {
+  level: string;
+  /** The first session, built during the page render. See `app/grammar/study/page.tsx`. */
+  initial: GrammarSessionPayload;
+}) {
+  // Seeded from the server render, so there is no null state and no first paint without cards.
+  // `useState` initialisers only run on mount, which is correct here rather than a hazard: a
+  // re-render with a fresh `initial` would mean the page had been revalidated underneath a
+  // session in progress, and §9.2 states why neither grammar action revalidates.
+  const [cards, setCards] = useState<GrammarCard[]>(initial.cards);
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [reviewed, setReviewed] = useState<string[]>([]); // grammarPointIds, for undo
   const [error, setError] = useState<string | null>(null);
   const [sessionDone, setSessionDone] = useState(false);
-  const [totalDueAtLoad, setTotalDueAtLoad] = useState(0);
-  const [dueCardsInSession, setDueCardsInSession] = useState(0);
-  // Distinguishes "fetch failed" from "queue is genuinely empty" — both leave
-  // cards as [], but they need different headlines (see render below).
+  const [totalDueAtLoad, setTotalDueAtLoad] = useState(initial.totalDue);
+  // Only the due cards in this batch (not new points), so approxRemaining is exact rather than
+  // the estimate vocab settles for; see the note in lib/grammar-cards.ts.
+  const [dueCardsInSession, setDueCardsInSession] = useState(initial.dueCount);
+  // Distinguishes "refetch failed" from "queue is genuinely empty": both can leave the session
+  // with nothing to show, but they need different screens, and a failure must offer a retry
+  // rather than claiming "All caught up!". Only a *refetch* can set this now: a failed first
+  // build throws during the server render and is caught by `app/grammar/study/error.tsx`.
   const [loadFailed, setLoadFailed] = useState(false);
+  // Ratings run inside a transition so the optimistic advance stays interruptible: React can
+  // process the next card's keystroke while the previous write is still in flight.
+  const [, startTransition] = useTransition();
 
-  // loadQueue is called both from the initial effect and imperatively (the
-  // "Check for more" / retry button), so a plain effect-cleanup `cancelled` flag
-  // can't guard it — a request token does: each call gets its own id, and a
-  // response only applies state if it's still the most recent call in flight.
+  // loadQueue is only ever called imperatively now ("Check for more", "Another session?", retry),
+  // which is exactly why it still needs a request token rather than an effect-cleanup `cancelled`
+  // flag: there is no effect to clean up, and a user can tap twice. Each call takes its own id and
+  // a response applies state only if it is still the most recent one in flight.
   const requestIdRef = useRef(0);
 
   const loadQueue = useCallback(async () => {
@@ -83,17 +82,16 @@ export function GrammarSession({ level }: { level: string }) {
     try {
       const res = await fetch(`/api/grammar/queue?level=${encodeURIComponent(level)}`);
       if (!res.ok) throw new Error(`queue ${res.status}`);
-      const data: QueueResponse = await res.json();
+      // The route returns the same flattened payload this component was handed as `initial`, so
+      // the two entry points cannot drift; it used to return raw Prisma rows that were normalized
+      // here on arrival (lib/grammar-cards.ts).
+      const data: GrammarSessionPayload = await res.json();
       if (requestIdRef.current !== requestId) return;
-      const allCards = [
-        ...data.due.map((d) => toCard(d.grammarPoint)),
-        ...data.newPoints.map(toCard),
-      ];
-      setCards(allCards);
+      setCards(data.cards);
       setTotalDueAtLoad(data.totalDue);
-      // Track only the due cards in this batch (not new points) so approxRemaining is correct.
-      setDueCardsInSession(data.due.length);
+      setDueCardsInSession(data.dueCount);
       setIndex(0);
+      setReviewed([]);
       setFlipped(false);
       setSessionDone(false);
       setError(null);
@@ -102,77 +100,129 @@ export function GrammarSession({ level }: { level: string }) {
       if (requestIdRef.current !== requestId) return;
       setError("Couldn't load your grammar queue.");
       setLoadFailed(true);
-      setCards((prev) => prev ?? []);
+      // `cards` is left alone on purpose: a failed refetch must not discard the session that is
+      // already on screen, and the retry screen below is what the user sees meanwhile.
     }
   }, [level]);
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadQueue();
-  }, [loadQueue]);
-
-  const current = cards && index < cards.length ? cards[index] : null;
+  const current = index < cards.length ? cards[index] : null;
 
   const rate = useCallback(
-    async (rating: Rating) => {
-      if (!current || !cards || busy) return;
-      setBusy(true);
-      setError(null);
-      try {
-        const res = await fetch("/api/grammar/review", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ grammarPointId: current.grammarPointId, rating }),
-        });
-        if (!res.ok) throw new Error(`review ${res.status}`);
+    (rating: Rating) => {
+      if (!current) return;
+      // Snapshot both facts the rollback needs, before any state starts moving.
+      const grammarPointId = current.grammarPointId;
+      const wasLastCard = index >= cards.length - 1;
 
-        if (index >= cards.length - 1) {
-          setSessionDone(true);
-        } else {
-          setIndex((i) => i + 1);
-          setFlipped(false);
-        }
-      } catch {
-        setError("Failed to save your review.");
-      } finally {
-        setBusy(false);
+      // **Advance first, ask the server second**, matching study-session.tsx. Rating is the one
+      // action a user performs twenty times in a row, and making each one wait on a round trip
+      // made a session feel like it was buffering. All three pieces of state move now and are
+      // rolled back together if the write fails.
+      //
+      // Advance uniformly, including on the last card, so `index` always equals the number of
+      // cards rated and `reviewed` always holds every rated id. That invariant is what lets one
+      // undo implementation serve both the header button and the completion screen.
+      setReviewed((r) => [...r, grammarPointId]);
+      setIndex((i) => i + 1);
+      setFlipped(false);
+      if (wasLastCard) {
+        // Last card → the session-complete screen. No auto-refetch, so there is a clear stopping
+        // point (FSRS sessions should feel finite).
+        setSessionDone(true);
       }
+      setError(null);
+
+      startTransition(async () => {
+        try {
+          await rateGrammarPoint({ grammarPointId, rating });
+        } catch {
+          // Put the card back exactly as it was: same index, same history, and revealed, because
+          // it was revealed at the moment it was rated.
+          setReviewed((r) => r.slice(0, -1));
+          setIndex((i) => Math.max(0, i - 1));
+          setFlipped(true);
+          if (wasLastCard) setSessionDone(false);
+          setError("Failed to save your review.");
+        }
+      });
     },
-    [current, cards, index, busy],
+    [current, cards.length, index],
   );
+
+  // Undo keeps an in-flight guard even though rating no longer has one, and the asymmetry is the
+  // point rather than an oversight. Two quick ratings hit two *different* cards, which is what
+  // rapid-fire rating means and is now supported. Two quick undos hit the *same* card: the second
+  // finds no log row left to roll back, so the action throws and the user is shown a failure for
+  // something that did in fact work once. A ref, not state, so taking the guard costs no render;
+  // the button's `disabled` stays tied to the history alone so it never flickers mid-tap.
+  const undoing = useRef(false);
+
+  // Deliberately not optimistic, unlike `rate`. Undo is a corrective action taken once, not on the
+  // hot path, so the round trip is affordable, and rolling back a rollback is materially harder to
+  // reason about than rolling back an advance.
+  const undo = useCallback(async () => {
+    if (undoing.current || reviewed.length === 0) return;
+    undoing.current = true;
+    setError(null);
+    const grammarPointId = reviewed[reviewed.length - 1];
+    try {
+      await undoGrammarRating({ grammarPointId });
+      setReviewed((r) => r.slice(0, -1));
+      setIndex((i) => Math.max(0, i - 1));
+      setFlipped(false);
+      // Undoing from the completion screen re-opens the session on the last card (a no-op
+      // mid-session, where sessionDone is already false).
+      setSessionDone(false);
+    } catch {
+      setError("Failed to undo.");
+    } finally {
+      undoing.current = false;
+    }
+  }, [reviewed]);
+
+  // --- focus management (SPEC §8.4) ---
+  //
+  // Rating unmounts the four rating buttons out from under the focused element, so focus fell to
+  // `<body>` after every card. Targets follow the rule in `use-focus-on-transition.ts`.
+  //
+  // **The reveal deliberately moves nothing** (`flipped ? null : …`). Its next step is a *choice*
+  // among four ratings, and focusing "Again" would let a reflexive second Space press bury a card
+  // the user had not read, which is the hazard SPEC §14.18 declined Anki's Space-rates-Good binding to
+  // avoid. Anchoring focus near the ratings instead was rejected for a second reason: the reveal
+  // already fires a polite `role="status"` announcement of the answer, and moving focus in the same
+  // commit can cut a screen reader off mid-sentence. Rating keys work from anywhere, so nothing is
+  // lost by staying put.
+  const showAnswerRef = useRef<HTMLButtonElement>(null);
+  const doneRef = useRef<HTMLParagraphElement>(null);
+  const focusTarget = sessionDone || !current ? doneRef : flipped ? null : showAnswerRef;
+  useFocusOnTransition(focusTarget, `${index}:${flipped}:${sessionDone}`);
 
   // --- keyboard shortcuts (SPEC §8.4) ---
   //
-  // Identical map to study-session.tsx minus `u`, since grammar has no undo yet (see the
-  // header comment above, and the TODO item that would add it). Keeping the two maps
-  // otherwise the same matters more than it looks: the whole value of a shortcut is that
-  // it transfers, and a learner moving between the vocab and grammar queues in one sitting
-  // should not have to remember which one 3 means "Good" in.
+  // Now identical to study-session.tsx including `u`, which is the parity the map was always meant
+  // to have: the whole value of a shortcut is that it transfers, and a learner moving between the
+  // vocab and grammar queues in one sitting should not have to remember which one 3 means "Good"
+  // in, or which one can take a mistake back.
   const cardVisible = current !== null && !sessionDone && !loadFailed;
   useKeyboardShortcuts(
     {
       space: flipped ? undefined : () => setFlipped(true),
       enter: flipped ? undefined : () => setFlipped(true),
-      "1": flipped ? () => void rate(1) : undefined,
-      "2": flipped ? () => void rate(2) : undefined,
-      "3": flipped ? () => void rate(3) : undefined,
-      "4": flipped ? () => void rate(4) : undefined,
+      "1": flipped ? () => rate(1) : undefined,
+      "2": flipped ? () => rate(2) : undefined,
+      "3": flipped ? () => rate(3) : undefined,
+      "4": flipped ? () => rate(4) : undefined,
+      // No `flipped` guard: undo self-guards on its in-flight ref and an empty history, and the
+      // whole point of undo is that it is reachable the instant you realise the mistake.
+      u: () => void undo(),
     },
     cardVisible,
   );
 
   // --- render states ---
-
-  if (cards === null) {
-    return (
-      <Centered>
-        <Parrot expr="sleepy" style={{ width: 84, height: 94 }} />
-        <p className="mt-3" style={{ color: "var(--ink-soft)" }}>
-          Loading…
-        </p>
-      </Centered>
-    );
-  }
+  //
+  // There is no loading branch. The first queue arrives as a prop, and the wait that used to live
+  // here is now `<Suspense>`'s fallback in `app/grammar/study/page.tsx` (`SessionLoading`).
 
   if (loadFailed && !sessionDone) {
     return (
@@ -185,7 +235,7 @@ export function GrammarSession({ level }: { level: string }) {
           {error ?? "Something went wrong loading your grammar queue."}
         </p>
         <div className="mt-6 flex gap-3">
-          <button onClick={() => void loadQueue()} disabled={busy} className="btn btn-primary">
+          <button onClick={() => void loadQueue()} className="btn btn-primary">
             Try again
           </button>
           <Link href="/grammar" className="btn btn-ghost">
@@ -198,8 +248,8 @@ export function GrammarSession({ level }: { level: string }) {
 
   if (sessionDone || !current) {
     const allCaughtUp = !sessionDone;
-    // approxRemaining = due cards that weren't in this session's batch.
-    // Only subtract the due cards we loaded (not new points) from totalDue.
+    // approxRemaining = due cards that weren't in this session's batch. Only subtract the due
+    // cards we loaded (not new points) from totalDue.
     const approxRemaining = Math.max(0, totalDueAtLoad - dueCardsInSession);
     return (
       <Centered>
@@ -208,7 +258,14 @@ export function GrammarSession({ level }: { level: string }) {
           title={allCaughtUp ? "Pī cheering" : "Pī smiling"}
           style={{ width: 124, height: 138 }}
         />
-        <p className="mt-4 text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
+        {/* tabIndex={-1}: focusable by script, not by Tab. The standard way to land a screen
+            reader on "where you now are" without adding a tab stop that does nothing. */}
+        <p
+          ref={doneRef}
+          tabIndex={-1}
+          className="mt-4 text-2xl"
+          style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}
+        >
           {allCaughtUp ? "All caught up! 🎉" : "Session done! 🎉"}
         </p>
         <p className="mt-1" style={{ color: "var(--ink-soft)" }}>
@@ -221,15 +278,22 @@ export function GrammarSession({ level }: { level: string }) {
           )}
         </p>
         <div className="mt-6 flex gap-3">
-          <button onClick={() => void loadQueue()} disabled={busy} className="btn btn-primary">
+          <button onClick={() => void loadQueue()} className="btn btn-primary">
             {allCaughtUp ? "Check for more" : "Another session?"}
           </button>
           <Link href="/grammar" className="btn btn-ghost">
             Back
           </Link>
         </div>
-        {/* Always-mounted `role="alert"`, matching study-session.tsx. Only "Check for more" can
-            fail from this screen today; it gains a second failure mode when grammar gets undo. */}
+        {/* Escape hatch for a fat-fingered rating on the LAST card, matching study-session.tsx:
+            without it that one mistake is the single unrecoverable rating in a session. */}
+        {!allCaughtUp && reviewed.length > 0 && (
+          <button onClick={() => void undo()} className="btn btn-ghost mt-3 text-sm">
+            Undo last rating
+          </button>
+        )}
+        {/* Always-mounted `role="alert"`, matching study-session.tsx: both "Check for more" and
+            the undo button above are live on this screen, so a failure here is silent without it. */}
         <div role="alert">
           {error && (
             <p className="mt-3 text-sm" style={{ color: "var(--bad)" }}>
@@ -265,7 +329,18 @@ export function GrammarSession({ level }: { level: string }) {
             {remaining} left
           </>
         }
-        right={null}
+        /* Undo advertises its shortcut via `title` rather than a .kbd-hint keycap, matching
+           study-session.tsx: this pill is deliberately the quietest control on the screen
+           (BRAND.md §7 session chrome), and a badge here would cost more than the hint is worth. */
+        right={
+          <SessionHeaderButton
+            onClick={undo}
+            disabled={reviewed.length === 0}
+            title="Undo last rating (U)"
+          >
+            Undo
+          </SessionHeaderButton>
+        }
       />
 
       {/* Card area: scrollable so long example sentences don't overflow.
@@ -363,10 +438,13 @@ export function GrammarSession({ level }: { level: string }) {
         {flipped ? (
           <div className="grid grid-cols-4 gap-2">
             {RATINGS.map((r) => (
+              // No `disabled` while a write is in flight, matching study-session.tsx: rating is
+              // optimistic now, so rapid-fire rating is a supported interaction rather than
+              // something to block. The SERIALIZABLE transaction in grammar-review.ts is what
+              // keeps two concurrent writes for one card from losing an update.
               <button
                 key={r.value}
-                onClick={() => void rate(r.value)}
-                disabled={busy}
+                onClick={() => rate(r.value)}
                 className={`rate ${r.cls}`}
               >
                 {r.label}
@@ -377,7 +455,7 @@ export function GrammarSession({ level }: { level: string }) {
             ))}
           </div>
         ) : (
-          <button onClick={() => setFlipped(true)} className="btn btn-primary w-full">
+          <button ref={showAnswerRef} onClick={() => setFlipped(true)} className="btn btn-primary w-full">
             Show answer
             <span className="kbd-hint" aria-hidden>
               Space

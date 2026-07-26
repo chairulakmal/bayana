@@ -8,6 +8,10 @@
 //
 // As the earlier MVP promised, confusability scoring dropped in by changing only
 // `pickDistractors` — the question shape and the endpoint are untouched.
+//
+// `buildQuizRound` is the entry point both callers use: the `/quiz` page render (which builds
+// the round the user actually sees) and `GET /api/quiz` (which now only serves "Play again").
+// One definition of a round means the two cannot drift on its size (SPEC §9).
 
 import { db } from "@/lib/db";
 import type { Level } from "@/generated/prisma/enums";
@@ -26,9 +30,46 @@ type PoolWord = { id: string; expression: string; reading: string; meaning: stri
 
 const OPTIONS_PER_QUESTION = 4;
 
+/** Round size when a caller does not ask for one. Was the route handler's `DEFAULT_COUNT`. */
+export const DEFAULT_QUIZ_COUNT = 10;
+/** Upper bound on a round, since `count` can arrive from a query string. */
+const MAX_QUIZ_COUNT = 20;
+
+/**
+ * Build one Quiz round: the payload shape both callers hand to `QuizSession`.
+ *
+ * This wrapper exists because there are now two entry points (the `/quiz` page renders the
+ * first round during its own render, and `GET /api/quiz` still serves "Play again"), and the
+ * round size and its clamp are the part they must not disagree about. Keeping the clamp here
+ * rather than in the handler also means it is a property of *building a round* rather than of
+ * one transport: no caller can ask for an unbounded round, whether or not it remembered to
+ * validate first.
+ *
+ * It is deliberately thin today. Phase 3 Part B is what it is really for: the 50/50
+ * review-pool/new split needs `userId`, and adding a parameter here reaches both callers at
+ * once, exactly as `buildSession` now serves both `/study` callers.
+ *
+ * @param level JLPT level to draw from. Callers validate it with `Object.hasOwn(Level, …)`
+ *   before this point, since an unchecked string reaching Prisma as an enum is a 500.
+ * @param count how many questions to aim for; clamped to [1, 20], defaults to 10.
+ * @returns up to `count` questions, or `[]` when the level's pool is too small for even one.
+ */
+export async function buildQuizRound(
+  level: Level,
+  count: number = DEFAULT_QUIZ_COUNT,
+): Promise<QuizQuestion[]> {
+  const safeCount = Number.isFinite(count)
+    ? Math.min(Math.max(1, Math.trunc(count)), MAX_QUIZ_COUNT)
+    : DEFAULT_QUIZ_COUNT;
+  return buildQuiz(level, safeCount);
+}
+
 /**
  * Build up to `count` distinct questions for `level`. Returns `[]` if the level has too
  * few words to form even one question.
+ *
+ * Prefer `buildQuizRound` as the entry point; this stays exported for the tests and for any
+ * caller that genuinely wants an exact, already-validated count.
  */
 export async function buildQuiz(level: Level, count: number): Promise<QuizQuestion[]> {
   // One cheap fetch of the level's pool (~700–2,700 rows) — used both to choose targets

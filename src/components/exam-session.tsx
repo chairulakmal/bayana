@@ -10,45 +10,40 @@
 //
 // Non-scheduling: no FSRS writes. Exam is a benchmark, not a study scheduler.
 // Modes are independent by design — see SPEC §8.6.
+//
+// **The first round is built by the server** (`app/exam/page.tsx`) and arrives in `initial`, so
+// this component has no loading state and never fetches on mount. It keeps `load` for the
+// imperative refetch only ("Try again" from the summary, and the retry after a failed one).
+//
+// The question types come from `@/lib/exam` rather than being re-declared here; the local copies
+// were a hand-written mirror of the same three types, which is exactly the drift the shared module
+// prevents. Note the section boundary is recovered from question *order* (`writingStart` below),
+// which is why `buildExamRound` owns the split for both callers.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import Link from "next/link";
 import { Parrot } from "@/components/parrot";
 import { SessionHeader, SessionHeaderLink } from "@/components/session-header";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
-
-type Option = { text: string; correct: boolean };
-
-type ReadingQuestion = {
-  type: "reading";
-  wordId: string;
-  sentence: string;
-  sentenceReading: string | null;
-  sentenceEnglish: string | null;
-  target: string;
-  meaning: string;
-  options: Option[];
-};
-
-type WritingQuestion = {
-  type: "writing";
-  wordId: string;
-  sentence: string;
-  sentenceReading: string | null;
-  sentenceEnglish: string | null;
-  target: string;
-  meaning: string;
-  options: Option[];
-};
-
-type ExamQuestion = ReadingQuestion | WritingQuestion;
+import { useFocusOnTransition } from "@/hooks/use-focus-on-transition";
+// `import type`, and it matters: `lib/exam` imports `lib/db`, so importing a *value* from it here
+// would pull Prisma and `pg` into the browser bundle. A type import is erased at compile time.
+import type { ExamQuestion } from "@/lib/exam";
 
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
-export function ExamSession({ level }: { level: string }) {
-  const [questions, setQuestions] = useState<ExamQuestion[] | null>(null);
+export function ExamSession({
+  level,
+  initial,
+}: {
+  level: string;
+  /** The first round, built during the page render. See `app/exam/page.tsx`. */
+  initial: ExamQuestion[];
+}) {
+  // Seeded from the server render: no null state, no first paint without questions.
+  const [questions, setQuestions] = useState<ExamQuestion[]>(initial);
   const [index, setIndex] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
   const [readingScore, setReadingScore] = useState(0);
@@ -56,47 +51,55 @@ export function ExamSession({ level }: { level: string }) {
   const [error, setError] = useState<string | null>(null);
   // showBreak is true after the last 問題１ question, before the first 問題２ question.
   const [showBreak, setShowBreak] = useState(false);
+  // Separates "refetch failed" from "this level has too few words"; see quiz-session.tsx. A failed
+  // *first* build throws during the server render and lands in `app/exam/error.tsx`.
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  // Request token for the imperative refetch, because a user can tap "Try again" twice and a stale
+  // response must not overwrite a newer one. See quiz-session.tsx for the full reasoning.
+  const requestIdRef = useRef(0);
 
   const load = useCallback(async () => {
-    setQuestions(null);
-    setIndex(0);
-    setPicked(null);
-    setReadingScore(0);
-    setWritingScore(0);
-    setShowBreak(false);
-    setError(null);
+    const requestId = ++requestIdRef.current;
     try {
-      const res = await fetch(`/api/exam?level=${encodeURIComponent(level)}&count=20`);
+      // No `count` param, deliberately: `buildExamRound`'s default is the single definition of a
+      // round's size, and a literal here would be a second copy of it. See quiz-session.tsx.
+      const res = await fetch(`/api/exam?level=${encodeURIComponent(level)}`);
       if (!res.ok) throw new Error(`exam ${res.status}`);
       const data: { questions: ExamQuestion[] } = await res.json();
+      if (requestIdRef.current !== requestId) return;
       setQuestions(data.questions);
+      setIndex(0);
+      setPicked(null);
+      setReadingScore(0);
+      setWritingScore(0);
+      setShowBreak(false);
+      setError(null);
+      setLoadFailed(false);
     } catch {
+      if (requestIdRef.current !== requestId) return;
       setError("Couldn't load the exam.");
-      setQuestions([]);
+      setLoadFailed(true);
     }
   }, [level]);
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void load();
-  }, [load]);
-
   // --- Derived state and actions ---
   //
-  // Hoisted above the early returns for the same reason as in quiz-session.tsx: the
-  // keyboard hook closes over them and has to run on every render.
-  const total = questions?.length ?? 0;
+  // Hoisted above the early returns because the keyboard and focus hooks close over them and
+  // have to run on every render.
+  const total = questions.length;
   // The split point is where 問題２ begins (first writing question index).
-  const writingStart = questions ? questions.findIndex((q) => q.type === "writing") : -1;
+  const writingStart = questions.findIndex((q) => q.type === "writing");
   // If all questions are one type, writingStart is -1 — treat as past the end.
   const readingTotal = writingStart === -1 ? total : writingStart;
   const writingTotal = total - readingTotal;
 
-  const current = questions && index < total ? questions[index] : null;
+  const current = index < total ? questions[index] : null;
   const answered = picked !== null;
   const correctIndex = current ? current.options.findIndex((o) => o.correct) : -1;
 
-  // Self-guarding, so the keyboard map can bind all four digits unconditionally.
+  // Self-guarding, so the keyboard map can bind all four digits unconditionally. Now also the
+  // guard for pointer input, since answered options are no longer `disabled` (see the footer).
   const choose = useCallback(
     (i: number) => {
       if (!current || picked !== null || i >= current.options.length) return;
@@ -119,6 +122,25 @@ export function ExamSession({ level }: { level: string }) {
     setIndex(nextIndex);
   }, [index, writingStart]);
 
+  // --- Focus management (SPEC §8.4) ---
+  //
+  // Targets follow the rule in `use-focus-on-transition.ts`: a button only where the next step is
+  // a single unambiguous one, an anchor where it is a choice. Exam has one target the other modes
+  // do not: the section break's "Start 問題２" button, which is the clearest case of all, since
+  // the break screen exists to be acknowledged and holds exactly one control.
+  const promptRef = useRef<HTMLDivElement>(null);
+  const continueRef = useRef<HTMLButtonElement>(null);
+  const summaryRef = useRef<HTMLParagraphElement>(null);
+  const breakRef = useRef<HTMLButtonElement>(null);
+  const focusTarget = showBreak
+    ? breakRef
+    : current === null
+      ? summaryRef
+      : answered
+        ? continueRef
+        : promptRef;
+  useFocusOnTransition(focusTarget, `${index}:${answered}:${showBreak}`);
+
   // --- Keyboard shortcuts (SPEC §8.4) ---
   //
   // The section break gets Space/Enter too. Without it the keyboard flow would hit a wall
@@ -138,23 +160,38 @@ export function ExamSession({ level }: { level: string }) {
           space: answered ? next : undefined,
           enter: answered ? next : undefined,
         },
-    current !== null,
+    current !== null && !loadFailed,
   );
 
-  // --- Loading / empty / error states ---
+  // --- Empty / retry states ---
+  //
+  // There is no loading branch; the wait is now `<Suspense>`'s fallback in `app/exam/page.tsx`.
 
-  if (questions === null) {
+  if (loadFailed) {
     return (
       <Centered>
-        <Parrot expr="happy" style={{ width: 84, height: 94 }} />
-        <p className="mt-3" style={{ color: "var(--ink-soft)" }}>
-          Loading…
+        <Parrot expr="sleepy" title="Pī looking concerned" style={{ width: 124, height: 138 }} />
+        <p className="mt-4 text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
+          Couldn&apos;t load
         </p>
+        <p className="mt-1" style={{ color: "var(--ink-soft)" }}>
+          {error ?? "Something went wrong loading the exam."}
+        </p>
+        <div className="mt-6 flex gap-3">
+          <button onClick={() => void load()} className="btn btn-primary">
+            Try again
+          </button>
+          <Link href="/home" className="btn btn-ghost">
+            Home
+          </Link>
+        </div>
       </Centered>
     );
   }
 
-  if (questions.length === 0) {
+  // Too few words at this level to form a round. `buildExam` returns [] rather than throwing
+  // for this case, so it is a state and not an error.
+  if (total === 0) {
     return (
       <Centered>
         <Parrot expr="sleepy" style={{ width: 110, height: 123 }} />
@@ -162,7 +199,7 @@ export function ExamSession({ level }: { level: string }) {
           No exam available
         </p>
         <p className="mt-1" style={{ color: "var(--ink-soft)" }}>
-          {error ?? "Not enough words at this level yet."}
+          Not enough words at this level yet.
         </p>
         <Link href="/home" className="btn btn-primary mt-6">
           Back home
@@ -191,6 +228,7 @@ export function ExamSession({ level }: { level: string }) {
           <span lang="ja" className="jp">問題１</span> score: {readingScore} / {readingTotal}
         </p>
         <button
+          ref={breakRef}
           onClick={() => setShowBreak(false)}
           className="btn btn-primary mt-6"
         >
@@ -214,7 +252,13 @@ export function ExamSession({ level }: { level: string }) {
     return (
       <Centered>
         <Parrot expr="wow" title="Pī cheering" style={{ width: 124, height: 138 }} />
-        <p className="mt-4 text-3xl" style={{ fontFamily: "var(--f-display)", fontWeight: 700 }}>
+        {/* tabIndex={-1}: focusable by script, not by Tab. See quiz-session.tsx. */}
+        <p
+          ref={summaryRef}
+          tabIndex={-1}
+          className="mt-4 text-3xl"
+          style={{ fontFamily: "var(--f-display)", fontWeight: 700 }}
+        >
           {totalScore} / {total} 🎉
         </p>
         <div className="mt-3 flex flex-col gap-1 text-[14px]" style={{ color: "var(--ink-soft)" }}>
@@ -236,6 +280,15 @@ export function ExamSession({ level }: { level: string }) {
           <Link href="/home" className="btn btn-ghost">
             Home
           </Link>
+        </div>
+        {/* Always-mounted `role="alert"`: "Try again" is live here, so a failed refetch that
+            lands back on this screen needs somewhere to say so. */}
+        <div role="alert">
+          {error && (
+            <p className="mt-3 text-sm" style={{ color: "var(--bad)" }}>
+              {error}
+            </p>
+          )}
         </div>
       </Centered>
     );
@@ -275,7 +328,13 @@ export function ExamSession({ level }: { level: string }) {
       />
 
       <section className="flex flex-1 flex-col overflow-y-auto px-4 py-4">
-        <div className="my-auto flex w-full flex-col items-center text-center">
+        {/* Focus anchor for a fresh question; wraps the prompt so focusing it reads out what is
+            being asked rather than landing on an empty sentinel. */}
+        <div
+          ref={promptRef}
+          tabIndex={-1}
+          className="my-auto flex w-full flex-col items-center text-center"
+        >
           {/* Question type label */}
           <p
             lang="ja" className="jp text-[13px] font-semibold"
@@ -351,11 +410,13 @@ export function ExamSession({ level }: { level: string }) {
             if (answered && i === correctIndex) cls += " opt-correct";
             else if (answered && i === picked) cls += " opt-wrong";
             return (
+              // `aria-disabled`, not `disabled`; see quiz-session.tsx for why (a real `disabled`
+              // blurred the option on answer, dropping focus to <body> every question).
               <button
                 key={i}
                 lang="ja"
                 className={`${cls} jp`}
-                disabled={answered}
+                aria-disabled={answered}
                 onClick={() => choose(i)}
               >
                 {/* Grouped so .opt keeps two flex children (see quiz-session.tsx). */}
@@ -372,7 +433,7 @@ export function ExamSession({ level }: { level: string }) {
           })}
         </div>
         {answered && (
-          <button onClick={next} className="btn btn-primary mt-3 w-full">
+          <button ref={continueRef} onClick={next} className="btn btn-primary mt-3 w-full">
             {index + 1 === total ? "See results" : "Continue"}
             <span className="kbd-hint" aria-hidden>
               Space
@@ -430,7 +491,7 @@ function HighlightedSentence({ sentence, target }: { sentence: string; target: s
   );
 }
 
-/** Full-screen centered container for loading / empty / summary / break states. */
+/** Full-screen centered container for empty / retry / summary / break states. */
 function Centered({ children }: { children: React.ReactNode }) {
   return (
     <main className="flex min-h-svh flex-col items-center justify-center px-6 text-center pt-safe pb-safe">

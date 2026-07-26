@@ -2,11 +2,11 @@
 
 Open work only: what is planned, in flight, or found-but-not-fixed. This file is the cross-session "where we left off" record, so keep it current, and **delete an item in the commit that lands it** rather than archiving it. Shipped work is already recorded three times over: [SPEC.md](SPEC.md) §13 Milestones at design altitude, [DECISIONS.md](DECISIONS.md) for why it was done that way, and git for the detail. Decisions do **not** go here.
 
-**Now: the frontend architecture workstream** (first section below). New on 2026-07-26, from a frontend review that looked at data flow rather than at the rendered surface. It is sequenced first because it rewrites the exact lines several already-queued items touch, and doing those first means writing them twice.
+**Now: the frontend architecture workstream** (first section below). New on 2026-07-26, from a frontend review that looked at data flow rather than at the rendered surface. **Items 1 to 3 have landed**, so no session screen is a client-side SPA any more; what remains is the two browse pages, the form pending states, and the design-token migration.
 
-**Then: the UI/UX workstream** (second section). Six items: four sequenced behind the architecture work, two deferred on external blockers. Each is marked in place.
+**Then: the UI/UX workstream** (second section). Five items: three sequenced behind the remaining architecture work, two deferred on external blockers. Each is marked in place.
 
-**Then: Phase 3.** MC↔FSRS coupling for Quiz mode (planned, not started). Its Part A is written against the `rateCard` Server Action that landed with `/study`, and Part B collides with the Quiz port, so it must not start before architecture item 3.
+**Then: Phase 3.** MC↔FSRS coupling for Quiz mode (planned, not started). **No longer blocked:** architecture item 3 landed on 2026-07-26, so Part A can be written against `rateCard` as it stands and Part B against `buildQuizRound`, the shared builder the Quiz port introduced for exactly that seam.
 
 **Next: Phase 4.** Admin sentence audit + on-demand generation. Then Phase 5 (multi-user) and Phase 6 (further enhancements), both tracked only in SPEC.md §13 for now.
 
@@ -25,13 +25,7 @@ The finding: the app is an App Router shell around a client-side SPA. All six in
 - **Reads stay route handlers; writes become Server Actions.** Reads keep a documented, cacheable HTTP surface and are still needed for the imperative refetch paths ("Check for more", retry, "Play again"). Writes have no external consumer and gain typed arguments plus a shorter path. Action names and their guards are specified in SPEC §9.2; follow them rather than inventing new ones.
 - **No opt-in rendering flags.** `cacheComponents`, View Transitions and the React Compiler are all opt-in and would put a live Railway deployment at the mercy of a Next minor bump. This also rules out `use cache`, which is gated behind `cacheComponents`, so the caching work below uses React's stable `cache()` instead. (Verified against 16.2.7: only `viewTransition` is still under the `experimental.` namespace, so do not go looking for the other two there.)
 
-**Numbering here is stable, unlike the UI/UX section below.** Items 1 (the reads/writes convention plus the memoized profile read) and 2 (the `/study` reference implementation) have landed and are deleted, and the remaining numbers were **not** closed up over them, because Phase 3 and four UI/UX items all cross-reference these by number. "Architecture item 3" therefore means the same item tomorrow as it does today.
-
-### 3. Port the three remaining session modes
-
-- [ ] `quiz-session.tsx`, `exam-session.tsx`, `grammar-session.tsx` against the `/study` reference, which is now real code to copy rather than a description: `src/app/study/page.tsx` (shell plus streaming child, and note **which** awaits sit in the page body and why), `src/lib/study-cards.ts` (the shared normalizer), `src/app/study/actions.ts` (guards reproduced, no `revalidatePath`), `src/app/study/error.tsx`, and `study-session.tsx`'s optimistic `rate`. Each mode also gains its `metadata` title (UI/UX item 3) and the shared `SessionLoading` fallback.
-- [ ] `grammar-session.tsx:121` write path to a Server Action alongside the vocab one.
-- [ ] Delete `POST /api/review`, `POST /api/review/undo` and `POST /api/grammar/review` only once all four modes are ported, not before. The seven read routes (`cards/queue`, `quiz`, `exam`, `browse`, `words/[id]/sentence`, `grammar/queue`, `grammar/browse`) all stay, as does `demo/login`, `dev/login` and the Auth.js catch-all.
+**Numbering here is stable, unlike the UI/UX section below.** Items 1 (the reads/writes convention plus the memoized profile read), 2 (the `/study` reference implementation) and 3 (the three remaining session ports, with grammar undo and the focus work folded in) have landed and are deleted, and the remaining numbers were **not** closed up over them, because the UI/UX items cross-reference these by number. "Architecture item 5" therefore means the same item tomorrow as it does today.
 
 ### 4. Browse and grammar browse
 
@@ -43,7 +37,7 @@ The finding: the app is an App Router shell around a client-side SPA. All six in
 
 - [ ] `level-picker.tsx:50`: the picker dims to `opacity: 0.4` and waits a full round trip to move a check mark. `useOptimistic` fits here precisely because `current` is a prop rendered by the RSC and replaced by `revalidatePath`.
 - [ ] `level-picker.tsx:57`: `router.refresh()` fires after `setActiveLevel`, which already calls `revalidatePath` on five paths (`src/app/home/actions.ts:57`). A `revalidatePath` inside a Server Action refreshes the current route on the action response, so this looks like a redundant second round trip. Verify before removing.
-- [ ] `src/app/auth/signin/page.tsx:116`: `useActionState` for the pending state, which resolves the one remaining bullet of UI/UX item 2 as a side effect rather than as separate work.
+- [ ] `src/app/auth/signin/page.tsx:116`: `useActionState` for the pending state, which resolves the one remaining bullet of UI/UX item 1 as a side effect rather than as separate work.
 
 ### 6. Design tokens as Tailwind utilities
 
@@ -59,45 +53,31 @@ Independent of items 1 to 5 and pullable in parallel, but do it after the compon
 
 Everything user-facing that is known-wrong or known-missing, worked top-down. The items reachable on pages that are otherwise finished (route states, hit targets, three passes at keyboard and screen-reader gaps, navigation parity) landed on 2026-07-26 and were deleted as they did.
 
-**Items 1 to 4 came from a full UI/UX review of the shipped surface on 2026-07-26**, read against BRAND.md and SPEC §8.4. They cluster on one axis the earlier passes did not cover: what happens on a keyboard, with a screen reader, or in the instant after a tap. The visual system itself held, so nothing below is a token or layout change. Four of the review's items shipped on 2026-07-26 and are deleted, which is what the numbering below has been closed up over: keyboard shortcuts in the study modes (SPEC §8.4, §14.18), the tap-anywhere card no longer being a `<button>` (SPEC §8.4, §14.19), the labelling and live-region gaps (SPEC §8.4, §14.20), and the grammar-browse parity fixes (SPEC §8.4, §14.21). Item 2 shipped its first bullet the same day, the two Auth.js built-in pages (SPEC §11.2, §14.22), and keeps the second.
+**Items 1 to 3 came from a full UI/UX review of the shipped surface on 2026-07-26**, read against BRAND.md and SPEC §8.4. They cluster on one axis the earlier passes did not cover: what happens on a keyboard, with a screen reader, or in the instant after a tap. The visual system itself held, so nothing below is a token or layout change. Five of the review's items shipped on 2026-07-26 and are deleted, which is what the numbering below has been closed up over: keyboard shortcuts in the study modes (SPEC §8.4, §14.18), the tap-anywhere card no longer being a `<button>` (SPEC §8.4, §14.19), the labelling and live-region gaps (SPEC §8.4, §14.20), the grammar-browse parity fixes (SPEC §8.4, §14.21), and the focus-after-transition defect in all four modes, which landed inside architecture item 3 as planned (SPEC §8.4, §14.24). Item 1 below shipped its first bullet the same day, the two Auth.js built-in pages (SPEC §11.2, §14.22), and keeps the second.
 
-**Every remaining item here sequences behind the architecture workstream above**, which rewrites the same lines. Nothing in this section is a free pull any more: the last one was item 2's `verifyRequest` page, and it has landed.
+**Every remaining item here sequences behind the architecture workstream above**, which rewrites the same lines. Nothing in this section is a free pull any more: the last one was the `verifyRequest` page, and it has landed.
 
-**Items 5 and 6 are deferred, and neither is waiting on capacity.** One is blocked on other work, the other on a decision that was explicitly postponed. Do not pull either in as filler.
+**Items 4 and 5 are deferred, and neither is waiting on capacity.** One is blocked on other work, the other on a decision that was explicitly postponed. Do not pull either in as filler.
 
-### 1. Focus is destroyed after every answer, in all four modes
-
-Rating or answering leaves focus on `<body>`, so a keyboard user re-Tabs from the top of the document on every card.
-
-**Downgraded from "highest-frequency defect" on 2026-07-26**, when the study-mode keyboard shortcuts shipped: a document-level handler means a keyboard user drives the whole session without needing focus to be anywhere in particular, so the ten-to-twenty re-Tabs per session are no longer on the main path. What remains is the screen-reader case, which the shortcuts do not help: an SR user is told nothing about where they now are, and browse-mode quick-nav keys intercept the digits before the handler ever sees them. Still worth fixing, no longer urgent.
-
-**Sequenced behind architecture item 3**, which rewrites both mechanisms below. Fixing it first means writing it twice; the rewrite is also the natural place to put the focus move.
-
-- [ ] `src/components/study-session.tsx:443` and `src/components/grammar-session.tsx:365`: rating a card sets `flipped = false`, which unmounts the four rating buttons out from under the focused element, so focus falls to `<body>`.
-- [ ] `src/components/quiz-session.tsx:192` and `src/components/exam-session.tsx:317`: the chosen option takes `disabled={answered}`, and browsers blur a control the moment it is disabled.
-- [ ] Fix is the same in all four: after each transition, move focus deliberately to the control that is now the next step (the "Show answer" button, or the "Continue" button). A ref plus an effect keyed on the transition, not an `autoFocus`.
-- [ ] Note that `/study` has already dropped `busy`/`disabled`, which removed the *second* cause there outright; architecture item 3 does the same for the other three, leaving only the unmount case to handle.
-
-### 2. The magic-link flow leaves the brand at its most fragile moment
+### 1. The magic-link flow leaves the brand at its most fragile moment
 
 One bullet left, and it is not pullable on its own:
 
 - [ ] `src/app/auth/signin/page.tsx`: "Send magic link" has no pending state, so a slow Resend call reads as a dead button and invites a double-submit. **Superseded by architecture item 5**, which fixes it via `useActionState`. Delete this bullet there, not here.
 
-### 3. Missing headings and page titles
+### 2. Missing headings and page titles
 
-- [ ] No `<h1>` on `/home`, `/grammar`, or any of the four session screens. The hub's "TODAY" / "STUDY MODES" / "LEVEL" labels are `<p>` elements, so heading navigation finds nothing at all on the app's default page. Landing, browse, stats, signin, onboarding and the error routes all have one already.
-- [ ] 9 of 14 routes never set a title. `src/app/layout.tsx:7` defines `template: "%s · Bayana"` and only `/browse`, `/grammar/browse`, `/study` and the two `/auth` screens use it; everything else renders the default string in the tab, in history, and in the PWA task switcher. **Partly absorbed**: `/study` got its title when it was rewritten, and architecture item 3 rewrites the other three session `page.tsx` files and should add each `metadata` export in the same edit, leaving only `/home`, `/grammar` and `/onboarding` here.
+- [ ] No `<h1>` on `/home`, `/grammar`, or any of the four session screens. The hub's "TODAY" / "STUDY MODES" / "LEVEL" labels are `<p>` elements, so heading navigation finds nothing at all on the app's default page. Landing, browse, stats, signin, onboarding and the error routes all have one already. Note the session screens now have a **focus** target on their completion/summary states (a `tabIndex={-1}` score or "Session done" line, architecture item 3), which is not a heading and does not close this: the two mechanisms are independent, and the right fix here may well be to promote those same elements.
+- [ ] 6 of 14 routes never set a title. `src/app/layout.tsx:7` defines `template: "%s · Bayana"`. **Mostly absorbed**: `/study` got its title when it was rewritten, and `/quiz`, `/exam` and `/grammar/study` got theirs in architecture item 3, leaving only `/home`, `/grammar` and `/onboarding` here.
 
-### 4. Smaller UX items
+### 3. Smaller UX items
 
 - [ ] `src/components/browse-client.tsx:82` `goToPage`: turning a page does not scroll back to the top of the list. At 375px with 50 rows, tapping "Next" at the bottom leaves the user at the bottom of the next page.
-- [ ] Grammar has no Undo while vocab does (`grammar-session.tsx:8` calls it a v1 omission). A mis-tapped "Easy" on a grammar card is as unrecoverable as the last-card vocab case that was worth fixing in `study-session.tsx`. **Cheapest during architecture item 3**, which is already writing that component's action layer. When it lands, add the `u` binding to `grammar-session.tsx`'s shortcut map: it is the one key where the two queues currently disagree, and SPEC §8.4 records that parity as deliberate.
 - [ ] `src/app/auth/signin/page.tsx:114`: the email field uses `outline-none` plus `focus:border-*` instead of the `.focus-ring` utility both search fields use, and `focus:` rather than `focus-visible:`, so it also fires on pointer taps.
 - [ ] `/stats` has no level control, so changing level means a round trip through `/home`. That is the same friction that justified adding the picker to the grammar hub.
 - [ ] `src/components/browse-client.tsx:204`: the `role="status"` result count re-announces on every keystroke. Debounce the announced value, not the filtering.
 
-### 5. Performance: subset the Japanese face, blocked on bayan
+### 4. Performance: subset the Japanese face, blocked on bayan
 
 **Deferred 2026-07-26: starts only once bayan is finished.** Not a capacity call. The sibling bayan/zaka dataset is the nearer-term commitment, and this is a self-contained build-pipeline project that will still be worth exactly as much later.
 
@@ -106,7 +86,7 @@ One bullet left, and it is not pullable on its own:
   - Still a real project rather than a config change: it needs a build step plus a decided answer for what happens when a generated sentence contains a kanji outside the subset.
   - **Note the interaction with the Kalima/bayan work**, which is the thing it waits on: imported questions and the N3 passage set introduce Japanese text this app did not author, so the "kanji outside the subset" question has a wider blast radius after that lands than before. Deciding it first would have meant deciding it twice.
 
-### 6. UX correctness: day boundaries, deferred pending a timezone decision
+### 5. UX correctness: day boundaries, deferred pending a timezone decision
 
 **Deferred 2026-07-26.** The fix is small; what it needs first is a decision on where a user's timezone comes from (profile field, browser-reported, or a fixed offset), and that was postponed rather than made.
 
@@ -118,7 +98,7 @@ One bullet left, and it is not pullable on its own:
 
 Resolves SPEC §15 open question #1. Makes Quiz and Flashcard modes genuinely complementary: MC answers seed the FSRS schedule, and MC question selection is informed by the user's FSRS state. No new schema, since it reuses `ReviewState` and `ReviewLog`.
 
-**Sequenced behind the architecture workstream.** Part B changes `buildQuiz`'s signature in the same file the Quiz port touches, and Part A is now written against the `rateCard` action that landed with `/study`. Starting here first means writing Part A twice.
+**Unblocked as of 2026-07-26**, when architecture item 3 ported Quiz. Both halves now have the seam they need: Part A writes through the shipped `rateCard` action, and Part B changes `buildQuizRound`, which the port introduced precisely so a signature change reaches the page render and the refetch route at once.
 
 ### Part A: MC answers write FSRS ratings
 
@@ -127,8 +107,8 @@ Resolves SPEC §15 open question #1. Makes Quiz and Flashcard modes genuinely co
 
 ### Part B: 50/50 MC source split (review pool + new)
 
-- [ ] `src/lib/quiz.ts` `buildQuiz(level, count, userId)`: add `userId`; split target selection into two pools: (a) words with `ReviewState` for this user at this level, ordered by `due asc` (near-due first, for reinforcement); (b) words with no `ReviewState` (new words, randomly sampled). Take `floor(count/2)` from (a) and `ceil(count/2)` from (b); if either pool is smaller than its half, fill from the other.
-- [ ] `src/app/api/quiz/route.ts`: pass `userId` (already available from `getCurrentUserId()`) into `buildQuiz`. Note that after the Quiz port this route has a second caller, the `/quiz` RSC, so the change lands in one shared helper rather than in the handler, exactly as `buildSession` now serves both `/study` callers.
+- [ ] `src/lib/quiz.ts`: add `userId` to `buildQuizRound` (and to `buildQuiz` beneath it); split target selection into two pools: (a) words with `ReviewState` for this user at this level, ordered by `due asc` (near-due first, for reinforcement); (b) words with no `ReviewState` (new words, randomly sampled). Take `floor(count/2)` from (a) and `ceil(count/2)` from (b); if either pool is smaller than its half, fill from the other.
+- [ ] Then pass `userId` from **both** callers: `src/app/quiz/page.tsx` (which has it from `requireAuth`) and `src/app/api/quiz/route.ts` (from `getCurrentUserId`, currently called only to authenticate and discarded). The pool logic itself lands once, in the shared builder.
 
 ### Part C: SPEC + open-question housekeeping
 
@@ -218,7 +198,7 @@ Lower-priority findings from the app review, roughly ordered. Pull into a phase 
 
 ### Code quality / tests
 
-- [ ] Dedup session components: byte-identical `Centered` in 4 files, duplicated `RATINGS` arrays, duplicated `shuffle` (`review.ts` / `grammar-review.ts`), ~80-line `getStudyQueue` / `getGrammarQueue` overlap. **Partly absorbed** by the landed `/study` work, whose `src/lib/study-cards.ts` is the natural home for the normalization half; the `Centered` and `RATINGS` duplication is untouched by it and stays here.
+- [ ] Dedup session components: byte-identical `Centered` in 4 files, duplicated `RATINGS` arrays, duplicated `shuffle` (`review.ts` / `grammar-review.ts`), ~80-line `getStudyQueue` / `getGrammarQueue` overlap. **The normalization half is now fully absorbed** by `src/lib/study-cards.ts` and `src/lib/grammar-cards.ts`; `Centered` (still 4 copies) and `RATINGS` (2) are untouched and stay here. Two knowingly-accepted duplications were added on 2026-07-26 and are *not* to be folded in without a reason: `undoLastGrammarReview` mirrors `undoLastReview` (~20 lines differing only in table and key names, where factoring them together means passing Prisma delegates around), and `exam-session.tsx` keeps its own `HighlightedSentence` (below).
 - [ ] Exam-session's local `HighlightedSentence` → shared component.
 - [ ] Extract quiz/exam scoring helpers (`pickDistractors`, similarity fns, currently module-private) so they can be unit-tested; then test them + the highlighted-sentence token pipeline.
 - [ ] Log hygiene: audit `console.error` calls for payloads that shouldn't be logged.

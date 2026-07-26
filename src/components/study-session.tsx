@@ -20,6 +20,7 @@ import Link from "next/link";
 import { Parrot } from "@/components/parrot";
 import { SessionHeader, SessionHeaderLink, SessionHeaderButton } from "@/components/session-header";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { useFocusOnTransition } from "@/hooks/use-focus-on-transition";
 import { rateCard, undoRating } from "@/app/study/actions";
 import type { StudyCard, StudySessionPayload } from "@/lib/study-cards";
 
@@ -177,6 +178,24 @@ export function StudySession({
     }
   }, [reviewed]);
 
+  // --- focus management (SPEC §8.4) ---
+  //
+  // Rating unmounts the four rating buttons out from under the focused element, so focus fell to
+  // `<body>` after every card and a keyboard user re-Tabbed from the top of the document twenty
+  // times a session. Targets follow the rule in `use-focus-on-transition.ts`.
+  //
+  // **The reveal deliberately moves nothing** (`flipped ? null : …`). Its next step is a *choice*
+  // among four ratings, and focusing "Again" would let a reflexive second Space press bury a card
+  // the user had not read, which is the hazard SPEC §14.18 declined Anki's Space-rates-Good binding to
+  // avoid. Anchoring focus near the ratings instead was rejected for a second reason: the reveal
+  // already fires the polite `role="status"` announcement below, and moving focus in the same
+  // commit can cut a screen reader off mid-sentence. Rating keys work from anywhere, so nothing is
+  // lost by staying put.
+  const showAnswerRef = useRef<HTMLButtonElement>(null);
+  const doneRef = useRef<HTMLParagraphElement>(null);
+  const focusTarget = sessionDone || !current ? doneRef : flipped ? null : showAnswerRef;
+  useFocusOnTransition(focusTarget, `${index}:${flipped}:${sessionDone}`);
+
   // --- keyboard shortcuts (SPEC §8.4) ---
   //
   // Bound only while a card is actually on screen. The loading, load-failure and
@@ -247,7 +266,14 @@ export function StudySession({
           title={allCaughtUp ? "Pī cheering" : "Pī smiling"}
           style={{ width: 124, height: 138 }}
         />
-        <p className="mt-4 text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
+        {/* tabIndex={-1}: focusable by script, not by Tab. The standard way to land a screen
+            reader on "where you now are" without adding a tab stop that does nothing. */}
+        <p
+          ref={doneRef}
+          tabIndex={-1}
+          className="mt-4 text-2xl"
+          style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}
+        >
           {allCaughtUp ? "All caught up! 🎉" : "Session done! 🎉"}
         </p>
         <p className="mt-1" style={{ color: "var(--ink-soft)" }}>
@@ -449,7 +475,7 @@ export function StudySession({
             ))}
           </div>
         ) : (
-          <button onClick={() => setFlipped(true)} className="btn btn-primary w-full">
+          <button ref={showAnswerRef} onClick={() => setFlipped(true)} className="btn btn-primary w-full">
             Show answer
             <span className="kbd-hint" aria-hidden>
               Space

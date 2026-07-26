@@ -7,17 +7,20 @@
 // Questions are random and non-scheduling — exam mode is a pure benchmark that neither
 // reads from nor writes to FSRS state (SPEC §8.6). Auth is still required to keep access
 // control uniform with the other study endpoints.
+//
+// This route no longer serves a round's *first* payload: the `/exam` page renders that
+// server-side (§8.6). What it still serves is the imperative refetch behind "Try again" on the
+// summary screen. **The section split is not performed here any more**, deliberately:
+// `buildExamRound` owns it so this route and the page cannot divide a round differently, which
+// `ExamSession` would not notice, since it recovers the boundary from question order (§9).
 
 import { NextResponse } from "next/server";
 import { getCurrentUserId } from "@/lib/current-user";
-import { buildExam } from "@/lib/exam";
+import { buildExamRound, DEFAULT_EXAM_COUNT } from "@/lib/exam";
 import { Level } from "@/generated/prisma/enums";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic"; // randomised per request — never cache
-
-const DEFAULT_COUNT = 20;
-const MAX_COUNT = 40;
 
 export async function GET(request: Request) {
   try {
@@ -33,17 +36,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: `Unknown level "${levelParam}"` }, { status: 400 });
   }
 
-  const raw = Number(params.get("count") ?? DEFAULT_COUNT);
-  const count = Number.isFinite(raw)
-    ? Math.min(Math.max(2, Math.trunc(raw)), MAX_COUNT)
-    : DEFAULT_COUNT;
-
-  // Split evenly: ceil for reading (問題１), floor for writing (問題２).
-  const readingCount = Math.ceil(count / 2);
-  const writingCount = Math.floor(count / 2);
+  // Parsed here, clamped to [2, 40] inside `buildExamRound` so the bound holds for the page
+  // render too rather than only for callers that remembered to validate.
+  const count = Number(params.get("count") ?? DEFAULT_EXAM_COUNT);
 
   try {
-    const questions = await buildExam(levelParam as Level, readingCount, writingCount);
+    const questions = await buildExamRound(levelParam as Level, count);
     return NextResponse.json({ level: levelParam, questions });
   } catch (err) {
     console.error("GET /api/exam failed:", err);

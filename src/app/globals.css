@@ -153,8 +153,14 @@ body {
   border: 2px solid var(--line); box-shadow: 0 3px 0 var(--line);
   transition: transform .06s ease, box-shadow .06s ease;
 }
-.opt:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 0 0 var(--line); }
-.opt:disabled { cursor: default; }
+/* An answered option is marked `aria-disabled`, not `disabled`, so these selectors have to
+   cover both. The reason is focus: browsers blur a control the instant it is disabled, which
+   dropped focus to <body> after every answer (SPEC §8.4). `aria-disabled` still tells a screen
+   reader the option is inert, while leaving it focusable and leaving us free to move focus
+   somewhere deliberate. The click guard lives in the component, which already ignored repeat
+   answers. */
+.opt:active:not(:disabled):not([aria-disabled="true"]) { transform: translateY(3px); box-shadow: 0 0 0 var(--line); }
+.opt:disabled, .opt[aria-disabled="true"] { cursor: default; }
 .opt-correct { background: #eafaf1; border-color: var(--good); color: var(--good-edge); box-shadow: 0 3px 0 var(--good-edge); }
 .opt-wrong   { background: #ffe9ee; border-color: var(--bad);  color: #b12a44;        box-shadow: 0 3px 0 #d63a55; }
 
