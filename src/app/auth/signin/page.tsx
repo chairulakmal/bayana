@@ -1,31 +1,19 @@
-import { signIn } from "@/auth";
-import { AuthError } from "next-auth";
-import { redirect } from "next/navigation";
 import { AuthCard } from "@/components/auth-card";
+import { MagicLinkForm } from "@/components/magic-link-form";
 
 // Sign-in screen (BRAND.md): enter the allowlisted email → receive a one-time magic link.
-// The form posts to a server action that calls Auth.js `signIn`; on success Auth.js sends
-// the email and redirects to our own "check your email" page (`/auth/verify-request`).
+// The form calls the `sendMagicLink` server action, which calls Auth.js `signIn`; on success
+// Auth.js sends the email and redirects to our own "check your email" page
+// (`/auth/verify-request`).
 //
-// Error handling: a non-allowlisted email makes our `signIn` callback (src/auth.ts) return
-// false, so Auth.js throws an `AuthError` (type "AccessDenied"). Left unhandled, that
-// surfaces as an ugly 500. We catch `AuthError`, bounce back to this page with an `?error`
-// code, and render a friendly message — while RE-THROWING everything else, because on
-// success `signIn` itself throws a `NEXT_REDIRECT` that must propagate to do the redirect.
-
-/** Human-readable copy for the error codes we redirect back with. */
-function errorMessage(code: string | undefined): string | null {
-  if (!code) return null;
-  switch (code) {
-    case "AccessDenied":
-      // Bayana is invite-only (single-email allowlist, §11.2). Most people who hit this
-      // simply mistyped their address, so lead with that; the owner contact is the path
-      // for anyone who believes they should have access.
-      return "This email isn't on the access list. Double-check for a typo — or if you think you should have access, reach out to the site owner.";
-    default:
-      return "Couldn't send the magic link. Please try again.";
-  }
-}
+// This page is now only the shell: the form, its pending state and its error message all live in
+// `MagicLinkForm`, because the submit button needed to know whether the action was in flight and
+// that is a client concern. The error *copy* moved with it; see that file for why one renderer
+// rather than two.
+//
+// What stays here is the one thing that cannot cross to the client: reading `?error=`, which
+// Auth.js's own flows (a bad callback, an expired link) still redirect back with, and the
+// server-only owner-contact env var.
 
 export default async function SignInPage({
   searchParams,
@@ -34,7 +22,6 @@ export default async function SignInPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const { error } = await searchParams;
-  const message = errorMessage(error);
 
   // Optional owner contact for the access-denied case. Server-only env (NOT committed,
   // NOT NEXT_PUBLIC_) so the address stays out of source and the client bundle; it only
@@ -64,57 +51,18 @@ export default async function SignInPage({
         ) : undefined
       }
     >
-      {message && (
-        <div
-          role="alert"
-          className="mt-5 rounded-[var(--r-md)] px-4 py-3 text-left text-sm"
-          style={{ background: "#ffe9ee", color: "#b12a44" }}
-        >
-          <p>{message}</p>
-          {error === "AccessDenied" && contactEmail && (
-            <p className="mt-1">
-              <a
-                href={`mailto:${contactEmail}?subject=${encodeURIComponent("Bayana access request")}`}
-                className="font-semibold underline"
-                style={{ color: "var(--grape)" }}
-              >
-                Email the site owner
-              </a>
-            </p>
-          )}
-        </div>
-      )}
-
-      <form
-        action={async (formData: FormData) => {
-          "use server";
-          try {
-            await signIn("resend", {
-              email: String(formData.get("email") ?? ""),
-              redirectTo: "/home",
-            });
-          } catch (err) {
-            // Denied/again? Show it on the page instead of a 500.
-            if (err instanceof AuthError) {
-              redirect(`/auth/signin?error=${err.type}`);
-            }
-            // Anything else — including the success-path NEXT_REDIRECT — must propagate.
-            throw err;
-          }
-        }}
-        className="mt-6 flex flex-col gap-3"
-      >
-        <input
-          type="email"
-          name="email"
-          required
-          autoComplete="email"
-          placeholder="you@example.com"
-          className="min-h-12 rounded-[var(--r-md)] border-2 border-[var(--line)] px-4 text-base outline-none focus:border-[var(--magenta)]"
-          style={{ background: "var(--surface)", color: "var(--ink)", fontFamily: "var(--f-body)" }}
-        />
-        <button className="btn btn-primary btn-lg w-full">Send magic link</button>
-      </form>
+      {/* The owner contact rides along only with "AccessDenied", which is the one error that
+          offers it; see `MagicLinkState.contactEmail` for why it is not an unconditional prop. */}
+      <MagicLinkForm
+        initial={
+          error
+            ? {
+                errorCode: error,
+                contactEmail: error === "AccessDenied" ? contactEmail : undefined,
+              }
+            : {}
+        }
+      />
 
       <p className="mt-5 text-[12px]" style={{ color: "var(--ink-faint)" }}>
         Invite-only · a one-time link, no password to remember.

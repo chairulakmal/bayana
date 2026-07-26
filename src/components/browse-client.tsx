@@ -3,8 +3,19 @@
 // Browse/search client component (SPEC §13 Phase 2 light polish).
 //
 // Fetches the active level's word list once from GET /api/browse?level=, which the browser
-// caches (Cache-Control: private, max-age=3600, stale-while-revalidate=86400). Repeat
+// caches (Cache-Control: private, max-age=86400, stale-while-revalidate=604800). Repeat
 // visits within the cache window cost zero network round-trips.
+//
+// **Why this one screen still fetches on mount** while the four session screens are handed
+// their first payload by the server: the list is the whole level (~2,700 rows, ~90 KB gzipped
+// for N1) and has to be, because search filters in memory. In an RSC payload that would be
+// re-downloaded every visit; behind a route handler it is cached for a day. See the page's
+// header comment and SPEC §14.25.
+//
+// The per-user half arrives as the `started` prop, server-rendered by `app/browse/page.tsx`.
+// That is the split that let the response above earn its long cache lifetime: the fetched list
+// is now identical for every user and changes only on a re-seed, so nothing about it expires
+// when the learner rates a card.
 //
 // All filtering runs in memory per keystroke — no server requests.
 //
@@ -12,37 +23,43 @@
 // input lets users jump to any page directly. Tapping a word row lazy-fetches its cached
 // example sentence (GET /api/words/:id/sentence); one row open at a time (accordion).
 //
-// Words with an existing ReviewState (started: true from the API) are sorted first by the
-// server and shown with a small magenta dot so the user can see at a glance which words
-// they're actively studying.
+// Words already in the user's deck sort first and carry a small magenta dot, so the default
+// first page shows what they are actively studying.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { WordListSkeleton } from "@/components/word-list-skeleton";
+import type { BrowseWord } from "@/lib/browse";
 
-type Word = {
-  id: string;
-  expression: string;
-  reading: string;
-  meaning: string;
-  started: boolean;
-};
 type Sentence = { japanese: string; reading: string; english: string };
 
 const PAGE_SIZE = 50;
 
-export function BrowseClient({ level }: { level: string }) {
-  const [words, setWords] = useState<Word[] | null>(null); // null = loading
+export function BrowseClient({
+  level,
+  started,
+}: {
+  level: string;
+  /** Ids of words at this level with a `ReviewState`, from the server render. An array rather
+   *  than a `Set` because a `Set` does not survive RSC serialization; converted below. */
+  started: string[];
+}) {
+  const [words, setWords] = useState<BrowseWord[] | null>(null); // null = loading
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   // pageInput is a string so the number input can show partial/empty text while typing.
   const [pageInput, setPageInput] = useState("1");
   const [openId, setOpenId] = useState<string | null>(null);
-  // Sentence cache: avoid re-fetching a word the user already opened this session.
-  const sentenceCache = useRef<Map<string, Sentence | "missing">>(new Map());
+  // Sentence cache: avoid re-fetching a word the user already opened this session. One piece of
+  // state, not a ref plus a hand-copied mirror of it: functional updates give the fresh copy
+  // React needs to re-render without a second source of truth to keep in sync.
   const [sentences, setSentences] = useState<Map<string, Sentence | "missing">>(new Map());
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  // Request token for the per-row sentence fetch, mirroring `study-session.tsx`. Taps are
+  // independent requests with no effect to clean up, so a `cancelled` flag cannot serve here:
+  // see `toggle` for the race it closes.
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -50,7 +67,7 @@ export function BrowseClient({ level }: { level: string }) {
       try {
         const res = await fetch(`/api/browse?level=${encodeURIComponent(level)}`);
         if (!res.ok) throw new Error(`browse ${res.status}`);
-        const data: { words: Word[] } = await res.json();
+        const data: { words: BrowseWord[] } = await res.json();
         if (!cancelled) setWords(data.words);
       } catch {
         if (!cancelled) setError("Couldn't load the word list.");
@@ -60,17 +77,32 @@ export function BrowseClient({ level }: { level: string }) {
     return () => { cancelled = true; };
   }, [level]);
 
+  const startedIds = useMemo(() => new Set(started), [started]);
+
+  // Recombine the two halves. The fetched list arrives sorted by expression under Japanese
+  // collation (`lib/browse.ts`), so a *stable* partition is all that is needed to lift started
+  // words to the front while both groups stay alphabetical, which is the exact order the server
+  // used to produce, at O(n) with no comparisons. Memoized because it walks the level and neither
+  // input changes while the user types.
+  const ordered = useMemo(() => {
+    if (!words) return null;
+    const inDeck: BrowseWord[] = [];
+    const rest: BrowseWord[] = [];
+    for (const w of words) (startedIds.has(w.id) ? inDeck : rest).push(w);
+    return [...inDeck, ...rest];
+  }, [words, startedIds]);
+
   // Filter: query matches expression, reading, or meaning (case-insensitive substring).
   const q = query.trim().toLowerCase();
-  const filtered = words
+  const filtered = ordered
     ? q
-      ? words.filter(
+      ? ordered.filter(
           (w) =>
             w.expression.toLowerCase().includes(q) ||
             w.reading.toLowerCase().includes(q) ||
             w.meaning.toLowerCase().includes(q),
         )
-      : words
+      : ordered
     : [];
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -96,23 +128,28 @@ export function BrowseClient({ level }: { level: string }) {
     }
   }
 
-  async function toggle(word: Word) {
+  async function toggle(word: BrowseWord) {
     if (openId === word.id) { setOpenId(null); return; }
     setOpenId(word.id);
-    if (sentenceCache.current.has(word.id)) return;
+    if (sentences.has(word.id)) return;
 
+    // Take a token for this request. Tapping row A then row B quickly used to leave B with no
+    // spinner: A's `finally` ran while B was still in flight and cleared the shared `loadingId`
+    // out from under it. Only the most recent request is allowed to clear it now. The *result*
+    // is still stored either way, since a sentence fetched for a row the user has since closed is
+    // worth keeping, and only the spinner was ever ambiguous.
+    const requestId = ++requestIdRef.current;
     setLoadingId(word.id);
     try {
       const res = await fetch(`/api/words/${encodeURIComponent(word.id)}/sentence`);
       const value: Sentence | "missing" = res.ok ? await res.json() : "missing";
-      sentenceCache.current.set(word.id, value);
-      // Copy the Map so React sees a new reference and re-renders.
-      setSentences(new Map(sentenceCache.current));
+      // Functional update: copy the previous Map so React sees a new reference, without reading
+      // a possibly-stale `sentences` from this closure.
+      setSentences((prev) => new Map(prev).set(word.id, value));
     } catch {
-      sentenceCache.current.set(word.id, "missing");
-      setSentences(new Map(sentenceCache.current));
+      setSentences((prev) => new Map(prev).set(word.id, "missing"));
     } finally {
-      setLoadingId(null);
+      if (requestIdRef.current === requestId) setLoadingId(null);
     }
   }
 
@@ -225,6 +262,7 @@ export function BrowseClient({ level }: { level: string }) {
             const isOpen = openId === word.id;
             const sentence = sentences.get(word.id);
             const isLoading = loadingId === word.id;
+            const isStarted = startedIds.has(word.id);
 
             return (
               <div
@@ -272,12 +310,12 @@ export function BrowseClient({ level }: { level: string }) {
                     // discard it and the "in your deck" signal was silently sighted-only.
                     // Only when started: an unlabelled role="img" would announce an empty
                     // image on every other row.
-                    role={word.started ? "img" : undefined}
-                    aria-label={word.started ? "In your deck" : undefined}
+                    role={isStarted ? "img" : undefined}
+                    aria-label={isStarted ? "In your deck" : undefined}
                     style={{
                       width: 6,
                       height: 6,
-                      background: word.started ? "var(--mag-500)" : "transparent",
+                      background: isStarted ? "var(--mag-500)" : "transparent",
                     }}
                   />
                   <span

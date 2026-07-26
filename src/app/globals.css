@@ -96,6 +96,13 @@ body {
 }
 .btn:hover { filter: brightness(1.03); }
 .btn-lg { font-size: 20px; padding: 18px 36px; }
+/* A .btn while its action is in flight (the sign-in submit is the only one today). Drops the
+   hover lift and the pointer, and deliberately does NOT dim with opacity the way `.rate:disabled`
+   does: this button is white-on-grape, and fading a passing pair with alpha is the composite
+   BRAND.md §3 forbids by name. The label swaps to "Sending…" instead, which says more than a
+   greyed button would. */
+.btn:disabled { cursor: default; }
+.btn:disabled:hover { filter: none; }
 
 .btn-primary { background: var(--grape); color: #fff; box-shadow: 0 5px 0 var(--grape-edge); }
 .btn-primary:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--grape-edge); }

@@ -1,83 +1,40 @@
 # TODO: Bayana
 
-Open work only: what is planned, in flight, or found-but-not-fixed. This file is the cross-session "where we left off" record, so keep it current, and **delete an item in the commit that lands it** rather than archiving it. Shipped work is already recorded three times over: [SPEC.md](SPEC.md) §13 Milestones at design altitude, [DECISIONS.md](DECISIONS.md) for why it was done that way, and git for the detail. Decisions do **not** go here.
+Open work only: what is planned, in flight, or found-but-not-fixed. This file is the cross-session "where we left off" record, so keep it current, and **delete an item in the commit that lands it** rather than archiving it or noting that it used to be here. Shipped work is already recorded three times over: [SPEC.md](SPEC.md) §13 Milestones at design altitude, [DECISIONS.md](DECISIONS.md) for why it was done that way, and git for the detail. Decisions do **not** go here. Below: the sequence, then the active workstream, then the numbered phases, then the two unsequenced sections.
 
-**Now: the frontend architecture workstream** (first section below). New on 2026-07-26, from a frontend review that looked at data flow rather than at the rendered surface. **Items 1 to 3 have landed**, so no session screen is a client-side SPA any more; what remains is the two browse pages, the form pending states, and the design-token migration.
+## Sequence
 
-**Then: the UI/UX workstream** (second section). Five items: three sequenced behind the remaining architecture work, two deferred on external blockers. Each is marked in place.
+1. **[UI/UX](#uiux-workstream)**, items 1 and 2. Unblocked as of 2026-07-26: the frontend-architecture workstream that rewrote the same lines has landed in full. Items 3 and 4 are deferred on external blockers, not on capacity; do not pull them in as filler.
+2. **[Phase 3](#phase-3-mcfsrs-coupling)**: MC↔FSRS coupling for Quiz mode. Unblocked, not started.
+3. **[Phase 4](#phase-4-admin-audit--on-demand-generation)**: admin sentence audit plus on-demand generation.
+4. **[Kalima absorption + bayan/zaka consumer](#kalima-absorption--bayanzaka-consumer)**: new scope, not yet slotted against a phase. Coupled to Phase 4, since Kalima's rank review folds into that admin page.
+5. **Phases 5 and 6**: multi-user, then further enhancements. Tracked only in SPEC.md §13 for now.
 
-**Then: Phase 3.** MC↔FSRS coupling for Quiz mode (planned, not started). **No longer blocked:** architecture item 3 landed on 2026-07-26, so Part A can be written against `rateCard` as it stands and Part B against `buildQuizRound`, the shared builder the Quiz port introduced for exactly that seam.
+Three sections sit outside the sequence and are pulled from as capacity allows: the [legal pages](#legal-pages-privacy-policy--terms-of-use), which have no blocker and become non-optional if the app opens up beyond the invite list; the [design-token migration](#design-tokens-as-tailwind-utilities-deferred), deferred with no blocker but no present need either; and the internal [review backlog](#review-backlog-internal-findings-2026-07-10).
 
-**Next: Phase 4.** Admin sentence audit + on-demand generation. Then Phase 5 (multi-user) and Phase 6 (further enhancements), both tracked only in SPEC.md §13 for now.
-
-**Unsequenced:** Kalima absorption + bayan/zaka consumer (section below). New scope, decided 2026-07-26. Recorded as an unnumbered SPEC §13 milestone; not yet slotted against Phases 3 to 6, and note it is coupled to Phase 4 (Kalima's rank review folds into that admin page).
-
----
-
-## ▶ Frontend architecture: server-rendered data + Server Action writes
-
-**From a frontend review on 2026-07-26** that read the data flow rather than the rendered surface, so it overlaps the UI/UX workstream in files but not in findings.
-
-The finding: the app is an App Router shell around a client-side SPA. All six interactive surfaces (`study-session`, `quiz-session`, `exam-session`, `grammar-session`, `browse-client`, `grammar-browse-client`) mount, render a loading state, then `useEffect` → `fetch('/api/…')`. Server Components do real work on `/home` and `/stats`, but on the four session screens they resolve an auth cookie and a five-character level string and stop. `/study` therefore costs a server round trip that already knows `userId`, then a JS parse, then a second round trip that re-derives `userId` from scratch, before the first card paints. It also makes `<Link>` prefetch worthless, since prefetching `/study` warms up a spinner.
-
-**Two decisions are already made** (author, 2026-07-26) and constrain everything below. Both are recorded: SPEC §9 states the convention, §14.16 and §14.17 hold the rejected alternatives, and DECISIONS.md carries the dated row.
-
-- **Reads stay route handlers; writes become Server Actions.** Reads keep a documented, cacheable HTTP surface and are still needed for the imperative refetch paths ("Check for more", retry, "Play again"). Writes have no external consumer and gain typed arguments plus a shorter path. Action names and their guards are specified in SPEC §9.2; follow them rather than inventing new ones.
-- **No opt-in rendering flags.** `cacheComponents`, View Transitions and the React Compiler are all opt-in and would put a live Railway deployment at the mercy of a Next minor bump. This also rules out `use cache`, which is gated behind `cacheComponents`, so the caching work below uses React's stable `cache()` instead. (Verified against 16.2.7: only `viewTransition` is still under the `experimental.` namespace, so do not go looking for the other two there.)
-
-**Numbering here is stable, unlike the UI/UX section below.** Items 1 (the reads/writes convention plus the memoized profile read), 2 (the `/study` reference implementation) and 3 (the three remaining session ports, with grammar undo and the focus work folded in) have landed and are deleted, and the remaining numbers were **not** closed up over them, because the UI/UX items cross-reference these by number. "Architecture item 5" therefore means the same item tomorrow as it does today.
-
-### 4. Browse and grammar browse
-
-- [ ] Same server-fetch-then-hydrate treatment for `browse-client.tsx:47` and `grammar-browse-client.tsx:42`. Both keep their read routes: the browser cache on `/api/browse` (`private, max-age=3600, stale-while-revalidate=86400`) is doing real work and should not be discarded.
-- [ ] `browse-client.tsx:99` `toggle`: request-token race. Tap row A then row B quickly and A's `finally` clears `loadingId` while B is still in flight, so B's spinner vanishes. The fix is the token already used at `study-session.tsx:77`. Cosmetic, but the pattern is one file away.
-- [ ] `browse-client.tsx:42`: `sentenceCache` (ref) and `sentences` (state) are duplicated storage, with the ref as source of truth and the state a hand-copied mirror. One `useState<Map>` with functional updates does both.
-
-### 5. Optimistic level switch and form pending states
-
-- [ ] `level-picker.tsx:50`: the picker dims to `opacity: 0.4` and waits a full round trip to move a check mark. `useOptimistic` fits here precisely because `current` is a prop rendered by the RSC and replaced by `revalidatePath`.
-- [ ] `level-picker.tsx:57`: `router.refresh()` fires after `setActiveLevel`, which already calls `revalidatePath` on five paths (`src/app/home/actions.ts:57`). A `revalidatePath` inside a Server Action refreshes the current route on the action response, so this looks like a redundant second round trip. Verify before removing.
-- [ ] `src/app/auth/signin/page.tsx:116`: `useActionState` for the pending state, which resolves the one remaining bullet of UI/UX item 1 as a side effect rather than as separate work.
-
-### 6. Design tokens as Tailwind utilities
-
-Independent of items 1 to 5 and pullable in parallel, but do it after the component surgery so the two do not fight over the same lines.
-
-- [ ] Roughly 200 inline `style={{}}` objects across the app consume the `globals.css` tokens directly (`home/page.tsx` alone has 20+). Each allocates a fresh object per render, and none can be targeted by a media query, `:hover`, `focus-visible` or `dark:`.
-- [ ] `globals.css` already maps three tokens through `@theme inline`. Extend it to the full ramp so `bg-surface`, `text-ink-soft`, `border-line`, `rounded-lg` and `shadow-card` are real utilities, then migrate call sites.
-- [ ] **This is what makes the dark-mode question in SPEC §15 answerable.** Today dark mode would mean editing every one of those ~200 sites; after the migration it is one block redefining `:root`. Add that dependency note to the open question so it is not re-litigated as a design problem when it is a mechanical one.
+**Numbering is positional and closes up when an item lands.** It describes what is left, not what once was, so a cross-reference must name a section as well as a number ("UI/UX item 2"), and every cross-reference gets re-checked when a section is renumbered.
 
 ---
 
-## ▶ UI/UX workstream
+## UI/UX workstream
 
-Everything user-facing that is known-wrong or known-missing, worked top-down. The items reachable on pages that are otherwise finished (route states, hit targets, three passes at keyboard and screen-reader gaps, navigation parity) landed on 2026-07-26 and were deleted as they did.
+Everything user-facing that is known-wrong or known-missing, worked top-down and read against BRAND.md and SPEC §8.4. The visual system itself held under review, so nothing here is a token or layout change; what is left clusters on one axis, which is what happens on a keyboard, with a screen reader, or in the instant after a tap.
 
-**Items 1 to 3 came from a full UI/UX review of the shipped surface on 2026-07-26**, read against BRAND.md and SPEC §8.4. They cluster on one axis the earlier passes did not cover: what happens on a keyboard, with a screen reader, or in the instant after a tap. The visual system itself held, so nothing below is a token or layout change. Five of the review's items shipped on 2026-07-26 and are deleted, which is what the numbering below has been closed up over: keyboard shortcuts in the study modes (SPEC §8.4, §14.18), the tap-anywhere card no longer being a `<button>` (SPEC §8.4, §14.19), the labelling and live-region gaps (SPEC §8.4, §14.20), the grammar-browse parity fixes (SPEC §8.4, §14.21), and the focus-after-transition defect in all four modes, which landed inside architecture item 3 as planned (SPEC §8.4, §14.24). Item 1 below shipped its first bullet the same day, the two Auth.js built-in pages (SPEC §11.2, §14.22), and keeps the second.
+**Items 1 and 2 are unblocked as of 2026-07-26**, the architecture workstream that rewrote the same lines having landed. **Items 3 and 4 remain deferred**, one blocked on other work and one on a decision that was explicitly postponed.
 
-**Every remaining item here sequences behind the architecture workstream above**, which rewrites the same lines. Nothing in this section is a free pull any more: the last one was the `verifyRequest` page, and it has landed.
+### 1. Missing headings and page titles
 
-**Items 4 and 5 are deferred, and neither is waiting on capacity.** One is blocked on other work, the other on a decision that was explicitly postponed. Do not pull either in as filler.
+- [ ] No `<h1>` on `/home`, `/grammar`, or any of the four session screens. The hub's "TODAY" / "STUDY MODES" / "LEVEL" labels are `<p>` elements, so heading navigation finds nothing at all on the app's default page. Landing, browse, stats, signin, onboarding and the error routes all have one already. The session screens do have a **focus** target on their completion/summary states (a `tabIndex={-1}` score or "Session done" line), which is not a heading and does not close this: the two mechanisms are independent, and the right fix may well be to promote those same elements.
+- [ ] Five routes never set a title: `/home`, `/grammar`, `/onboarding`, `/stats` and `/auth/signin`. `src/app/layout.tsx:7` defines `template: "%s · Bayana"` and every other route uses it, apart from `/`, which deliberately takes the `default`. One `export const metadata` per page.
 
-### 1. The magic-link flow leaves the brand at its most fragile moment
+### 2. Smaller UX items
 
-One bullet left, and it is not pullable on its own:
-
-- [ ] `src/app/auth/signin/page.tsx`: "Send magic link" has no pending state, so a slow Resend call reads as a dead button and invites a double-submit. **Superseded by architecture item 5**, which fixes it via `useActionState`. Delete this bullet there, not here.
-
-### 2. Missing headings and page titles
-
-- [ ] No `<h1>` on `/home`, `/grammar`, or any of the four session screens. The hub's "TODAY" / "STUDY MODES" / "LEVEL" labels are `<p>` elements, so heading navigation finds nothing at all on the app's default page. Landing, browse, stats, signin, onboarding and the error routes all have one already. Note the session screens now have a **focus** target on their completion/summary states (a `tabIndex={-1}` score or "Session done" line, architecture item 3), which is not a heading and does not close this: the two mechanisms are independent, and the right fix here may well be to promote those same elements.
-- [ ] 6 of 14 routes never set a title. `src/app/layout.tsx:7` defines `template: "%s · Bayana"`. **Mostly absorbed**: `/study` got its title when it was rewritten, and `/quiz`, `/exam` and `/grammar/study` got theirs in architecture item 3, leaving only `/home`, `/grammar` and `/onboarding` here.
-
-### 3. Smaller UX items
-
-- [ ] `src/components/browse-client.tsx:82` `goToPage`: turning a page does not scroll back to the top of the list. At 375px with 50 rows, tapping "Next" at the bottom leaves the user at the bottom of the next page.
-- [ ] `src/app/auth/signin/page.tsx:114`: the email field uses `outline-none` plus `focus:border-*` instead of the `.focus-ring` utility both search fields use, and `focus:` rather than `focus-visible:`, so it also fires on pointer taps.
+- [ ] `browse-client.tsx` `goToPage`: turning a page does not scroll back to the top of the list. At 375px with 50 rows, tapping "Next" at the bottom leaves the user at the bottom of the next page.
 - [ ] `/stats` has no level control, so changing level means a round trip through `/home`. That is the same friction that justified adding the picker to the grammar hub.
-- [ ] `src/components/browse-client.tsx:204`: the `role="status"` result count re-announces on every keystroke. Debounce the announced value, not the filtering.
+- [ ] `browse-client.tsx`: the `role="status"` result count re-announces on every keystroke. Debounce the announced value, not the filtering.
+- [ ] `/grammar/browse` has no `error.tsx`, so since it moved to a server render (SPEC §9.3) a failed query replaces the whole page via the root boundary, where it used to show one red line inside intact page chrome. Probably the right trade for a database failure (the four session routes made that call deliberately), but decide it rather than inherit it. `/browse` is unaffected: its list is still a client fetch with its own error branch.
 
-### 4. Performance: subset the Japanese face, blocked on bayan
+### 3. Performance: subset the Japanese face, blocked on bayan
 
 **Deferred 2026-07-26: starts only once bayan is finished.** Not a capacity call. The sibling bayan/zaka dataset is the nearer-term commitment, and this is a self-contained build-pipeline project that will still be worth exactly as much later.
 
@@ -86,7 +43,7 @@ One bullet left, and it is not pullable on its own:
   - Still a real project rather than a config change: it needs a build step plus a decided answer for what happens when a generated sentence contains a kanji outside the subset.
   - **Note the interaction with the Kalima/bayan work**, which is the thing it waits on: imported questions and the N3 passage set introduce Japanese text this app did not author, so the "kanji outside the subset" question has a wider blast radius after that lands than before. Deciding it first would have meant deciding it twice.
 
-### 5. UX correctness: day boundaries, deferred pending a timezone decision
+### 4. UX correctness: day boundaries, deferred pending a timezone decision
 
 **Deferred 2026-07-26.** The fix is small; what it needs first is a decision on where a user's timezone comes from (profile field, browser-reported, or a fixed offset), and that was postponed rather than made.
 
@@ -94,20 +51,20 @@ One bullet left, and it is not pullable on its own:
 
 ---
 
-## ▶ Phase 3: MC↔FSRS coupling
+## Phase 3: MC↔FSRS coupling
 
 Resolves SPEC §15 open question #1. Makes Quiz and Flashcard modes genuinely complementary: MC answers seed the FSRS schedule, and MC question selection is informed by the user's FSRS state. No new schema, since it reuses `ReviewState` and `ReviewLog`.
 
-**Unblocked as of 2026-07-26**, when architecture item 3 ported Quiz. Both halves now have the seam they need: Part A writes through the shipped `rateCard` action, and Part B changes `buildQuizRound`, which the port introduced precisely so a signature change reaches the page render and the refetch route at once.
+**Unblocked as of 2026-07-26**, when the session-mode ports landed. Both halves now have the seam they need: Part A writes through the shipped `rateCard` action, and Part B changes `buildQuizRound`, the shared builder the Quiz port introduced precisely so a signature change reaches the page render and the refetch route at once.
 
 ### Part A: MC answers write FSRS ratings
 
-- [ ] `src/components/quiz-session.tsx`: in `choose(i)`, call the `rateCard` Server Action (shipped, `app/study/actions.ts`) with `{ wordId: current.wordId, rating: correct ? 3 : 1 }`. Fire inside a transition without blocking the UI, matching the optimistic advance the flashcard loop uses; the quiz must stay snappy. No UI change.
+- [ ] `src/components/quiz-session.tsx:98`, in the `choose` callback: call the `rateCard` Server Action (shipped, `src/app/study/actions.ts:41`) with `{ wordId: current.wordId, rating: correct ? 3 : 1 }`. Fire inside a transition without blocking the UI, matching the optimistic advance the flashcard loop uses; the quiz must stay snappy. No UI change.
 - [ ] **Decide before coding**: correct → Good (3) or Hard (2)? MC is recognition-only (easier than flashcard active recall), so Hard is more conservative and gives a shorter interval. Good is simpler and still rewards the answer. Log the choice in DECISIONS.md.
 
 ### Part B: 50/50 MC source split (review pool + new)
 
-- [ ] `src/lib/quiz.ts`: add `userId` to `buildQuizRound` (and to `buildQuiz` beneath it); split target selection into two pools: (a) words with `ReviewState` for this user at this level, ordered by `due asc` (near-due first, for reinforcement); (b) words with no `ReviewState` (new words, randomly sampled). Take `floor(count/2)` from (a) and `ceil(count/2)` from (b); if either pool is smaller than its half, fill from the other.
+- [ ] `src/lib/quiz.ts`: add `userId` to `buildQuizRound` (line 57) and to `buildQuiz` beneath it (line 74); split target selection into two pools: (a) words with `ReviewState` for this user at this level, ordered by `due asc` (near-due first, for reinforcement); (b) words with no `ReviewState` (new words, randomly sampled). Take `floor(count/2)` from (a) and `ceil(count/2)` from (b); if either pool is smaller than its half, fill from the other.
 - [ ] Then pass `userId` from **both** callers: `src/app/quiz/page.tsx` (which has it from `requireAuth`) and `src/app/api/quiz/route.ts` (from `getCurrentUserId`, currently called only to authenticate and discarded). The pool logic itself lands once, in the shared builder.
 
 ### Part C: SPEC + open-question housekeeping
@@ -130,11 +87,11 @@ Resolves SPEC §15 open question #1. Makes Quiz and Flashcard modes genuinely co
 
 ---
 
-## Kalima absorption + bayan/zaka consumer (new scope, 2026-07-26)
+## Kalima absorption + bayan/zaka consumer
 
-Kalima's JLPT mock exam moves into Bayana, and Bayana replaces Kalima as the named reference consumer of the bayan/zaka dataset. Both land in the same new table, so they are one piece of work, not two: Kalima's 496 seeded N3 vocabulary questions and bayan's published releases are the same kind of row from different sources.
+New scope, decided 2026-07-26. Kalima's JLPT mock exam moves into Bayana, and Bayana replaces Kalima as the named reference consumer of the bayan/zaka dataset. Both land in the same new table, so they are one piece of work, not two: Kalima's 496 seeded N3 vocabulary questions and bayan's published releases are the same kind of row from different sources.
 
-Why Bayana rather than Kalima, in one line each: Kalima is N3 vocabulary only across five question types, while this app already models N5 to N1, holds ~8,100 words plus a grammar table whose `pattern` matches bayan's `grammar_points`, and can grade an exported question into a learner's FSRS state. Full reasoning belongs in SPEC §14 and DECISIONS.md (see the housekeeping items below); the porting checklist for Kalima's side is in that repo's TODO.md.
+Why Bayana rather than Kalima, in one line each: Kalima is N3 vocabulary only across five question types, while this app already models N5 to N1, holds ~8,100 words plus a grammar table whose `pattern` matches bayan's `grammar_points`, and can grade an exported question into a learner's FSRS state. Full reasoning belongs in SPEC §14 and DECISIONS.md (see Part E); the porting checklist for Kalima's side is in that repo's TODO.md.
 
 ### Part A: the question store (decide before writing any of it)
 
@@ -166,7 +123,7 @@ Why Bayana rather than Kalima, in one line each: Kalima is N3 vocabulary only ac
 
 ### Part E: doc housekeeping
 
-Done 2026-07-26, before any code: SPEC §2 (scope change), §3 (terms), §4.2 (the third source-data class and its CC BY 4.0 obligation), §13 (unnumbered milestone), §14.9/§14.10 (both resolved forks), §15 (two open forks), and the DECISIONS.md row. Remaining:
+The first pass landed 2026-07-26, before any code: SPEC §2 (scope change), §3 (terms), §4.2 (the third source-data class and its CC BY 4.0 obligation), §13 (unnumbered milestone), §14.9/§14.10 (both resolved forks), §15 (two open forks), and the DECISIONS.md row. Remaining:
 
 - [ ] SPEC §13: give the milestone a phase number once it is sequenced.
 - [ ] SPEC §6 + §9: the question-store model and the session routes, both deliberately deferred until the Exam-mode fork in §15 is resolved, since that answer changes the shape.
@@ -188,24 +145,49 @@ See SPEC.md §13: audio/TTS, furigana, the full stats dashboard (streak/heatmap,
 
 ---
 
-## Review backlog: remaining findings (2026-07-10)
+## Legal pages: privacy policy + terms of use
+
+Not written. Two static routes plus a link surface, but the *content* has to describe what this app actually does, so the work is inventory first and prose second. Unsequenced; it becomes non-optional the moment the app stops being invite-only, since the demo door is already open to anyone (`POST /api/demo/login`, §11.8) and a demo visitor gets a cookie and a database row without ever seeing a policy.
+
+- [ ] **Inventory what is collected, before drafting either page.** From the code as it stands: an email address for allowlisted sign-in (`User`, `Account`, `Session`, plus the hashed magic-link token in `VerificationToken`), a demo identity that is an HMAC-signed cookie with a 7-day life and its own `User` row, and study progress (`ReviewState`, `ReviewLog`, `GrammarProgress`, `GrammarReviewLog`, `UserProfile`). Third parties: **Resend** (delivers the magic link, so it processes the address), **Railway** (hosting and the Postgres instance), **Anthropic** (sentence generation, and worth stating plainly that it is a *seeding* pipeline over deck words, so no user text is sent to it, per SPEC §11.4 and ARCHITECTURE). **No analytics, no tracking pixels, no third-party scripts at all**, the CSP naming no external origin (§11.3), which is a genuinely strong claim and should be made in the policy rather than left implicit.
+- [ ] **Decide the retention story for demo rows**, which the privacy page has to state and which is currently a cleanup heuristic rather than a promise (§14.5). "Deleted after N days" and "deleted when we get around to it" are different commitments; pick one and make the code match it.
+- [ ] Write `/privacy` and `/terms` as static routes (both prerender: no auth, no per-user data). They must be public in `proxy.ts`, added as **exact paths** rather than a prefix, following the `/api/demo/login` precedent in SPEC §11.8.
+- [ ] Link them from the landing footer (`src/app/page.tsx:377`, the credits block beside "MIT License") and from `/auth/signin`, which is where a visitor decides whether to hand over an address. Keep them internal links, so no `target="_blank"`.
+- [ ] **Do not describe the MIT licence as the terms of use.** The footer's MIT link covers the *source code*; terms of use govern a person's use of the hosted service. Conflating them is the likely failure mode here given the footer already links one of them.
+- [ ] **Coordinate with the attribution surface already owed** in the Kalima/bayan work (Part D: CC BY 4.0 for imported questions) and the deck credit in README. Three separate obligations about who owns what, and they should read as one coherent story rather than three pages that each mention a different licence.
+
+---
+
+## Design tokens as Tailwind utilities (deferred)
+
+**Deferred 2026-07-26, and the reason it was deferred is that its stated justification turned out to be false.** This item claimed dark mode was blocked on it. It is not: the ~327 inline `style={{}}` objects read the tokens (`background: "var(--surface)"`), so redefining `:root` reaches every one of them without touching a call site. Measured, 23 hardcoded colour values exist across all `.tsx`, and nearly all are the parrot mascot (brand-coloured under any theme) and `global-error.tsx` (deliberately token-free, since it must render when the stylesheet has not loaded). SPEC §15 now records the correction, and DECISIONS.md carries the row; do not re-derive the premise from this file's history.
+
+What survives is a real but smaller case, and it needs a trigger before it is worth a ~330-site sweep across five session screens:
+
+- [ ] Each inline object allocates per render, and none can be targeted by `:hover`, `focus-visible`, a media query or a future `dark:` variant. That last one is why `.focus-ring` and `.tap-44` exist as utilities at all: an element with `style={{ border: … }}` beats any Tailwind `focus:border-*` class, so the escape hatch had to be `box-shadow` in CSS.
+- [ ] `globals.css` maps three tokens through `@theme inline`. Extending it to the full ramp (`bg-surface`, `text-ink-soft`, `border-line`, `rounded-lg`, `shadow-card`) is cheap and independent of migrating any call site, so it can land first and on its own.
+- [ ] **Pull this in when something concrete needs a variant an inline style cannot express** (a `dark:` decision in SPEC §15, a hover state on a surface, a responsive layout change), and migrate the call sites that need it rather than all of them. A blanket sweep buys visual-regression risk that nothing currently pays for.
+
+---
+
+## Review backlog: internal findings (2026-07-10)
 
 Lower-priority findings from the app review, roughly ordered. Pull into a phase as capacity allows. Everything user-facing from this review now lives in the UI/UX workstream above, so what remains here is internal.
 
 ### Bugs / correctness
 
-- [ ] `scripts/collect-batch.ts`: per-item try/catch so one malformed result doesn't abort a whole batch collection.
+- [ ] `scripts/collect-batch.ts` has no `try`/`catch` at all: add per-item handling so one malformed result doesn't abort a whole batch collection.
 
 ### Code quality / tests
 
-- [ ] Dedup session components: byte-identical `Centered` in 4 files, duplicated `RATINGS` arrays, duplicated `shuffle` (`review.ts` / `grammar-review.ts`), ~80-line `getStudyQueue` / `getGrammarQueue` overlap. **The normalization half is now fully absorbed** by `src/lib/study-cards.ts` and `src/lib/grammar-cards.ts`; `Centered` (still 4 copies) and `RATINGS` (2) are untouched and stay here. Two knowingly-accepted duplications were added on 2026-07-26 and are *not* to be folded in without a reason: `undoLastGrammarReview` mirrors `undoLastReview` (~20 lines differing only in table and key names, where factoring them together means passing Prisma delegates around), and `exam-session.tsx` keeps its own `HighlightedSentence` (below).
-- [ ] Exam-session's local `HighlightedSentence` → shared component.
+- [ ] Dedup session components. `Centered` is byte-identical in all four session files and `RATINGS` is duplicated across `study-session.tsx` / `grammar-session.tsx`; both are untouched and belong here. The normalization half of this item is **already absorbed** by `src/lib/study-cards.ts` and `src/lib/grammar-cards.ts`, so do not re-derive it. Two duplications are **knowingly accepted** and are not to be folded in without a reason: `undoLastGrammarReview` mirrors `undoLastReview` (~20 lines differing only in table and key names, where factoring them together means passing Prisma delegates around), and `exam-session.tsx` keeps its own `HighlightedSentence` (next item).
+- [ ] `exam-session.tsx:461`: local `HighlightedSentence` → the shared `src/components/highlighted-sentence.tsx`.
 - [ ] Extract quiz/exam scoring helpers (`pickDistractors`, similarity fns, currently module-private) so they can be unit-tested; then test them + the highlighted-sentence token pipeline.
 - [ ] Log hygiene: audit `console.error` calls for payloads that shouldn't be logged.
 
 ### Local environment
 
-- [ ] `.env` pins `NODE_OPTIONS=--max-old-space-size=256`, which OOM-kills `next build`'s TypeScript worker locally; building needs an override (`NODE_OPTIONS=--max-old-space-size=4096 npm run build`). Decide whether the cap is still wanted: it mirrors the Railway runtime budget, but `start:prod` sets its own 512MB anyway.
+- [ ] `.env:8` pins `NODE_OPTIONS=--max-old-space-size=256`, which OOM-kills `next build`'s TypeScript worker locally; building needs an override (`NODE_OPTIONS=--max-old-space-size=4096 npm run build`). Decide whether the cap is still wanted: it mirrors the Railway runtime budget, but `start:prod` sets its own 512MB anyway.
 
 ---
 

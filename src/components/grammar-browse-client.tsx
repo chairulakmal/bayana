@@ -2,10 +2,14 @@
 
 // Grammar browse client — reference view for /grammar/browse.
 //
-// Fetches every grammar point for the active level from GET /api/grammar/browse?level=,
-// grouped by lesson (browser-cached, same headers as browse-client.tsx). Sentences are
-// already in the payload (see the route's doc comment for why), so unlike the vocab
-// browse page there's no per-row lazy fetch — expanding a lesson just reveals rows
+// **The lessons are built by the server** (`app/grammar/browse/page.tsx`) and arrive in the
+// `lessons` prop, so this component has no loading state, no error state, and never fetches. It
+// used to mount, paint "Loading grammar points…", then `useEffect` → `fetch`, which cost a
+// second round trip to re-derive a `userId` the first one already had. What is left here is only
+// what genuinely belongs to the client: the search box and which lessons are expanded.
+//
+// Sentences are already in the payload (see `lib/grammar-browse.ts` for why), so unlike the
+// vocab browse page there is no per-row lazy fetch — expanding a lesson just reveals rows
 // already in memory.
 //
 // Lessons render as a simple accordion (collapsed by default — 22 lessons open at once
@@ -13,45 +17,14 @@
 // filters points by pattern/reading/meaning and force-expands any lesson with a match,
 // so results are visible without the user having to open sections by hand.
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { HighlightedSentence } from "@/components/highlighted-sentence";
+import type { GrammarLessonGroup } from "@/lib/grammar-browse";
 
-type GrammarPointRow = {
-  id: string;
-  position: number;
-  pattern: string;
-  reading: string;
-  meanings: string[];
-  exampleJp: string;
-  exampleEn: string;
-  status: "new" | "started" | "mature";
-};
-type LessonGroup = { lesson: number; title: string; points: GrammarPointRow[] };
-
-export function GrammarBrowseClient({ level }: { level: string }) {
-  const [lessons, setLessons] = useState<LessonGroup[] | null>(null); // null = loading
-  const [error, setError] = useState<string | null>(null);
+export function GrammarBrowseClient({ lessons }: { lessons: GrammarLessonGroup[] }) {
   const [query, setQuery] = useState("");
   const [openLessons, setOpenLessons] = useState<Set<number>>(new Set());
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function fetchLessons() {
-      try {
-        const res = await fetch(`/api/grammar/browse?level=${encodeURIComponent(level)}`);
-        if (!res.ok) throw new Error(`grammar/browse ${res.status}`);
-        const data: { lessons: LessonGroup[] } = await res.json();
-        if (!cancelled) setLessons(data.lessons);
-      } catch {
-        if (!cancelled) setError("Couldn't load grammar points.");
-      }
-    }
-    void fetchLessons();
-    return () => {
-      cancelled = true;
-    };
-  }, [level]);
 
   const q = query.trim().toLowerCase();
 
@@ -62,22 +35,6 @@ export function GrammarBrowseClient({ level }: { level: string }) {
       else next.add(lesson);
       return next;
     });
-  }
-
-  if (error) {
-    return (
-      <p className="mt-10 text-center text-[14px]" style={{ color: "var(--bad)" }}>
-        {error}
-      </p>
-    );
-  }
-
-  if (lessons === null) {
-    return (
-      <p className="mt-10 text-center text-[14px]" style={{ color: "var(--ink-faint)" }}>
-        Loading grammar points…
-      </p>
-    );
   }
 
   // Filter points within each lesson when searching; drop lessons with no matches.

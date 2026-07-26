@@ -1,9 +1,9 @@
 "use client";
 
 // Inline level selector, mounted on the home hub (SPEC §8.5) and the grammar hub. Renders
-// the five JLPT levels as a vertical grouped list (N1 → N5, hardest first). Tapping a row
-// persists it via the `setActiveLevel` server action and refreshes so every level-scoped
-// page picks up the change.
+// the five JLPT levels as a vertical grouped list (N1 → N5, hardest first). Tapping a row moves
+// the check mark immediately (`useOptimistic`) and persists it via the `setActiveLevel` server
+// action, whose `revalidatePath` calls are what make every level-scoped page pick up the change.
 //
 // The level it sets is global, not per-page: switching from the grammar hub also re-scopes
 // vocabulary study. That is why `emptyNote` annotates rows rather than disabling them.
@@ -12,8 +12,7 @@
 // Active row: white surface (pops against the cream background of the siblings).
 // Inactive rows: cream, dimmed text — present but recessive.
 
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useOptimistic, useTransition } from "react";
 import type { Level } from "@/generated/prisma/enums";
 import { setActiveLevel } from "@/app/home/actions";
 // N1 at top (hardest / the goal), N5 at bottom (easiest / the start): the shared order.
@@ -48,13 +47,27 @@ export function LevelPicker({
   emptyNote?: { levels: ReadonlySet<string>; label: string };
 }) {
   const [pending, startTransition] = useTransition();
-  const router = useRouter();
+  // **This is what `useOptimistic` is for**, and the distinction matters because the flashcard
+  // loop deliberately does *not* use it (see `study-session.tsx`'s note on `index`). The hook
+  // reconciles an optimistic value against server-owned state and drops it when the transition
+  // settles, so it needs a base value the server actually replaces. `current` is exactly that:
+  // it is a prop rendered by the RSC from `UserProfile.activeLevel`, and `revalidatePath` inside
+  // the action re-renders this page with the new one. There is something to reconcile against,
+  // so the check mark can move now and be confirmed (or reverted, if the write fails) later.
+  const [optimisticLevel, setOptimisticLevel] = useOptimistic(current);
 
   function pick(level: string) {
-    if (level === current || pending) return;
+    if (level === optimisticLevel) return;
     startTransition(async () => {
+      // Must be called inside the transition: outside one, React has no scope in which to hold
+      // the optimistic value, and it would be discarded on the next render.
+      setOptimisticLevel(level);
       await setActiveLevel(level as Level);
-      router.refresh();
+      // No `router.refresh()`. `setActiveLevel` calls `revalidatePath` on all five level-scoped
+      // paths, and a Server Function's response carries the re-rendered payload for the route
+      // being viewed in the same round trip ("Updates the UI immediately (if viewing the
+      // affected path)", Next.js `revalidatePath` docs, verified against 16.2.7). The refresh
+      // was therefore a *second* request for a render we had already been handed.
     });
   }
 
@@ -65,24 +78,32 @@ export function LevelPicker({
       aria-busy={pending}
     >
       {LEVELS.map((lvl, i) => {
-        const active = lvl === current;
+        const active = lvl === optimisticLevel;
         const isEmpty = emptyNote?.levels.has(lvl) ?? false;
         return (
           <button
             key={lvl}
             type="button"
             onClick={() => pick(lvl)}
-            disabled={pending}
+            // Not `disabled={pending}`, for the reason globals.css spells out for `.opt`:
+            // browsers blur a control the instant it is disabled, so disabling the row the user
+            // just tapped dropped focus to <body> on every level switch. Nothing needs to
+            // replace it, because React dispatches Server Functions sequentially, so a second tap
+            // mid-flight simply queues behind the first and the last one wins, and the check
+            // mark has already moved to wherever the user last tapped.
             aria-pressed={active}
             // py-3.5 (not py-2.5): with the 22px chip this makes each row about 50px tall,
             // clearing the 44px minimum touch target BRAND.md sets for thumb-reachable
             // controls. The tighter padding put every row under that floor.
             className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
+            // No `opacity` while a switch is in flight. Dimming every inactive row to 0.4 was
+            // the old stand-in for feedback, and it was both a contrast regression (BRAND.md §3
+            // forbids exactly this composite) and a lie about how long the write takes: the
+            // optimistic check mark below is the feedback now, and it lands on the next frame.
             style={{
               background: active ? "var(--surface)" : "var(--surface-cream)",
               borderTop: i > 0 ? "1px solid var(--line)" : undefined,
               cursor: active ? "default" : "pointer",
-              opacity: pending && !active ? 0.4 : 1,
             }}
           >
             {/* Level chip, always at full opacity. Inactive rows used to dim theirs to
