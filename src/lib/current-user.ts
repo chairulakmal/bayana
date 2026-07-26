@@ -72,8 +72,15 @@ export function createDemoCookieValue(userId: string, expiresAtMs: number): stri
  *
  * Note: cookies in the pre-expiry format (`userId:hmac`) fail verification and
  * fall through to the sign-in redirect — acceptable for throwaway demo sessions.
+ *
+ * **Exported for the tests, and that is a deliberate widening of the surface.** This is the
+ * app's second authentication path (SPEC §11.8), so its rejection cases — a tampered userId,
+ * a tampered expiry, a passed expiry, a missing `AUTH_SECRET` — are the behaviour that has to
+ * be re-established identically on the other side of the Nuxt port. Testing them through
+ * `getCurrentUserId` would mean mocking `next/headers` and Auth.js to reach two lines of
+ * crypto; testing them here needs neither, and the test doubles as the specification.
  */
-function verifyDemoCookie(value: string): string | null {
+export function verifyDemoCookie(value: string): string | null {
   // Split from the right: `userId:expiresAtMs:sig`. cuids contain no colons, so
   // the two rightmost separators are unambiguous.
   const sigIdx = value.lastIndexOf(":");

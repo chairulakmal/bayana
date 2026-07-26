@@ -119,7 +119,7 @@ export function QuizSession({
   // Space answer the question; the score on the summary, which is the "you are here" line.
   const promptRef = useRef<HTMLDivElement>(null);
   const continueRef = useRef<HTMLButtonElement>(null);
-  const summaryRef = useRef<HTMLParagraphElement>(null);
+  const summaryRef = useRef<HTMLHeadingElement>(null);
   const focusTarget = current === null ? summaryRef : answered ? continueRef : promptRef;
   useFocusOnTransition(focusTarget, `${index}:${answered}`);
 
@@ -150,9 +150,10 @@ export function QuizSession({
     return (
       <Centered>
         <Parrot expr="sleepy" title="Pī looking concerned" style={{ width: 124, height: 138 }} />
-        <p className="mt-4 text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
+        {/* One <h1> per branch, per the pattern documented in study-session.tsx. */}
+        <h1 className="mt-4 text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
           Couldn&apos;t load
-        </p>
+        </h1>
         <p className="mt-1" style={{ color: "var(--ink-soft)" }}>
           {error ?? "Something went wrong loading the quiz."}
         </p>
@@ -174,9 +175,9 @@ export function QuizSession({
     return (
       <Centered>
         <Parrot expr="sleepy" style={{ width: 110, height: 123 }} />
-        <p className="mt-4 text-xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
+        <h1 className="mt-4 text-xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
           No quiz available
-        </p>
+        </h1>
         <p className="mt-1" style={{ color: "var(--ink-soft)" }}>
           Not enough words at this level yet.
         </p>
@@ -197,14 +198,14 @@ export function QuizSession({
         {/* tabIndex={-1} makes this focusable by script but not by Tab. The standard way to
             land a screen reader on "where you now are" without adding a tab stop that does
             nothing. */}
-        <p
+        <h1
           ref={summaryRef}
           tabIndex={-1}
           className="mt-4 text-3xl"
           style={{ fontFamily: "var(--f-display)", fontWeight: 700 }}
         >
           {score} / {total} 🎉
-        </p>
+        </h1>
         <p className="mt-1" style={{ color: "var(--ink-soft)" }}>
           Nice warm-up! <span lang="ja" className="jp">おつかれさま</span>
         </p>
@@ -231,6 +232,7 @@ export function QuizSession({
 
   return (
     <main className="flex h-svh flex-col pt-safe">
+      <h1 className="sr-only">Quiz · {level}</h1>
       {/* Progress + exit to the home hub */}
       <SessionHeader
         progress={Math.round((index / total) * 100)}

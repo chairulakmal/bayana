@@ -10,7 +10,7 @@
 // what tapping the corresponding tile actually gives you. See `vocabDue` below for the case
 // where that forced an asymmetry.
 
-import { db } from "@/lib/db";
+import { defaultDeps, type Deps } from "@/lib/deps";
 import type { Level } from "@/generated/prisma/enums";
 import { getGrammarStats } from "@/lib/grammar-review";
 
@@ -43,11 +43,18 @@ export type HomeSnapshot = {
 /**
  * Start of the current day, used for the "done today" counts.
  *
- * Caveat, stated rather than hidden: this is the *server's* local midnight, not the user's.
- * Bayana has no per-user timezone or day-start preference yet, so every day-boundary
- * calculation in the codebase shares this limitation (`getGrammarStats` does the same).
- * Centralising it here means the eventual fix is one function, not a grep. Tracked in
- * TODO.md's review backlog.
+ * Caveat, stated rather than hidden: this is the *server's* local midnight, not the user's, so
+ * a user in another timezone can watch the "done today" count reset mid-session. Every
+ * day-boundary calculation in the codebase shares it (`getGrammarStats` does the same).
+ *
+ * **The blocker this comment used to claim is false, corrected 2026-07-27.** It said Bayana
+ * "has no per-user timezone or day-start preference yet". It has both: `UserProfile.timezone`
+ * (IANA string, default "UTC") and `UserProfile.dayStartHour` (default 4, Anki-style rollover)
+ * have been in the schema since it was written, and are read by nothing. What is genuinely
+ * open is only how a user's value gets *set* — a settings control, or browser detection at
+ * onboarding — not where it would be stored. Tracked in TODO.md.
+ *
+ * Centralising the calculation here means the eventual fix is one function, not a grep.
  */
 function startOfToday(now: Date): Date {
   const start = new Date(now);
@@ -76,7 +83,9 @@ export async function getHomeSnapshot(
   userId: string,
   level: Level,
   now: Date = new Date(),
+  deps: Deps = defaultDeps,
 ): Promise<HomeSnapshot> {
+  const { db } = deps;
   const dayStart = startOfToday(now);
 
   // All independent reads, so run them concurrently. Each is a COUNT with no joins beyond
@@ -99,7 +108,7 @@ export async function getHomeSnapshot(
     // already counts points studied today, so the hub does not repeat that query.
     // `GrammarPoint.level` is a plain String column (level-agnostic schema, SPEC §4.1),
     // hence the toString(). It is not the Level enum.
-    getGrammarStats(userId, level.toString()),
+    getGrammarStats(userId, level.toString(), deps),
   ]);
 
   return {

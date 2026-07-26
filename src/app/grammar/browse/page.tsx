@@ -6,6 +6,7 @@ import { getActiveLevel, hasOnboarded } from "@/lib/profile";
 import { buildGrammarBrowse } from "@/lib/grammar-browse";
 import { GrammarBrowseClient } from "@/components/grammar-browse-client";
 import { LessonListSkeleton } from "@/components/lesson-list-skeleton";
+import { InlineErrorBoundary } from "@/components/inline-error-boundary";
 import { UserMenu } from "@/components/user-menu";
 import { BottomNav } from "@/components/bottom-nav";
 
@@ -69,10 +70,21 @@ export default async function GrammarBrowsePage() {
         Every grammar point and example, grouped by lesson.
       </p>
 
+      {/* The boundary sits OUTSIDE `<Suspense>` and inside the page, which is the whole
+          point: a failed query replaces the list and nothing else, leaving the header, the
+          heading and the nav intact. Wrapping it the other way round would put the fallback
+          where the skeleton goes but leave the boundary unable to catch a failure that
+          happens before the suspense resolves. See `inline-error-boundary.tsx` for why this
+          is not an `error.tsx`. */}
       <div className="mt-5">
-        <Suspense fallback={<LessonListSkeleton />}>
-          <GrammarLessons userId={userId} level={grammarLevel} />
-        </Suspense>
+        <InlineErrorBoundary
+          title="Couldn't load the grammar points"
+          message="That one is on us, not you. Nothing you have studied was affected."
+        >
+          <Suspense fallback={<LessonListSkeleton />}>
+            <GrammarLessons userId={userId} level={grammarLevel} />
+          </Suspense>
+        </InlineErrorBoundary>
       </div>
       <BottomNav />
     </main>
@@ -84,9 +96,10 @@ export default async function GrammarBrowsePage() {
  * its `await` happens below the `<Suspense>` boundary: a separate component is what makes it a
  * separate unit of streaming. Not exported, because nothing else should build this list.
  *
- * A failure here now throws during a server render rather than landing in a `useEffect`'s catch,
- * so it surfaces through the nearest error boundary instead of the client's own "Couldn't load
- * grammar points" branch, which no longer exists.
+ * A failure here throws during a server render rather than landing in a `useEffect`'s catch, so
+ * it surfaces through the nearest error boundary instead of the client's own "Couldn't load
+ * grammar points" branch, which no longer exists. That nearest boundary is the page's own
+ * `<InlineErrorBoundary>`, deliberately, so the failure stays inside the page.
  */
 async function GrammarLessons({ userId, level }: { userId: string; level: string }) {
   const lessons = await buildGrammarBrowse(userId, level);

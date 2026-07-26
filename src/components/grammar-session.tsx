@@ -193,7 +193,7 @@ export function GrammarSession({
   // commit can cut a screen reader off mid-sentence. Rating keys work from anywhere, so nothing is
   // lost by staying put.
   const showAnswerRef = useRef<HTMLButtonElement>(null);
-  const doneRef = useRef<HTMLParagraphElement>(null);
+  const doneRef = useRef<HTMLHeadingElement>(null);
   const focusTarget = sessionDone || !current ? doneRef : flipped ? null : showAnswerRef;
   useFocusOnTransition(focusTarget, `${index}:${flipped}:${sessionDone}`);
 
@@ -223,14 +223,16 @@ export function GrammarSession({
   //
   // There is no loading branch. The first queue arrives as a prop, and the wait that used to live
   // here is now `<Suspense>`'s fallback in `app/grammar/study/page.tsx` (`SessionLoading`).
+  //
+  // One `<h1>` per branch, per the pattern documented at the same spot in study-session.tsx.
 
   if (loadFailed && !sessionDone) {
     return (
       <Centered>
         <Parrot expr="sleepy" title="Pī looking concerned" style={{ width: 124, height: 138 }} />
-        <p className="mt-4 text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
+        <h1 className="mt-4 text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
           Couldn&apos;t load
-        </p>
+        </h1>
         <p className="mt-1" style={{ color: "var(--ink-soft)" }}>
           {error ?? "Something went wrong loading your grammar queue."}
         </p>
@@ -260,14 +262,14 @@ export function GrammarSession({
         />
         {/* tabIndex={-1}: focusable by script, not by Tab. The standard way to land a screen
             reader on "where you now are" without adding a tab stop that does nothing. */}
-        <p
+        <h1
           ref={doneRef}
           tabIndex={-1}
           className="mt-4 text-2xl"
           style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}
         >
           {allCaughtUp ? "All caught up! 🎉" : "Session done! 🎉"}
-        </p>
+        </h1>
         <p className="mt-1" style={{ color: "var(--ink-soft)" }}>
           {allCaughtUp ? (
             <>No grammar cards due right now. <span lang="ja" className="jp">またね！</span></>
@@ -319,6 +321,7 @@ export function GrammarSession({
 
   return (
     <main className="flex h-svh flex-col pt-safe">
+      <h1 className="sr-only">Grammar study · {level}</h1>
       <SessionHeader
         progress={progress}
         level={level}

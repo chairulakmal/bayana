@@ -21,6 +21,13 @@ import { BottomNav } from "@/components/bottom-nav";
 // It is a *light* dashboard, not the full one: no streak, no history, no charts. Those
 // warrant a richer screen and stay on `/stats` (SPEC §13 Phase 4). Ordering reflects
 // frequency: the modes you tap every session sit above the level you change once a month.
+//
+// Heading structure (SPEC §8.4): the greeting is the `<h1>` and each of the three section
+// labels is an `<h2>`. Those labels were `<p>` elements, so the app's *default* page — the
+// one a screen-reader user lands on after every sign-in — offered nothing at all to heading
+// navigation. They read as headings to a sighted user already; the markup now says so.
+export const metadata = { title: "Home" };
+
 export default async function HomePage() {
   const { userId, email, isDemo } = await requireAuth();
   if (!(await hasOnboarded(userId))) redirect("/onboarding");
@@ -55,10 +62,10 @@ export default async function HomePage() {
             <p lang="ja" className="jp text-[15px]" style={{ color: "var(--ink-soft)" }}>
               おかえり
             </p>
-            <p className="text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
+            <h1 className="text-2xl" style={{ fontFamily: "var(--f-display)", fontWeight: 600 }}>
               {/* Encouraging, never a scold (BRAND.md §1): showing up is the win. */}
               {doneToday > 0 ? "Nice work today" : "Let's study"}
-            </p>
+            </h1>
           </div>
         </div>
         <UserMenu email={email ?? ""} isDemo={isDemo} />
@@ -111,7 +118,7 @@ export default async function HomePage() {
             scoping the whole panel, which would misreport a cross-level backlog as belonging
             to the active level. The chip lives on the progress bar instead, which genuinely
             is level-scoped. */}
-        <p
+        <h2
           className="text-[11px] font-semibold"
           style={{
             color: "var(--ink-faint)",
@@ -120,7 +127,7 @@ export default async function HomePage() {
           }}
         >
           TODAY
-        </p>
+        </h2>
 
         <div className="mt-3 grid grid-cols-3 gap-2">
           <Stat label="words due" value={snapshot.vocabDue} highlight={snapshot.vocabDue > 0} />
@@ -172,7 +179,7 @@ export default async function HomePage() {
           rather than four stacked rows: at the 375px baseline, four full-width rows pushed
           the level picker and pace note off-screen entirely. Each tile is roughly 150x104px,
           comfortably past the 44px touch-target floor (BRAND.md platform focus). */}
-      <p
+      <h2
         className="mt-7 text-[11px] font-semibold"
         style={{
           color: "var(--ink-faint)",
@@ -181,7 +188,7 @@ export default async function HomePage() {
         }}
       >
         STUDY MODES
-      </p>
+      </h2>
       <div className="mt-2 grid grid-cols-2 gap-3">
         <ModeTile href="/study" emoji="🎴" title="Flashcards" subtitle={flashcardSubtitle(snapshot)} />
         <ModeTile href="/quiz" emoji="⚡" title="Quiz" subtitle="Quick multiple-choice" />
@@ -207,7 +214,7 @@ export default async function HomePage() {
           Below the modes on purpose: the level is set once and revisited rarely, while a
           mode is chosen every session. The old hub had this order inverted, putting the
           rarest action at the top of the page. */}
-      <p
+      <h2
         className="mt-7 text-[11px] font-semibold"
         style={{
           color: "var(--ink-faint)",
@@ -216,7 +223,7 @@ export default async function HomePage() {
         }}
       >
         LEVEL
-      </p>
+      </h2>
       <div className="mt-2">
         <LevelPicker current={level} />
       </div>

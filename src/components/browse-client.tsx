@@ -34,6 +34,13 @@ type Sentence = { japanese: string; reading: string; english: string };
 
 const PAGE_SIZE = 50;
 
+// How long the result count must hold still before it is announced. Long enough that an
+// ordinary typing cadence produces one announcement instead of one per letter, short enough
+// that a user who stops to listen is not left waiting on it. Filtering itself is NOT
+// debounced — the visible list still updates on every keystroke, which is the whole point of
+// an in-memory search, and delaying it to fix an announcement would be fixing the wrong thing.
+const ANNOUNCE_DELAY_MS = 700;
+
 export function BrowseClient({
   level,
   started,
@@ -56,6 +63,8 @@ export function BrowseClient({
   const [sentences, setSentences] = useState<Map<string, Sentence | "missing">>(new Map());
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  // Top of the results list, so turning a page can put row 1 back under the user's thumb.
+  const listRef = useRef<HTMLDivElement>(null);
   // Request token for the per-row sentence fetch, mirroring `study-session.tsx`. Taps are
   // independent requests with no effect to clean up, so a `cancelled` flag cannot serve here:
   // see `toggle` for the race it closes.
@@ -111,11 +120,50 @@ export function BrowseClient({
   const safePage = Math.min(currentPage, totalPages);
   const visible = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
+  // The result count as one string, rendered visibly and (after a pause) announced. Empty
+  // while the list is still loading, so the live region below stays silent until there is a
+  // real count — the loading branch has its own "Loading words" region for that wait.
+  const countLabel =
+    words === null
+      ? ""
+      : (q
+          ? `${filtered.length.toLocaleString()} match${filtered.length !== 1 ? "es" : ""}`
+          : `${words.length.toLocaleString()} words`) +
+        (totalPages > 1 ? ` · page ${safePage} of ${totalPages}` : "");
+
+  // Debounce the *announcement*, not the filtering. The count used to sit directly in a
+  // `role="status"` element, so typing "benkyou" queued seven announcements and a screen
+  // reader spent the whole word reading interim totals over the user's own typing. Holding
+  // the announced value until the count settles turns that into one useful sentence.
+  //
+  // The effect depends on the label *string*, not on `query`, so a keystroke that does not
+  // change the result count (a second space, a character that matches nothing new) never
+  // restarts the timer and never re-announces an identical value.
+  const [announcedCount, setAnnouncedCount] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => setAnnouncedCount(countLabel), ANNOUNCE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [countLabel]);
+
   function goToPage(n: number) {
     const clamped = Math.min(Math.max(1, n), totalPages);
     setCurrentPage(clamped);
     setPageInput(String(clamped));
     setOpenId(null); // close any open sentence when turning a page
+
+    // Return to the top of the list. Without this, tapping "Next" — which sits *below* 50
+    // rows — left the viewport at the bottom of the new page, so at the 375px baseline the
+    // user landed on rows 45-50 of a page they had not read a word of.
+    //
+    // `scrollIntoView` on the list rather than `window.scrollTo(0, 0)`: scrolling to the
+    // document top would also scroll the heading and search field back into view, costing a
+    // swipe before the first result. Aligning the list's top edge to the viewport top puts
+    // row 1 exactly where the eye already is.
+    //
+    // Instant, not smooth. A 50-row jump animated is motion the user did not ask for, and
+    // honouring `prefers-reduced-motion` here would mean branching on a media query for a
+    // scroll that reads better instant either way.
+    listRef.current?.scrollIntoView({ block: "start" });
   }
 
   function commitPage() {
@@ -232,18 +280,21 @@ export function BrowseClient({
         )}
       </div>
 
-      {/* Result count. `role="status"` (implicitly aria-live="polite" + atomic) makes the
-          count audible: filtering happens per keystroke with no other feedback, so a screen
-          reader user typing a query had no way to know whether anything matched. Matching
-          the precedent in `quiz-session.tsx`, the live node is part of the normal render
-          rather than mounted when the number first changes — a live region created at the
-          moment it has something to say is frequently not announced at all. */}
-      <p role="status" className="mt-3 text-[12px]" style={{ color: "var(--ink-faint)" }}>
-        {q
-          ? `${filtered.length.toLocaleString()} match${filtered.length !== 1 ? "es" : ""}`
-          : `${words.length.toLocaleString()} words`}
-        {totalPages > 1 && ` · page ${safePage} of ${totalPages}`}
+      {/* Result count, split into what is *seen* and what is *said*.
+          The visible line updates on every keystroke, as it must: it is the only feedback a
+          sighted user gets that the filter is working. It is no longer the live region
+          itself, because a live region that changes seven times while you type a word
+          announces seven times.
+          The announcement lives in the sr-only node below, on a debounced copy of the same
+          string. Matching the precedent in `quiz-session.tsx`, that node is part of the
+          normal render rather than mounted when the number first changes — a live region
+          created at the moment it has something to say is frequently not announced at all. */}
+      <p className="mt-3 text-[12px]" style={{ color: "var(--ink-faint)" }}>
+        {countLabel}
       </p>
+      <span className="sr-only" role="status">
+        {announcedCount}
+      </span>
 
       {/* Word list */}
       <div

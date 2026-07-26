@@ -22,6 +22,7 @@
 // them would mean either losing this precision or adding a field vocab cannot populate.
 
 import { getGrammarQueue } from "@/lib/grammar-review";
+import { defaultDeps, type Deps } from "@/lib/deps";
 
 /** One grammar card exactly as the session renders it. No scheduling internals by design. */
 export type GrammarCard = {
@@ -85,8 +86,9 @@ function toGrammarCard(point: PointFields): GrammarCard {
 export async function buildGrammarSession(
   userId: string,
   opts: { level?: string; sessionLimit?: number } = {},
+  deps: Deps = defaultDeps,
 ): Promise<GrammarSessionPayload> {
-  const { due, newPoints, totalDue } = await getGrammarQueue(userId, opts);
+  const { due, newPoints, totalDue } = await getGrammarQueue(userId, opts, deps);
   return {
     cards: [...due.map((d) => toGrammarCard(d.grammarPoint)), ...newPoints.map(toGrammarCard)],
     totalDue,

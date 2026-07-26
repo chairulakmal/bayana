@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AuthCard } from "@/components/auth-card";
 import { MagicLinkForm } from "@/components/magic-link-form";
 
@@ -14,6 +15,8 @@ import { MagicLinkForm } from "@/components/magic-link-form";
 // What stays here is the one thing that cannot cross to the client: reading `?error=`, which
 // Auth.js's own flows (a bad callback, an expired link) still redirect back with, and the
 // server-only owner-contact env var.
+
+export const metadata = { title: "Sign in" };
 
 export default async function SignInPage({
   searchParams,
@@ -36,19 +39,36 @@ export default async function SignInPage({
           <span lang="ja" className="jp">メールのリンクでログイン</span> · sign in with your email
         </>
       }
-      /* Dev-only shortcut: skip the magic link locally (SPEC §11.7). Rendered only when the
-         bypass is actually enabled, so it never appears in production. It sits outside the card
-         rather than in it, which is the only reason `AuthCard` has a `below` slot at all. */
+      /* Below the card: the policy links, plus the dev-only shortcut when it is enabled.
+         The policy links belong on *this* screen specifically, and not merely for
+         completeness — this is the one place a visitor decides whether to hand over an email
+         address, so it is the last moment where "what happens to it?" is still a question
+         they can act on. Internal links, so they stay in the same tab and the half-typed
+         address in the field survives the trip.
+
+         The dev shortcut skips the magic link locally (SPEC §11.7) and is rendered only when
+         the bypass is actually enabled, so it never appears in production. */
       below={
-        process.env.NODE_ENV !== "production" && process.env.DEV_AUTH === "1" ? (
-          <a
-            href="/api/dev/login"
-            className="mt-5 inline-block text-[13px] font-semibold underline"
-            style={{ color: "var(--ink-faint)" }}
-          >
-            Dev login (skip email)
-          </a>
-        ) : undefined
+        <>
+          <p className="mt-5 text-[12px]" style={{ color: "var(--ink-faint)" }}>
+            <Link href="/privacy" className="font-semibold underline">
+              Privacy
+            </Link>{" "}
+            ·{" "}
+            <Link href="/terms" className="font-semibold underline">
+              Terms of use
+            </Link>
+          </p>
+          {process.env.NODE_ENV !== "production" && process.env.DEV_AUTH === "1" && (
+            <a
+              href="/api/dev/login"
+              className="mt-3 inline-block text-[13px] font-semibold underline"
+              style={{ color: "var(--ink-faint)" }}
+            >
+              Dev login (skip email)
+            </a>
+          )}
+        </>
       }
     >
       {/* The owner contact rides along only with "AccessDenied", which is the one error that

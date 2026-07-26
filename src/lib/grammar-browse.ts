@@ -11,7 +11,7 @@
 // against ~2,700, small enough that serializing the whole thing into the page's RSC payload
 // costs less than the extra round trip the split would preserve.
 
-import { db } from "@/lib/db";
+import { defaultDeps, type Deps } from "@/lib/deps";
 
 /** One grammar point as the reference view renders it. `status` is per-user, derived from
  *  `GrammarProgress`; "mature" reuses `getGrammarStats`' threshold (scheduledDays >= 21). */
@@ -51,6 +51,7 @@ export type GrammarLessonGroup = {
 export async function buildGrammarBrowse(
   userId: string,
   level: string,
+  { db }: Deps = defaultDeps,
 ): Promise<GrammarLessonGroup[]> {
   // Fetch the point list and the user's progress on this level in parallel — two cheap
   // queries, same pattern as the vocabulary browse pair.

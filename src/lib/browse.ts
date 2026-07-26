@@ -16,7 +16,7 @@
 // The client recombines them: a stable partition puts started words first, which is the same
 // order the server used to produce (see `getLevelWords` for why the sort stays here).
 
-import { db } from "@/lib/db";
+import { defaultDeps, type Deps } from "@/lib/deps";
 import type { Level } from "@/generated/prisma/enums";
 
 /** One row of the vocabulary reference list. No per-user field, by design: see the module
@@ -41,7 +41,10 @@ export type BrowseWord = {
  * comparisons is only ~10 ms, but it is 10 ms of the main thread during hydration, spent on
  * work whose answer never changes.
  */
-export async function getLevelWords(level: Level): Promise<BrowseWord[]> {
+export async function getLevelWords(
+  level: Level,
+  { db }: Deps = defaultDeps,
+): Promise<BrowseWord[]> {
   const words = await db.word.findMany({
     where: { level },
     select: { id: true, expression: true, reading: true, meaning: true },
@@ -58,7 +61,11 @@ export async function getLevelWords(level: Level): Promise<BrowseWord[]> {
  * Returned as an array rather than a `Set` because it crosses the server/client boundary as a
  * prop, and a `Set` is not serializable in the RSC payload. The client builds the `Set`.
  */
-export async function getStartedWordIds(userId: string, level: Level): Promise<string[]> {
+export async function getStartedWordIds(
+  userId: string,
+  level: Level,
+  { db }: Deps = defaultDeps,
+): Promise<string[]> {
   const rows = await db.reviewState.findMany({
     where: { userId, word: { level } },
     select: { wordId: true },
