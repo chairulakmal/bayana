@@ -228,17 +228,30 @@ export function GrammarSession({ level }: { level: string }) {
             Back
           </Link>
         </div>
-        {error && (
-          <p className="mt-3 text-sm" style={{ color: "var(--bad)" }}>
-            {error}
-          </p>
-        )}
+        {/* Always-mounted `role="alert"`, matching study-session.tsx. Only "Check for more" can
+            fail from this screen today; it gains a second failure mode when grammar gets undo. */}
+        <div role="alert">
+          {error && (
+            <p className="mt-3 text-sm" style={{ color: "var(--bad)" }}>
+              {error}
+            </p>
+          )}
+        </div>
       </Centered>
     );
   }
 
   const remaining = cards.length - index;
   const progress = cards.length ? Math.round((index / cards.length) * 100) : 0;
+
+  // What the reveal announces (see the live region below). Mirrors what the card actually
+  // renders, including the conditional reading: a kana-only pattern is its own reading, and
+  // hearing it twice in a row is worse than not hearing it. The example sentence is left out
+  // for the reason given at the same spot in study-session.tsx.
+  const revealedAnswer =
+    current.reading === current.pattern
+      ? current.meanings.join(", ")
+      : `${current.reading}. ${current.meanings.join(", ")}`;
 
   return (
     <main className="flex h-svh flex-col pt-safe">
@@ -328,11 +341,20 @@ export function GrammarSession({ level }: { level: string }) {
         </div>
       </section>
 
-      {error && (
-        <p className="px-4 pb-1 text-center text-sm" style={{ color: "var(--bad)" }}>
-          {error}
-        </p>
-      )}
+      {/* Reveal announcement and failure notice; both carry the reasoning at the matching spot
+          in study-session.tsx. Kept identical to the vocab queue on purpose: the two screens are
+          the same interaction, and a screen-reader user should not have to learn two of them. */}
+      <div role="status" className="sr-only">
+        {flipped ? revealedAnswer : ""}
+      </div>
+
+      <div role="alert">
+        {error && (
+          <p className="px-4 pb-1 text-center text-sm" style={{ color: "var(--bad)" }}>
+            {error}
+          </p>
+        )}
+      </div>
 
       <footer
         className="mx-auto w-full max-w-md shrink-0 px-3 pt-2"

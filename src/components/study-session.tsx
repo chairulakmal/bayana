@@ -277,17 +277,27 @@ export function StudySession({ level }: { level: string }) {
             Undo last rating
           </button>
         )}
-        {error && (
-          <p className="mt-3 text-sm" style={{ color: "var(--bad)" }}>
-            {error}
-          </p>
-        )}
+        {/* Same always-mounted `role="alert"` as the mid-session notice: the undo button above
+            is live on this screen, so a failure here is just as silent without it. */}
+        <div role="alert">
+          {error && (
+            <p className="mt-3 text-sm" style={{ color: "var(--bad)" }}>
+              {error}
+            </p>
+          )}
+        </div>
       </Centered>
     );
   }
 
   const remaining = cards.length - index;
   const progress = cards.length ? Math.round((index / cards.length) * 100) : 0;
+
+  // What the reveal announces (see the live region below). Reading and meaning only: those two
+  // *are* the answer, whereas the example sentence is supporting context the user can read off
+  // the card whenever they want, and pushing a full Japanese sentence plus its kana through an
+  // English speech synthesiser is noise rather than help.
+  const revealedAnswer = `${current.reading}. ${current.meaning}`;
 
   return (
     // h-svh: same fix as quiz-session — pins to chrome-visible viewport so the footer
@@ -396,11 +406,31 @@ export function StudySession({ level }: { level: string }) {
         </div>
       </section>
 
-      {error && (
-        <p className="px-4 pb-1 text-center text-sm" style={{ color: "var(--bad)" }}>
-          {error}
-        </p>
-      )}
+      {/* Screen-reader announcement of the reveal. Flipping a card is a silent change: the
+          headword stays put and the answer is simply appended below it, so nothing tells a
+          screen-reader user that the tap did anything. Quiz and Exam already announce their
+          result this way, and the same two constraints apply here. The node is part of the
+          normal render rather than mounted on flip, because a live region created at the moment
+          it first has something to say is frequently not announced at all (the original comment
+          is in quiz-session.tsx). And the announcement is a duplicate of visible text, which is
+          accepted: the tidier-looking alternative (`aria-live` on the answer container itself) is
+          precisely the mounts-with-its-content case that goes unheard. */}
+      <div role="status" className="sr-only">
+        {flipped ? revealedAnswer : ""}
+      </div>
+
+      {/* Failure notice. `role="alert"` (assertive, atomic) rather than `role="status"`: this
+          says a rating or an undo was *not* saved, and a polite region would queue behind
+          whatever the reveal above is still reading out. The wrapper is always mounted for the
+          same reason as that region, and carries no padding of its own so an empty one adds no
+          height to the flex column. */}
+      <div role="alert">
+        {error && (
+          <p className="px-4 pb-1 text-center text-sm" style={{ color: "var(--bad)" }}>
+            {error}
+          </p>
+        )}
+      </div>
 
       {/* Footer: rating buttons appear once flipped. shrink-0 + safe-area padding — same
           reasoning as quiz-session footer. */}
