@@ -11,7 +11,11 @@ export function HomeLink() {
   return (
     <Link
       href="/home"
-      className="inline-flex items-center gap-1.5 active:opacity-70"
+      // The pill is painted ~30px tall (13px text + the 22px parrot + 4px padding), which is
+      // the intended visual weight for secondary chrome — but it is also the only way out of
+      // Stats and Browse. `.tap-44` is the right tool rather than the both-axis variant: at
+      // ~90px the pill is already wide enough, so only the vertical axis is short.
+      className="tap-44 inline-flex items-center gap-1.5 active:opacity-70"
       style={{
         fontFamily: "var(--f-display)",
         fontWeight: 600,

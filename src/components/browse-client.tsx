@@ -159,7 +159,10 @@ export function BrowseClient({ level }: { level: string }) {
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
-          className="focus-ring w-full rounded-[var(--r-md)] px-4 py-3 text-[15px] outline-none"
+          // pr-12 reserves the 44px the clear button occupies. Unconditional, even though the
+          // button only renders when there is a query: making the padding conditional would
+          // reflow the text under the caret at the exact moment the user starts typing.
+          className="focus-ring w-full rounded-[var(--r-md)] py-3 pl-4 pr-12 text-[15px] outline-none"
           style={{
             background: "var(--surface)",
             border: "1px solid var(--line)",
@@ -177,7 +180,10 @@ export function BrowseClient({ level }: { level: string }) {
               setOpenId(null);
               searchRef.current?.focus();
             }}
-            className="absolute top-1/2 right-3 -translate-y-1/2 text-[18px] leading-none"
+            // 44x44 flex box centring the glyph, which stays 18px. The input is ~46px tall
+            // (py-3 + 15px text), so a 44px button fits inside it without changing the
+            // field's height; right-1 keeps it clear of the rounded border.
+            className="absolute top-1/2 right-1 flex h-11 w-11 -translate-y-1/2 items-center justify-center text-[18px] leading-none"
             style={{ color: "var(--ink-faint)" }}
           >
             ×
@@ -313,11 +319,16 @@ export function BrowseClient({ level }: { level: string }) {
       {/* Pagination bar — only shown when there is more than one page. */}
       {totalPages > 1 && (
         <div className="mt-4 flex items-center justify-between gap-3">
+          {/* Real padding rather than `.tap-44`, because these were bare text: the utility
+              only grows the vertical axis, and a "← Prev" run is about 40px wide. The
+              negative margin is on the OUTER side only, so the label stays visually flush
+              with the list edge above while the target reaches into the page gutter — the
+              inner padding simply eats into the row's gap, where nothing else sits. */}
           <button
             type="button"
             onClick={() => goToPage(safePage - 1)}
             disabled={safePage <= 1}
-            className="text-[13px] font-semibold"
+            className="-ml-3 flex min-h-[44px] items-center px-3 text-[13px] font-semibold"
             style={{
               color: safePage <= 1 ? "var(--ink-faint)" : "var(--ink-soft)",
               cursor: safePage <= 1 ? "default" : "pointer",
@@ -350,12 +361,17 @@ export function BrowseClient({ level }: { level: string }) {
               }}
               className="focus-ring rounded text-center text-[13px] outline-none"
               style={{
-                // Width: enough for the max page number plus a little padding.
+                // Width: enough for the max page number plus a little padding. The `min`
+                // pair is the hit-target floor: at two or three characters the computed
+                // width lands around 30px, so without it this is a 30x18 tap target sitting
+                // between two controls that now clear 44px.
                 width: `${Math.max(2, String(totalPages).length) + 2}ch`,
+                minWidth: 44,
+                minHeight: 44,
                 border: "1px solid var(--line)",
                 background: "var(--surface)",
                 color: "var(--ink)",
-                padding: "2px 4px",
+                padding: "8px 6px",
               }}
             />
             <span>of {totalPages}</span>
@@ -365,7 +381,7 @@ export function BrowseClient({ level }: { level: string }) {
             type="button"
             onClick={() => goToPage(safePage + 1)}
             disabled={safePage >= totalPages}
-            className="text-[13px] font-semibold"
+            className="-mr-3 flex min-h-[44px] items-center px-3 text-[13px] font-semibold"
             style={{
               color: safePage >= totalPages ? "var(--ink-faint)" : "var(--ink-soft)",
               cursor: safePage >= totalPages ? "default" : "pointer",

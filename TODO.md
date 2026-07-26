@@ -18,39 +18,29 @@ Everything user-facing that is known-wrong or known-missing, promoted out of the
 
 Re-verified against the code 2026-07-26; sizes below are measured, not estimated, and items the font/accessibility work already closed were deleted rather than re-listed.
 
-### 1. Hit targets still under the 44px floor
-
-`.tap-44` (BRAND.md §7, defined `globals.css:185`) is deliberately **vertical-only**, so anything narrow needs real horizontal padding as well; the class alone will not fix a bare text link.
-
-- [ ] `src/components/user-menu.tsx:29`: avatar button is `h-9 w-9` (36px). It is the only control in the page header, so it cannot borrow slack from a neighbour.
-- [ ] `src/components/browse-client.tsx:316` and `:364`: pagination `← Prev` / `Next →` are bare 13px text, no padding (~18px tall), and they are the two most-tapped controls on Browse.
-- [ ] `src/components/browse-client.tsx:338`: page-number input, `padding: 2px 4px`.
-- [ ] Clear-search `×` in both browsers (`browse-client.tsx:170`, `grammar-browse-client.tsx:123`): 18px glyph, absolutely positioned, no padding.
-- [ ] `src/components/home-link.tsx`: the ただいま pill is ~30px tall (13px text, `padding: 4px 10px 4px 5px`).
-
-### 2. Keyboard and screen-reader gaps
+### 1. Keyboard and screen-reader gaps
 
 - [ ] `src/components/user-menu.tsx`: the dropdown carries `role="menu"`, `aria-haspopup`, and `aria-expanded`, but no key handling: Escape does not close it, focus is neither trapped while open nor returned to the avatar on close, and the only dismissal is a pointer tap on the backdrop `div`. A keyboard user can open this menu and not get out of it.
-- [ ] Search inputs have no accessible name. `browse-client.tsx:148` and `grammar-browse-client.tsx:110` are `type="search"` with a placeholder only. Add `aria-label`.
-- [ ] Result counts change silently (`browse-client.tsx:188`, plus the grammar equivalent). Put them in an `aria-live="polite"` region that is **mounted on first render**, since `quiz-session.tsx:179` already documents why a live node created at change time often goes unannounced.
-- [ ] `src/components/browse-client.tsx:223`: word rows are expand/collapse buttons with no `aria-expanded`. This is the vocab half of the accordion item; the grammar lesson toggles (`grammar-browse-client.tsx:167`) already have theirs.
+- [ ] Search inputs have no accessible name. `browse-client.tsx:150` and `grammar-browse-client.tsx:112` are `type="search"` with a placeholder only. Add `aria-label`.
+- [ ] Result counts change silently (`browse-client.tsx:194`, plus the grammar equivalent). Put them in an `aria-live="polite"` region that is **mounted on first render**, since `quiz-session.tsx:179` already documents why a live node created at change time often goes unannounced.
+- [ ] `src/components/browse-client.tsx:231`: word rows are expand/collapse buttons with no `aria-expanded`. This is the vocab half of the accordion item; the grammar lesson toggles (`grammar-browse-client.tsx:168`) already have theirs.
 
-### 3. Navigation parity
+### 2. Navigation parity
 
 - [ ] Grammar hub has no inline level switcher: `LevelPicker` is mounted only on `/home` (`src/app/home/page.tsx:212`), so switching level from `/grammar` costs a round trip through the hub. Note the picker needs empty-deck copy for the non-N3 levels, which `src/app/grammar/page.tsx` already computes as `hasDeck`.
 - [ ] Loading parity: `/grammar` and `/grammar/browse` fall back to the generic root `loading.tsx` spinner, while their vocabulary twins `/home` and `/browse` have layout-shaped skeletons (SPEC §8.4). `/grammar/browse` is the sharper gap of the two, since `GrammarBrowseClient` has the same two-wait shape `WordListSkeleton` was built for: its own client fetch is the long half, so it wants a lesson-shaped equivalent rather than a reuse.
 
-### 4. Performance: subset the Japanese face
+### 3. Performance: subset the Japanese face
 
 - [ ] `src/app/fonts.ts` now self-hosts M PLUS Rounded 1c at 400/700 with `preload: false`, but Google still slices Japanese into ~126 `unicode-range` chunks *per weight*, so ~252 `@font-face` rules are inlined into every page's CSS for glyphs that page will never use. Serving a `fonttools` subset of the ~2,500 characters the deck actually uses via `next/font/local` collapses that to a handful of rules.
   - **Re-measure before starting.** The ~66 KB-gzipped figure in SPEC §14.12 predates dropping weight 800 and moving both Latin faces to variable fonts, so the current cost is unknown.
   - Still a real project rather than a config change: it needs a build step plus a decided answer for what happens when a generated sentence contains a kanji outside the subset.
 
-### 5. UX correctness
+### 4. UX correctness
 
 - [ ] Day boundaries use local-*server* midnight (`setHours(0,0,0,0)`) in `getGrammarStats` and in `startOfToday` (`src/lib/home.ts`, which powers the hub's "done today"), so a user in another timezone can watch the count reset mid-session. Wire in a per-user timezone / day-start; the hub's helper is centralised, so the fix is one function.
 
-### 6. Open design question
+### 5. Open design question
 
 - [ ] Dark mode: support it or declare it an explicit non-goal, and log the call in DECISIONS.md. Interim state as of 2026-07-26 is light-only, now *declared* via `color-scheme: light` (`globals.css:18`) so UA chrome cannot paint dark against the cream surfaces. That closes the leak, not the question.
 

@@ -26,7 +26,11 @@ export function UserMenu({ email, isDemo }: { email: string; isDemo: boolean }) 
         aria-label="Account menu"
         aria-expanded={open}
         aria-haspopup="menu"
-        className="flex h-9 w-9 items-center justify-center rounded-full text-[15px] font-bold"
+        // tap-44-box, not tap-44: the vertical-only default would leave this 36px wide. The
+        // avatar is the sole control in the page header, so there is no neighbour whose hit
+        // area a both-axis overlay could steal, and the painted circle stays 36px (BRAND.md
+        // §7 allows a smaller painted box, never a smaller target).
+        className="tap-44-box flex h-9 w-9 items-center justify-center rounded-full text-[15px] font-bold"
         style={{ background: "var(--grape)", color: "#fff", fontFamily: "var(--f-display)" }}
       >
         {initial}
