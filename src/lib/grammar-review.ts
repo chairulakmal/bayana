@@ -9,10 +9,9 @@
 //   getGrammarStats     – counts for the inline stats panel on /grammar.
 
 import { db, serializableTxn } from "@/lib/db";
+import { getStudySettings } from "@/lib/profile";
 import { schedulerFor, toCard, fromCard } from "@/lib/fsrs";
 import type { Grade } from "ts-fsrs";
-
-const DEFAULT_PROFILE = { desiredRetention: 0.9, fsrsParams: [] as number[], newCardsPerDay: 10 };
 
 // Grammar levels are plain strings (not the vocab `Level` enum) so new levels need no
 // schema change — see SPEC.md §16 (2026-06-29, decision (c)). Shared here so both
@@ -28,8 +27,7 @@ export async function reviewGrammarPoint(
   const now = new Date();
 
   // Per-user config, not per-card state — safe to read outside the transaction.
-  const rawProfile = await db.userProfile.findUnique({ where: { userId } });
-  const profile = rawProfile ?? DEFAULT_PROFILE;
+  const profile = await getStudySettings(userId);
 
   // Read-compute-write as one atomic unit, same reasoning as reviewWord (review.ts):
   // concurrent ratings of the same card would otherwise lose one update.
@@ -69,7 +67,7 @@ export async function getGrammarQueue(
 ) {
   const sessionLimit = opts.sessionLimit ?? 20;
   const now = new Date();
-  const profile = (await db.userProfile.findUnique({ where: { userId } })) ?? DEFAULT_PROFILE;
+  const profile = await getStudySettings(userId);
 
   const [totalDue, due] = await Promise.all([
     db.grammarProgress.count({ where: { userId, due: { lte: now } } }),
@@ -142,6 +140,23 @@ export async function getGrammarStats(userId: string, level: string) {
   ]);
 
   return { total, started, mature, dueNow, studiedTodayCount, studiedToday: studiedTodayCount > 0 };
+}
+
+/**
+ * Which JLPT levels actually have grammar points seeded.
+ *
+ * Derived from the table rather than hardcoded to "N3", even though N3 is the only seeded
+ * deck today (SPEC §4.1). The restriction is a property of what has been imported, not of
+ * the design, so a literal would become wrong the moment a second deck lands and would be
+ * wrong *silently* — the level picker would keep telling users a seeded level is empty.
+ *
+ * One `groupBy` over ~220 rows, so it is cheap enough to call on a page render.
+ *
+ * @returns the set of level strings ("N3", …) with at least one GrammarPoint
+ */
+export async function getSeededGrammarLevels(): Promise<Set<string>> {
+  const rows = await db.grammarPoint.groupBy({ by: ["level"] });
+  return new Set(rows.map((row) => row.level));
 }
 
 function shuffle<T>(arr: T[]): T[] {

@@ -39,7 +39,12 @@ export async function demoSignOutAction(): Promise<void> {
   redirect("/");
 }
 
-/** Persist the user's active JLPT level (the level both modes operate on). */
+/** Persist the user's active JLPT level (the level both modes operate on).
+ *
+ *  Deliberately does not read the profile before writing it. `getProfile` memoizes per
+ *  request and an action plus the re-render it triggers can be one request, so a read
+ *  here would seed the cache with the pre-write row and the revalidated render below
+ *  could then describe the *previous* level. See the hazard note in `lib/profile.ts`. */
 export async function setActiveLevel(level: Level): Promise<void> {
   const userId = await getCurrentUserId(); // throws → action errors if unauthenticated
   // Object.hasOwn, not `in`: the arg is untrusted (server action), and `in` would accept
@@ -51,6 +56,10 @@ export async function setActiveLevel(level: Level): Promise<void> {
     update: { activeLevel: level },
     create: { userId, activeLevel: level },
   });
-  revalidatePath("/home");
-  revalidatePath("/browse"); // browse reads activeLevel too
+  // Every page that reads `activeLevel`, not just the one the picker used to live on. The
+  // picker is now mounted on /grammar as well, and /grammar, /grammar/browse and /stats are
+  // all level-scoped, so omitting them left a cached render describing the previous level.
+  for (const path of ["/home", "/browse", "/stats", "/grammar", "/grammar/browse"]) {
+    revalidatePath(path);
+  }
 }

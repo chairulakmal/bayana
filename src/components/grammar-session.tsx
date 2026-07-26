@@ -12,6 +12,7 @@ import Link from "next/link";
 import { Parrot } from "@/components/parrot";
 import { SessionHeader, SessionHeaderLink } from "@/components/session-header";
 import { HighlightedSentence } from "@/components/highlighted-sentence";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 
 // --- shapes returned by GET /api/grammar/queue ---
 
@@ -140,6 +141,26 @@ export function GrammarSession({ level }: { level: string }) {
     [current, cards, index, busy],
   );
 
+  // --- keyboard shortcuts (SPEC §8.4) ---
+  //
+  // Identical map to study-session.tsx minus `u`, since grammar has no undo yet (see the
+  // header comment above, and the TODO item that would add it). Keeping the two maps
+  // otherwise the same matters more than it looks: the whole value of a shortcut is that
+  // it transfers, and a learner moving between the vocab and grammar queues in one sitting
+  // should not have to remember which one 3 means "Good" in.
+  const cardVisible = current !== null && !sessionDone && !loadFailed;
+  useKeyboardShortcuts(
+    {
+      space: flipped ? undefined : () => setFlipped(true),
+      enter: flipped ? undefined : () => setFlipped(true),
+      "1": flipped ? () => void rate(1) : undefined,
+      "2": flipped ? () => void rate(2) : undefined,
+      "3": flipped ? () => void rate(3) : undefined,
+      "4": flipped ? () => void rate(4) : undefined,
+    },
+    cardVisible,
+  );
+
   // --- render states ---
 
   if (cards === null) {
@@ -234,20 +255,32 @@ export function GrammarSession({ level }: { level: string }) {
         right={null}
       />
 
-      {/* Card area: scrollable so long example sentences don't overflow. */}
+      {/* Card area: scrollable so long example sentences don't overflow.
+          A plain <div> with a tap-to-flip overlay rather than a wrapping <button>, for the
+          three reasons documented at the same spot in study-session.tsx (selectable text,
+          a sane screen-reader name, no inert control left behind after the flip). */}
       <section className="flex flex-1 flex-col overflow-y-auto px-4 py-4">
-        <button
-          type="button"
-          onClick={() => !flipped && setFlipped(true)}
-          className="mx-auto my-auto flex w-full max-w-md flex-col items-center justify-center gap-5 rounded-[var(--r-lg)] px-6 py-10 text-center"
+        <div
+          className="relative mx-auto my-auto flex w-full max-w-md flex-col items-center justify-center gap-5 rounded-[var(--r-lg)] px-6 py-10 text-center"
           style={{
             background: "var(--surface)",
             border: "1px solid var(--line)",
             boxShadow: "var(--shadow)",
             minHeight: "55svh",
-            cursor: flipped ? "default" : "pointer",
           }}
         >
+          {/* Pointer-only tap-anywhere overlay; see study-session.tsx for why it is
+              aria-hidden and untabbable rather than a second labelled control. */}
+          {!flipped && (
+            <button
+              type="button"
+              aria-hidden
+              tabIndex={-1}
+              onClick={() => setFlipped(true)}
+              className="absolute inset-0 cursor-pointer rounded-[var(--r-lg)]"
+            />
+          )}
+
           {/* Front: grammar pattern in large Japanese type */}
           <div
             lang="ja" className="jp text-5xl"
@@ -292,7 +325,7 @@ export function GrammarSession({ level }: { level: string }) {
               タップして答え · tap to reveal
             </span>
           )}
-        </button>
+        </div>
       </section>
 
       {error && (
@@ -315,12 +348,18 @@ export function GrammarSession({ level }: { level: string }) {
                 className={`rate ${r.cls}`}
               >
                 {r.label}
+                <span className="kbd-hint ml-1.5" aria-hidden>
+                  {r.value}
+                </span>
               </button>
             ))}
           </div>
         ) : (
           <button onClick={() => setFlipped(true)} className="btn btn-primary w-full">
             Show answer
+            <span className="kbd-hint" aria-hidden>
+              Space
+            </span>
           </button>
         )}
       </footer>

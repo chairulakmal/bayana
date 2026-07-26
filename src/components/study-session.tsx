@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Parrot } from "@/components/parrot";
 import { SessionHeader, SessionHeaderLink, SessionHeaderButton } from "@/components/session-header";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 
 // --- shapes returned by GET /api/cards/queue ---
 type QueueWord = {
@@ -172,6 +173,31 @@ export function StudySession({ level }: { level: string }) {
     }
   }, [busy, reviewed]);
 
+  // --- keyboard shortcuts (SPEC §8.4) ---
+  //
+  // Bound only while a card is actually on screen. The loading, load-failure and
+  // session-complete screens are ordinary two-or-three-button layouts reachable by Tab;
+  // a global Space handler over them would be a surprise, not a shortcut.
+  //
+  // Space/Enter reveals and then deliberately goes inert: Anki maps Space to "Good" once
+  // the answer is showing, and this app does not (SPEC §14.18). Rating is 1–4 only, so a
+  // reflexive Space can never schedule a card the user had not finished reading.
+  const cardVisible = current !== null && !sessionDone && !loadFailed;
+  useKeyboardShortcuts(
+    {
+      space: flipped ? undefined : () => setFlipped(true),
+      enter: flipped ? undefined : () => setFlipped(true),
+      "1": flipped ? () => void rate(1) : undefined,
+      "2": flipped ? () => void rate(2) : undefined,
+      "3": flipped ? () => void rate(3) : undefined,
+      "4": flipped ? () => void rate(4) : undefined,
+      // No `flipped` guard: undo self-guards on `busy` and an empty history, and the
+      // whole point of undo is that it is reachable the instant you realise the mistake.
+      u: () => void undo(),
+    },
+    cardVisible,
+  );
+
   // --- render states ---
 
   if (cards === null) {
@@ -278,8 +304,15 @@ export function StudySession({ level }: { level: string }) {
             {remaining} left
           </>
         }
+        /* Undo advertises its shortcut via `title` rather than a .kbd-hint keycap: this
+           pill is deliberately the quietest control on the screen (BRAND.md §7 session
+           chrome), and a badge here would cost more than the hint is worth. */
         right={
-          <SessionHeaderButton onClick={undo} disabled={busy || reviewed.length === 0}>
+          <SessionHeaderButton
+            onClick={undo}
+            disabled={busy || reviewed.length === 0}
+            title="Undo last rating (U)"
+          >
             Undo
           </SessionHeaderButton>
         }
@@ -288,20 +321,44 @@ export function StudySession({ level }: { level: string }) {
       {/* Card: tap anywhere to reveal the answer (BRAND.md §7 flashcard).
           Section is overflow-y-auto so long revealed sentences scroll within the section
           rather than pushing the footer off-screen. my-auto centers the card when it fits;
-          collapses to top when it overflows (avoids the Safari justify-center clip bug). */}
+          collapses to top when it overflows (avoids the Safari justify-center clip bug).
+
+          The card is a plain <div>, not a <button>. Wrapping it was costing three things:
+          Blink and WebKit apply `user-select: none` to button content, so a learner could
+          not select the word or the example sentence to paste into a dictionary, which on
+          a vocabulary app is a functional loss; a screen reader read the whole revealed card
+          (expression, reading, meaning, sentence, its reading, the translation) as one
+          enormous button name; and once flipped it was a focusable control that did
+          nothing. Tap-anywhere survives as the overlay below. */}
       <section className="flex flex-1 flex-col overflow-y-auto px-4 py-4">
-        <button
-          type="button"
-          onClick={() => !flipped && setFlipped(true)}
-          className="mx-auto my-auto flex w-full max-w-md flex-col items-center justify-center gap-5 rounded-[var(--r-lg)] px-6 py-10 text-center"
+        <div
+          className="relative mx-auto my-auto flex w-full max-w-md flex-col items-center justify-center gap-5 rounded-[var(--r-lg)] px-6 py-10 text-center"
           style={{
             background: "var(--surface)",
             border: "1px solid var(--line)",
             boxShadow: "var(--shadow)",
             minHeight: "55svh",
-            cursor: flipped ? "default" : "pointer",
           }}
         >
+          {/* Tap-anywhere-to-flip, as a transparent overlay that unmounts on reveal.
+              Pointer-only on purpose: aria-hidden plus tabIndex={-1} keeps it out of the
+              tab order and out of the accessibility tree, because the footer's "Show
+              answer" button already exposes this exact action. A labelled overlay would
+              put two identically-named buttons in the tree for one action; an unlabelled
+              focusable one would be a bare stop on the Tab path. It needs no z-index and
+              no particular DOM position: a positioned element paints above the card's
+              in-flow content whatever the tree order, and being out of flow it also sits
+              outside the flex layout, so it adds nothing to the `gap-5` rhythm. */}
+          {!flipped && (
+            <button
+              type="button"
+              aria-hidden
+              tabIndex={-1}
+              onClick={() => setFlipped(true)}
+              className="absolute inset-0 cursor-pointer rounded-[var(--r-lg)]"
+            />
+          )}
+
           <div lang="ja" className="jp text-6xl" style={{ fontWeight: 700, color: "var(--ink)", lineHeight: 1.1 }}>
             {current.expression}
           </div>
@@ -336,7 +393,7 @@ export function StudySession({ level }: { level: string }) {
               タップして答え · tap to reveal
             </span>
           )}
-        </button>
+        </div>
       </section>
 
       {error && (
@@ -356,12 +413,20 @@ export function StudySession({ level }: { level: string }) {
             {RATINGS.map((r) => (
               <button key={r.value} onClick={() => rate(r.value)} disabled={busy} className={`rate ${r.cls}`}>
                 {r.label}
+                {/* .rate has no flex gap of its own (unlike .btn), so the badge brings its
+                    own spacing. It collapses with the badge when display:none applies. */}
+                <span className="kbd-hint ml-1.5" aria-hidden>
+                  {r.value}
+                </span>
               </button>
             ))}
           </div>
         ) : (
           <button onClick={() => setFlipped(true)} className="btn btn-primary w-full">
             Show answer
+            <span className="kbd-hint" aria-hidden>
+              Space
+            </span>
           </button>
         )}
       </footer>

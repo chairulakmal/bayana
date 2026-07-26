@@ -158,6 +158,32 @@ body {
 .opt-correct { background: #eafaf1; border-color: var(--good); color: var(--good-edge); box-shadow: 0 3px 0 var(--good-edge); }
 .opt-wrong   { background: #ffe9ee; border-color: var(--bad);  color: #b12a44;        box-shadow: 0 3px 0 #d63a55; }
 
+/* Keycap badge for the study-mode keyboard shortcuts (SPEC §8.4). A shortcut nobody can
+   discover is dead weight, so each key is printed on the control it drives rather than
+   documented on a help screen the user would have to go looking for.
+
+   Hidden unless the device has a precise pointer, which is the closest proxy the platform
+   offers for "there is probably a physical keyboard attached". Deliberately not a width
+   breakpoint: a 768px touch tablet has no keys to press, and the 375px baseline this app
+   is designed against (BRAND.md platform note) must render byte-identically to before.
+
+   Colour is `currentColor` at full opacity, never a faded one. The badge sits on four
+   different button fills (coral, yellow, green, grape), and fading a passing pair with
+   alpha is exactly the composite BRAND.md §3 forbids; inheriting the label's own colour
+   means it can only ever be as legible as the label beside it. It is aria-hidden at every
+   call site, since it duplicates a key binding rather than carrying information. */
+.kbd-hint {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--f-body); font-weight: 700; font-size: 10px; line-height: 1;
+  padding: 3px 5px; border-radius: 4px;
+  border: 1px solid currentColor;
+}
+@media (hover: hover) and (pointer: fine) {
+  .kbd-hint { display: inline-flex; }
+}
+
 /* ── Accessibility utilities ─────────────────────────────────────────────────
    Two cross-cutting helpers. Both exist because the obvious inline fix doesn't work:
    an element with `style={{ border: ... }}` beats any Tailwind `focus:border-*` class,
@@ -192,10 +218,59 @@ body {
   min-height: 44px;
 }
 
-/* Honor reduced-motion: keep the press functional, drop the spring (BRAND.md §7, SPEC §8.2). */
+/* Both-axis variant, for a control that is narrow AND has no horizontal neighbour to
+   collide with. The vertical-only default above exists to stop chips sitting side by side
+   in a row from stealing each other's taps; where a control stands alone — the page
+   header's avatar button is the only one in the app — that constraint buys nothing, and a
+   36px-wide target is simply a 36px-wide target. Growing the target on both axes keeps the
+   painted circle at its designed size while making the control thumb-sized.
+
+   Do not reach for this on anything that sits in a row. If two of these are ever adjacent,
+   their overlays overlap and the mis-tap this whole utility exists to prevent comes back. */
+.tap-44-box { position: relative; }
+.tap-44-box::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* ── Loading skeletons ───────────────────────────────────────────────────────
+   The placeholder block used by the route-level `loading.tsx` fallbacks. One class,
+   defined once, because a skeleton that differs per page reads as four different
+   loading states rather than one app waiting.
+
+   The fill is --cream-100, which is already this palette's "not filled in yet"
+   value: it is the unfilled track behind every progress bar on the hub and stats
+   pages. Reusing it means the meaning is inherited rather than newly asserted, and
+   it avoids importing a neutral grey that exists nowhere else in the brand.
+
+   The pulse animates opacity rather than sweeping a gradient across the block. A
+   shimmer sweep repaints a large area every frame, which is precisely the wrong
+   work to hand a cheap phone while the server response it is masking is still in
+   flight — the animation would compete with the page it is waiting for. */
+.skel {
+  background: var(--cream-100);
+  border-radius: var(--r-sm);
+  animation: skel-pulse 1.6s ease-in-out infinite;
+}
+@keyframes skel-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .45; }
+}
+
+/* Honor reduced-motion: keep the press functional, drop the spring (BRAND.md §7, SPEC §8.2).
+   Skeletons hold at a settled opacity rather than vanishing: the block must still read as
+   a placeholder, it just stops breathing. */
 @media (prefers-reduced-motion: reduce) {
   .btn, .rate, .opt { transition: none; }
   .btn:active, .rate:active, .opt:active { transform: none; }
+  .skel { animation: none; opacity: .75; }
 }
 
 /* Hide native number-input spinners globally — we provide Prev/Next + JS clamping instead.

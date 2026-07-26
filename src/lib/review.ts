@@ -10,14 +10,10 @@
 // would otherwise both compute from the same stale row and one update would be lost.
 
 import { db, serializableTxn } from "@/lib/db";
+import { getStudySettings } from "@/lib/profile";
 import { schedulerFor, toCard, fromCard, fromLog, toLog } from "@/lib/fsrs";
 import type { Grade } from "ts-fsrs";
 import { Prisma, type Level } from "@/generated/prisma/client";
-
-// Fallback used when no UserProfile row exists yet (e.g. a new user who reaches study
-// before completing onboarding). Matches schema defaults so behaviour is identical to a
-// freshly-created profile row.
-const DEFAULT_PROFILE = { desiredRetention: 0.9, fsrsParams: [] as number[], newCardsPerDay: 10 };
 
 /** Apply a rating (1=Again, 2=Hard, 3=Good, 4=Easy) to a (user, word).
  *  Persists the updated scheduling state and appends an immutable review-log row. */
@@ -26,8 +22,7 @@ export async function reviewWord(userId: string, wordId: string, rating: number)
 
   // The profile holds the user's FSRS tuning — per-user config, not per-card state,
   // so it's safe to read outside the transaction (it isn't part of the race).
-  const rawProfile = await db.userProfile.findUnique({ where: { userId } });
-  const profile = rawProfile ?? DEFAULT_PROFILE;
+  const profile = await getStudySettings(userId);
 
   // Read the card's current state, compute the next state, and write it back as one
   // atomic unit. `existing` is null the very first time this word is seen.
@@ -54,8 +49,7 @@ export async function reviewWord(userId: string, wordId: string, rating: number)
 /** Undo the most recent review for a (user, word): roll the card back to its prior
  *  state and delete that log row. Returns null if there is nothing to undo. */
 export async function undoLastReview(userId: string, wordId: string) {
-  const rawProfile = await db.userProfile.findUnique({ where: { userId } });
-  const profile = rawProfile ?? DEFAULT_PROFILE;
+  const profile = await getStudySettings(userId);
 
   try {
     return await serializableTxn(async (tx) => {
@@ -112,7 +106,7 @@ export async function getStudyQueue(
   // Default 20 matches the Anki community norm for a focused daily session.
   const sessionLimit = opts.sessionLimit ?? 20;
   const now = opts.now ?? new Date();
-  const profile = (await db.userProfile.findUnique({ where: { userId } })) ?? DEFAULT_PROFILE;
+  const profile = await getStudySettings(userId);
 
   // Two narrow queries instead of one fat one. We need both the slice we'll show AND the
   // total-waiting count, but materializing every due row (with its word + sentence joined)

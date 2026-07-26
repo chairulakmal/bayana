@@ -113,10 +113,14 @@ export function GrammarBrowseClient({ level }: { level: string }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search pattern, reading, or meaning…"
+          // See browse-client: a placeholder is not an accessible name.
+          aria-label="Search grammar points"
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
-          className="focus-ring w-full rounded-[var(--r-md)] px-4 py-3 text-[15px] outline-none"
+          // pr-12 reserves the clear button's 44px unconditionally, so the text does not
+          // reflow under the caret the moment a query appears (same as browse-client).
+          className="focus-ring w-full rounded-[var(--r-md)] py-3 pl-4 pr-12 text-[15px] outline-none"
           style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--ink)" }}
         />
         {query && (
@@ -127,7 +131,8 @@ export function GrammarBrowseClient({ level }: { level: string }) {
               setQuery("");
               searchInputRef.current?.focus();
             }}
-            className="absolute top-1/2 right-3 -translate-y-1/2 text-[18px] leading-none"
+            // 44x44 target around an 18px glyph; the field is ~46px tall so it fits inside.
+            className="absolute top-1/2 right-1 flex h-11 w-11 -translate-y-1/2 items-center justify-center text-[18px] leading-none"
             style={{ color: "var(--ink-faint)" }}
           >
             ×
@@ -135,7 +140,9 @@ export function GrammarBrowseClient({ level }: { level: string }) {
         )}
       </div>
 
-      <p className="mt-3 text-[12px]" style={{ color: "var(--ink-faint)" }}>
+      {/* Live result count, same reasoning as browse-client: filtering is per keystroke and
+          this line is the only feedback that a query matched anything. */}
+      <p role="status" className="mt-3 text-[12px]" style={{ color: "var(--ink-faint)" }}>
         {q
           ? `${matchCount.toLocaleString()} match${matchCount !== 1 ? "es" : ""}`
           : `${totalPoints.toLocaleString()} grammar points · ${lessons.length} lessons`}

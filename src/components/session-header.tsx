@@ -97,16 +97,22 @@ export function SessionHeaderLink({
 export function SessionHeaderButton({
   onClick,
   disabled,
+  title,
   children,
 }: {
   onClick: () => void;
   disabled?: boolean;
+  /** Optional hover tooltip. Used to advertise a keyboard shortcut (SPEC §8.4) without
+   *  putting a visible keycap on a control whose whole job is to stay quiet. Supplementary
+   *  only: the button already has a visible text label, so nothing depends on the tooltip. */
+  title?: string;
   children: ReactNode;
 }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
+      title={title}
       className={`${PILL_CLASS} disabled:opacity-40`}
       style={PILL_STYLE}
     >

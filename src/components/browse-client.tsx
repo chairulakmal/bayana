@@ -17,6 +17,7 @@
 // they're actively studying.
 
 import { useEffect, useRef, useState } from "react";
+import { WordListSkeleton } from "@/components/word-list-skeleton";
 
 type Word = {
   id: string;
@@ -125,11 +126,18 @@ export function BrowseClient({ level }: { level: string }) {
     );
   }
 
+  // The long wait: the whole level's word list over the network. Renders the same skeleton
+  // `app/browse/loading.tsx` used for the server render that just finished, so the two waits
+  // read as one continuous load rather than the page regressing from a laid-out placeholder
+  // to a line of centred text.
   if (words === null) {
     return (
-      <p className="mt-10 text-center text-[14px]" style={{ color: "var(--ink-faint)" }}>
-        Loading words…
-      </p>
+      <>
+        <WordListSkeleton />
+        <span className="sr-only" role="status" aria-live="polite">
+          Loading words
+        </span>
+      </>
     );
   }
 
@@ -148,10 +156,17 @@ export function BrowseClient({ level }: { level: string }) {
             setOpenId(null);
           }}
           placeholder="Search kanji, reading, or meaning…"
+          // A placeholder is not an accessible name: it is not exposed by every screen
+          // reader, and it disappears the moment the field has content, so a user who tabs
+          // back to a filled field would hear only its value.
+          aria-label="Search words"
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
-          className="focus-ring w-full rounded-[var(--r-md)] px-4 py-3 text-[15px] outline-none"
+          // pr-12 reserves the 44px the clear button occupies. Unconditional, even though the
+          // button only renders when there is a query: making the padding conditional would
+          // reflow the text under the caret at the exact moment the user starts typing.
+          className="focus-ring w-full rounded-[var(--r-md)] py-3 pl-4 pr-12 text-[15px] outline-none"
           style={{
             background: "var(--surface)",
             border: "1px solid var(--line)",
@@ -169,7 +184,10 @@ export function BrowseClient({ level }: { level: string }) {
               setOpenId(null);
               searchRef.current?.focus();
             }}
-            className="absolute top-1/2 right-3 -translate-y-1/2 text-[18px] leading-none"
+            // 44x44 flex box centring the glyph, which stays 18px. The input is ~46px tall
+            // (py-3 + 15px text), so a 44px button fits inside it without changing the
+            // field's height; right-1 keeps it clear of the rounded border.
+            className="absolute top-1/2 right-1 flex h-11 w-11 -translate-y-1/2 items-center justify-center text-[18px] leading-none"
             style={{ color: "var(--ink-faint)" }}
           >
             ×
@@ -177,8 +195,13 @@ export function BrowseClient({ level }: { level: string }) {
         )}
       </div>
 
-      {/* Result count */}
-      <p className="mt-3 text-[12px]" style={{ color: "var(--ink-faint)" }}>
+      {/* Result count. `role="status"` (implicitly aria-live="polite" + atomic) makes the
+          count audible: filtering happens per keystroke with no other feedback, so a screen
+          reader user typing a query had no way to know whether anything matched. Matching
+          the precedent in `quiz-session.tsx`, the live node is part of the normal render
+          rather than mounted when the number first changes — a live region created at the
+          moment it has something to say is frequently not announced at all. */}
+      <p role="status" className="mt-3 text-[12px]" style={{ color: "var(--ink-faint)" }}>
         {q
           ? `${filtered.length.toLocaleString()} match${filtered.length !== 1 ? "es" : ""}`
           : `${words.length.toLocaleString()} words`}
@@ -215,6 +238,11 @@ export function BrowseClient({ level }: { level: string }) {
                 <button
                   type="button"
                   onClick={() => void toggle(word)}
+                  // The vocab half of the accordion; the grammar lesson toggles already
+                  // carry theirs. Without it the row announces as a plain button and its
+                  // open/closed state is conveyed only by the ▲/▼ glyph, which is
+                  // aria-hidden precisely because it reads as noise.
+                  aria-expanded={isOpen}
                   className="flex w-full items-baseline gap-3 px-4 py-3 text-left"
                 >
                   <span
@@ -239,6 +267,12 @@ export function BrowseClient({ level }: { level: string }) {
                       before the chevron so it doesn't shift the layout when absent. */}
                   <span
                     className="flex-shrink-0 self-center rounded-full"
+                    // `role="img"` is what makes the label count. `aria-label` on a bare
+                    // <span> has no implicit role to attach to, so most screen readers
+                    // discard it and the "in your deck" signal was silently sighted-only.
+                    // Only when started: an unlabelled role="img" would announce an empty
+                    // image on every other row.
+                    role={word.started ? "img" : undefined}
                     aria-label={word.started ? "In your deck" : undefined}
                     style={{
                       width: 6,
@@ -305,11 +339,16 @@ export function BrowseClient({ level }: { level: string }) {
       {/* Pagination bar — only shown when there is more than one page. */}
       {totalPages > 1 && (
         <div className="mt-4 flex items-center justify-between gap-3">
+          {/* Real padding rather than `.tap-44`, because these were bare text: the utility
+              only grows the vertical axis, and a "← Prev" run is about 40px wide. The
+              negative margin is on the OUTER side only, so the label stays visually flush
+              with the list edge above while the target reaches into the page gutter — the
+              inner padding simply eats into the row's gap, where nothing else sits. */}
           <button
             type="button"
             onClick={() => goToPage(safePage - 1)}
             disabled={safePage <= 1}
-            className="text-[13px] font-semibold"
+            className="-ml-3 flex min-h-[44px] items-center px-3 text-[13px] font-semibold"
             style={{
               color: safePage <= 1 ? "var(--ink-faint)" : "var(--ink-soft)",
               cursor: safePage <= 1 ? "default" : "pointer",
@@ -342,12 +381,17 @@ export function BrowseClient({ level }: { level: string }) {
               }}
               className="focus-ring rounded text-center text-[13px] outline-none"
               style={{
-                // Width: enough for the max page number plus a little padding.
+                // Width: enough for the max page number plus a little padding. The `min`
+                // pair is the hit-target floor: at two or three characters the computed
+                // width lands around 30px, so without it this is a 30x18 tap target sitting
+                // between two controls that now clear 44px.
                 width: `${Math.max(2, String(totalPages).length) + 2}ch`,
+                minWidth: 44,
+                minHeight: 44,
                 border: "1px solid var(--line)",
                 background: "var(--surface)",
                 color: "var(--ink)",
-                padding: "2px 4px",
+                padding: "8px 6px",
               }}
             />
             <span>of {totalPages}</span>
@@ -357,7 +401,7 @@ export function BrowseClient({ level }: { level: string }) {
             type="button"
             onClick={() => goToPage(safePage + 1)}
             disabled={safePage >= totalPages}
-            className="text-[13px] font-semibold"
+            className="-mr-3 flex min-h-[44px] items-center px-3 text-[13px] font-semibold"
             style={{
               color: safePage >= totalPages ? "var(--ink-faint)" : "var(--ink-soft)",
               cursor: safePage >= totalPages ? "default" : "pointer",

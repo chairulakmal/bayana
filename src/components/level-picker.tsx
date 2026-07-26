@@ -1,8 +1,12 @@
 "use client";
 
-// Inline level selector for the home hub (SPEC §8.5). Renders the five JLPT levels as
-// a vertical grouped list (N1 → N5, hardest first). Tapping a row persists it via the
-// `setActiveLevel` server action and refreshes so /study and /quiz pick up the change.
+// Inline level selector, mounted on the home hub (SPEC §8.5) and the grammar hub. Renders
+// the five JLPT levels as a vertical grouped list (N1 → N5, hardest first). Tapping a row
+// persists it via the `setActiveLevel` server action and refreshes so every level-scoped
+// page picks up the change.
+//
+// The level it sets is global, not per-page: switching from the grammar hub also re-scopes
+// vocabulary study. That is why `emptyNote` annotates rows rather than disabling them.
 //
 // Pattern: "radio list inside a card" — the iOS/Android settings convention.
 // Active row: white surface (pops against the cream background of the siblings).
@@ -27,7 +31,22 @@ const LEVEL_LABEL: Record<string, { ja: string; en: string }> = {
   N5: { ja: "はじめよう", en: "the apprentice" },
 };
 
-export function LevelPicker({ current }: { current: string }) {
+export function LevelPicker({
+  current,
+  emptyNote,
+}: {
+  current: string;
+  /**
+   * Marks rows that have nothing behind them *on the page hosting the picker* — grammar
+   * levels with no seeded deck, today. Annotated, never disabled: this control sets the
+   * global `activeLevel` that vocabulary study also reads, so a level with no grammar deck
+   * is still a perfectly valid thing to switch to from the grammar hub.
+   *
+   * The marker text is supplied by the caller rather than baked in, so the picker stays
+   * domain-agnostic: /home mounts it with no note at all.
+   */
+  emptyNote?: { levels: ReadonlySet<string>; label: string };
+}) {
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -47,6 +66,7 @@ export function LevelPicker({ current }: { current: string }) {
     >
       {LEVELS.map((lvl, i) => {
         const active = lvl === current;
+        const isEmpty = emptyNote?.levels.has(lvl) ?? false;
         return (
           <button
             key={lvl}
@@ -91,6 +111,18 @@ export function LevelPicker({ current }: { current: string }) {
               </span>{" "}
               · {LEVEL_LABEL[lvl].en}
             </span>
+
+            {/* Empty-deck marker. Sits before the check column so it never displaces it, and
+                is real text rather than a dimmed row: the row still does something, it just
+                does nothing *here*. --ink-faint clears AA, so this needs no opacity. */}
+            {isEmpty && (
+              <span
+                className="flex-shrink-0 text-[11px]"
+                style={{ color: "var(--ink-faint)" }}
+              >
+                {emptyNote?.label}
+              </span>
+            )}
 
             {/* Active indicator — green check, right-aligned */}
             <span

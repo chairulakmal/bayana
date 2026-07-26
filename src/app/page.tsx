@@ -258,8 +258,16 @@ export default async function Home() {
                 className="mt-4 rounded-[var(--r-md)] px-4 py-3"
                 style={{ background: "var(--surface-cream)", border: "1px solid var(--line)" }}
               >
+                {/* The headword is bolded in grape, not underlined: that is how the app
+                    itself marks a target word inside an example sentence (SPEC §13, and
+                    `HighlightedSentence` renders exactly this), so the mock now shows the
+                    real treatment rather than inventing a second one. Bold is also the
+                    safer choice for Japanese: an underline cuts through the descenders and
+                    lower strokes of kana and kanji in a way it never does for Latin text.
+                    700 is a real weight of the JP face (BRAND.md §4), so this is genuine
+                    bold rather than a synthesised faux-bold. */}
                 <p lang="ja" className="jp text-[17px] leading-relaxed">
-                  明日の<u>約束</u>を忘れないでください。
+                  明日の<strong style={{ color: "var(--grape)" }}>約束</strong>を忘れないでください。
                 </p>
                 <p className="mt-1.5 text-[14px]" style={{ color: "var(--ink-soft)" }}>
                   Please don&apos;t forget tomorrow&apos;s appointment.
