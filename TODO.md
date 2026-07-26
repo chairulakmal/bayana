@@ -54,7 +54,7 @@ Do one mode properly, then port. Steps are ordered because each depends on the l
 
 - [ ] `level-picker.tsx:50`: the picker dims to `opacity: 0.4` and waits a full round trip to move a check mark. `useOptimistic` fits here precisely because `current` is a prop rendered by the RSC and replaced by `revalidatePath`.
 - [ ] `level-picker.tsx:57`: `router.refresh()` fires after `setActiveLevel`, which already calls `revalidatePath` on five paths (`src/app/home/actions.ts:57`). A `revalidatePath` inside a Server Action refreshes the current route on the action response, so this looks like a redundant second round trip. Verify before removing.
-- [ ] `src/app/auth/signin/page.tsx:117`: `useActionState` for the pending state, which resolves the second bullet of UI/UX item 2 as a side effect rather than as separate work.
+- [ ] `src/app/auth/signin/page.tsx:116`: `useActionState` for the pending state, which resolves the one remaining bullet of UI/UX item 2 as a side effect rather than as separate work.
 
 ### 6. Design tokens as Tailwind utilities
 
@@ -70,9 +70,9 @@ Independent of items 1 to 5 and pullable in parallel, but do it after the compon
 
 Everything user-facing that is known-wrong or known-missing, worked top-down. The items reachable on pages that are otherwise finished (route states, hit targets, three passes at keyboard and screen-reader gaps, navigation parity) landed on 2026-07-26 and were deleted as they did.
 
-**Items 1 to 4 came from a full UI/UX review of the shipped surface on 2026-07-26**, read against BRAND.md and SPEC §8.4. They cluster on one axis the earlier passes did not cover: what happens on a keyboard, with a screen reader, or in the instant after a tap. The visual system itself held, so nothing below is a token or layout change. Four of the review's items shipped on 2026-07-26 and are deleted, which is what the numbering below has been closed up over: keyboard shortcuts in the study modes (SPEC §8.4, §14.18), the tap-anywhere card no longer being a `<button>` (SPEC §8.4, §14.19), the labelling and live-region gaps (SPEC §8.4, §14.20), and the grammar-browse parity fixes (SPEC §8.4, §14.21).
+**Items 1 to 4 came from a full UI/UX review of the shipped surface on 2026-07-26**, read against BRAND.md and SPEC §8.4. They cluster on one axis the earlier passes did not cover: what happens on a keyboard, with a screen reader, or in the instant after a tap. The visual system itself held, so nothing below is a token or layout change. Four of the review's items shipped on 2026-07-26 and are deleted, which is what the numbering below has been closed up over: keyboard shortcuts in the study modes (SPEC §8.4, §14.18), the tap-anywhere card no longer being a `<button>` (SPEC §8.4, §14.19), the labelling and live-region gaps (SPEC §8.4, §14.20), and the grammar-browse parity fixes (SPEC §8.4, §14.21). Item 2 shipped its first bullet the same day, the two Auth.js built-in pages (SPEC §11.2, §14.22), and keeps the second.
 
-**Every remaining item here now sequences behind the architecture workstream above**, which rewrites the same lines, so nothing in this section is a free pull any more. The one exception is a single bullet rather than an item: item 2's `verifyRequest` page touches none of those files and can be taken at any time.
+**Every remaining item here sequences behind the architecture workstream above**, which rewrites the same lines. Nothing in this section is a free pull any more: the last one was item 2's `verifyRequest` page, and it has landed.
 
 **Items 5 and 6 are deferred, and neither is waiting on capacity.** One is blocked on other work, the other on a decision that was explicitly postponed. Do not pull either in as filler.
 
@@ -91,13 +91,14 @@ Rating or answering leaves focus on `<body>`, so a keyboard user re-Tabs from th
 
 ### 2. The magic-link flow leaves the brand at its most fragile moment
 
-- [ ] `src/auth.ts:44` sets only `pages: { signIn }`, so submitting the form lands on Auth.js's built-in `/api/auth/verify-request`: white page, system font, generic copy, no Pī. Add `verifyRequest` (and `error`) to `pages` plus the two small routes. Independent, pullable now.
-- [ ] `src/app/auth/signin/page.tsx:117`: "Send magic link" has no pending state, so a slow Resend call reads as a dead button and invites a double-submit. **Superseded by architecture item 5**, which fixes it via `useActionState`. Delete this bullet there, not here.
+One bullet left, and it is not pullable on its own:
+
+- [ ] `src/app/auth/signin/page.tsx`: "Send magic link" has no pending state, so a slow Resend call reads as a dead button and invites a double-submit. **Superseded by architecture item 5**, which fixes it via `useActionState`. Delete this bullet there, not here.
 
 ### 3. Missing headings and page titles
 
 - [ ] No `<h1>` on `/home`, `/grammar`, or any of the four session screens. The hub's "TODAY" / "STUDY MODES" / "LEVEL" labels are `<p>` elements, so heading navigation finds nothing at all on the app's default page. Landing, browse, stats, signin, onboarding and the error routes all have one already.
-- [ ] 9 of 11 routes never set a title. `src/app/layout.tsx:7` defines `template: "%s · Bayana"` and only `/browse` and `/grammar/browse` use it; everything else renders the default string in the tab, in history, and in the PWA task switcher. **Partly absorbed**: architecture items 2 and 3 rewrite each session `page.tsx` and should add its `metadata` export in the same edit, leaving only `/home`, `/grammar` and `/onboarding` here.
+- [ ] 10 of 14 routes never set a title. `src/app/layout.tsx:7` defines `template: "%s · Bayana"` and only `/browse`, `/grammar/browse` and the two new `/auth` screens use it; everything else renders the default string in the tab, in history, and in the PWA task switcher. **Partly absorbed**: architecture items 2 and 3 rewrite each session `page.tsx` and should add its `metadata` export in the same edit, leaving only `/home`, `/grammar` and `/onboarding` here.
 
 ### 4. Smaller UX items
 
