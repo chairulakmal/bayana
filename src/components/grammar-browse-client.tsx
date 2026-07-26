@@ -172,9 +172,26 @@ export function GrammarBrowseClient({ level }: { level: string }) {
                   onClick={() => toggle(group.lesson)}
                   disabled={!!q}
                   aria-expanded={isOpen}
-                  aria-label={`${isOpen ? "Collapse" : "Expand"} Lesson ${group.lesson}: ${group.title}`}
+                  // The studied count lives in this name rather than on the <span> that renders
+                  // it, and that is the whole fix. An `aria-label` on a button *replaces* its
+                  // contents as the accessible name (§14.19), so "L3", the title and "3/12" were
+                  // all being discarded: labelling the child span could not have worked, however
+                  // the span was marked up. Note this is why the same `role="img"` that rescues
+                  // the progress dot below does not apply up here.
+                  //
+                  // No "Expand"/"Collapse" verb: `aria-expanded` is the state, and duplicating it
+                  // in the name meant the label read "Collapse" on a button that search had
+                  // disabled. Naming the thing and letting the attribute carry the state is the
+                  // disclosure pattern this app already settled on (SPEC §8.4).
+                  aria-label={`Lesson ${group.lesson}: ${group.title}, ${studiedCount} of ${group.points.length} studied`}
                   className="flex w-full items-center gap-3 px-4 py-3 text-left"
-                  style={q ? { opacity: 0.6, cursor: "default" } : undefined}
+                  // `cursor: default` only. This carried `opacity: 0.6` while a search was
+                  // active, which is the composite BRAND.md §3 forbids by name: it took the
+                  // --ink-faint count from 4.8 : 1 to roughly 2.6 : 1, and dimming a *search
+                  // result* is the last place to spend contrast. Nothing replaces it, because
+                  // the ▼ chevron below already unmounts while searching, and that absence is
+                  // the honest signal that there is nothing here to toggle.
+                  style={q ? { cursor: "default" } : undefined}
                 >
                   <span
                     className="flex-shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold"
@@ -185,11 +202,9 @@ export function GrammarBrowseClient({ level }: { level: string }) {
                   <span className="flex-1 text-[14px] font-semibold" style={{ color: "var(--ink)" }}>
                     {group.title}
                   </span>
-                  <span
-                    className="flex-shrink-0 text-[12px]"
-                    style={{ color: "var(--ink-faint)" }}
-                    aria-label={`${studiedCount} of ${group.points.length} studied`}
-                  >
+                  {/* Visible form only; the announced form is in the button's aria-label above.
+                      No `aria-hidden` needed: children of a named button are not announced. */}
+                  <span className="flex-shrink-0 text-[12px]" style={{ color: "var(--ink-faint)" }}>
                     {studiedCount}/{group.points.length}
                   </span>
                   {!q && (
@@ -221,6 +236,15 @@ export function GrammarBrowseClient({ level }: { level: string }) {
                               scan the reference list and see what still needs attention. */}
                           <span
                             className="ml-auto flex-shrink-0 self-center rounded-full"
+                            // `role="img"` is what makes the label count: `aria-label` is
+                            // prohibited on a bare <span> (role `generic` supports no author
+                            // name), so screen readers discarded it and the dot was
+                            // sighted-only. Exactly the fix browse-client.tsx:275 applied to
+                            // the vocab "in your deck" dot, and it transfers here because this
+                            // row is a plain <div>: the label joins the row's text. Role and
+                            // label are both conditional, since an unlabelled `role="img"`
+                            // would announce an empty image on every unstudied point.
+                            role={p.status === "new" ? undefined : "img"}
                             aria-label={
                               p.status === "mature"
                                 ? "Mature"

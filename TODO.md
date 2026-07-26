@@ -4,7 +4,7 @@ Open work only: what is planned, in flight, or found-but-not-fixed. This file is
 
 **Now: the frontend architecture workstream** (first section below). New on 2026-07-26, from a frontend review that looked at data flow rather than at the rendered surface. It is sequenced first because it rewrites the exact lines several already-queued items touch, and doing those first means writing them twice.
 
-**Then: the UI/UX workstream** (second section). Seven items, of which four are now sequenced behind the architecture work and two remain deferred on external blockers. Each is marked in place.
+**Then: the UI/UX workstream** (second section). Six items: four sequenced behind the architecture work, two deferred on external blockers. Each is marked in place.
 
 **Then: Phase 3.** MC↔FSRS coupling for Quiz mode (planned, not started). Its Part A is written against `POST /api/review`, which the architecture work deletes, so it has been restated against the replacement and must not start first.
 
@@ -68,13 +68,13 @@ Independent of items 1 to 5 and pullable in parallel, but do it after the compon
 
 ## ▶ UI/UX workstream
 
-Everything user-facing that is known-wrong or known-missing, worked top-down. The items reachable on pages that are otherwise finished (route states, hit targets, two passes at keyboard and screen-reader gaps, navigation parity) landed on 2026-07-26 and were deleted as they did.
+Everything user-facing that is known-wrong or known-missing, worked top-down. The items reachable on pages that are otherwise finished (route states, hit targets, three passes at keyboard and screen-reader gaps, navigation parity) landed on 2026-07-26 and were deleted as they did.
 
-**Items 1 to 5 came from a full UI/UX review of the shipped surface on 2026-07-26**, read against BRAND.md and SPEC §8.4. They cluster on one axis the earlier passes did not cover: what happens on a keyboard, with a screen reader, or in the instant after a tap. The visual system itself held, so nothing below is a token or layout change. Three of the review's items shipped on 2026-07-26 and are deleted, which is what the numbering below has been closed up over: keyboard shortcuts in the study modes (SPEC §8.4, §14.18), the tap-anywhere card no longer being a `<button>` (SPEC §8.4, §14.19), and the labelling and live-region gaps (SPEC §8.4, §14.20).
+**Items 1 to 4 came from a full UI/UX review of the shipped surface on 2026-07-26**, read against BRAND.md and SPEC §8.4. They cluster on one axis the earlier passes did not cover: what happens on a keyboard, with a screen reader, or in the instant after a tap. The visual system itself held, so nothing below is a token or layout change. Four of the review's items shipped on 2026-07-26 and are deleted, which is what the numbering below has been closed up over: keyboard shortcuts in the study modes (SPEC §8.4, §14.18), the tap-anywhere card no longer being a `<button>` (SPEC §8.4, §14.19), the labelling and live-region gaps (SPEC §8.4, §14.20), and the grammar-browse parity fixes (SPEC §8.4, §14.21).
 
-**Items 1, 2, 3 and 5 now sequence behind the architecture workstream above**, which rewrites the same lines. Marked in place. Item 4 is independent and can be pulled at any time.
+**Every remaining item here now sequences behind the architecture workstream above**, which rewrites the same lines, so nothing in this section is a free pull any more. The one exception is a single bullet rather than an item: item 2's `verifyRequest` page touches none of those files and can be taken at any time.
 
-**Items 6 and 7 are deferred, and neither is waiting on capacity.** One is blocked on other work, the other on a decision that was explicitly postponed. Do not pull either in as filler.
+**Items 5 and 6 are deferred, and neither is waiting on capacity.** One is blocked on other work, the other on a decision that was explicitly postponed. Do not pull either in as filler.
 
 ### 1. Focus is destroyed after every answer, in all four modes
 
@@ -99,14 +99,7 @@ Rating or answering leaves focus on `<body>`, so a keyboard user re-Tabs from th
 - [ ] No `<h1>` on `/home`, `/grammar`, or any of the four session screens. The hub's "TODAY" / "STUDY MODES" / "LEVEL" labels are `<p>` elements, so heading navigation finds nothing at all on the app's default page. Landing, browse, stats, signin, onboarding and the error routes all have one already.
 - [ ] 9 of 11 routes never set a title. `src/app/layout.tsx:7` defines `template: "%s · Bayana"` and only `/browse` and `/grammar/browse` use it; everything else renders the default string in the tab, in history, and in the PWA task switcher. **Partly absorbed**: architecture items 2 and 3 rewrite each session `page.tsx` and should add its `metadata` export in the same edit, leaving only `/home`, `/grammar` and `/onboarding` here.
 
-### 4. `grammar-browse-client.tsx` never got its sibling's fixes
-
-Two things `browse-client.tsx` fixed and documented in comments were not carried across:
-
-- [ ] `:191` and `:224` put `aria-label` on bare `<span>` elements with no role, which most screen readers discard. That is exactly the bug `browse-client.tsx:275` solved with `role="img"`, so the "n/m studied" count and the mature/learning status dot are still sighted-only here.
-- [ ] `:177` applies `opacity: 0.6` to the whole lesson header while a search is active. That is the contrast-passing-pair-plus-alpha composite BRAND.md §3 forbids by name; the `--ink-faint` count text lands near 2.6:1.
-
-### 5. Smaller UX items
+### 4. Smaller UX items
 
 - [ ] `src/components/browse-client.tsx:82` `goToPage`: turning a page does not scroll back to the top of the list. At 375px with 50 rows, tapping "Next" at the bottom leaves the user at the bottom of the next page.
 - [ ] Grammar has no Undo while vocab does (`grammar-session.tsx:8` calls it a v1 omission). A mis-tapped "Easy" on a grammar card is as unrecoverable as the last-card vocab case that was worth fixing in `study-session.tsx`. **Cheapest during architecture item 3**, which is already writing that component's action layer. When it lands, add the `u` binding to `grammar-session.tsx`'s shortcut map: it is the one key where the two queues currently disagree, and SPEC §8.4 records that parity as deliberate.
@@ -114,7 +107,7 @@ Two things `browse-client.tsx` fixed and documented in comments were not carried
 - [ ] `/stats` has no level control, so changing level means a round trip through `/home`. That is the same friction that justified adding the picker to the grammar hub.
 - [ ] `src/components/browse-client.tsx:204`: the `role="status"` result count re-announces on every keystroke. Debounce the announced value, not the filtering.
 
-### 6. Performance: subset the Japanese face, blocked on bayan
+### 5. Performance: subset the Japanese face, blocked on bayan
 
 **Deferred 2026-07-26: starts only once bayan is finished.** Not a capacity call. The sibling bayan/zaka dataset is the nearer-term commitment, and this is a self-contained build-pipeline project that will still be worth exactly as much later.
 
@@ -123,7 +116,7 @@ Two things `browse-client.tsx` fixed and documented in comments were not carried
   - Still a real project rather than a config change: it needs a build step plus a decided answer for what happens when a generated sentence contains a kanji outside the subset.
   - **Note the interaction with the Kalima/bayan work**, which is the thing it waits on: imported questions and the N3 passage set introduce Japanese text this app did not author, so the "kanji outside the subset" question has a wider blast radius after that lands than before. Deciding it first would have meant deciding it twice.
 
-### 7. UX correctness: day boundaries, deferred pending a timezone decision
+### 6. UX correctness: day boundaries, deferred pending a timezone decision
 
 **Deferred 2026-07-26.** The fix is small; what it needs first is a decision on where a user's timezone comes from (profile field, browser-reported, or a fixed offset), and that was postponed rather than made.
 
