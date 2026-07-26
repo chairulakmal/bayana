@@ -6,7 +6,7 @@ Open work only: what is planned, in flight, or found-but-not-fixed. This file is
 
 **Then: the UI/UX workstream** (second section). Six items: four sequenced behind the architecture work, two deferred on external blockers. Each is marked in place.
 
-**Then: Phase 3.** MC↔FSRS coupling for Quiz mode (planned, not started). Its Part A is written against `POST /api/review`, which the architecture work deletes, so it has been restated against the replacement and must not start first.
+**Then: Phase 3.** MC↔FSRS coupling for Quiz mode (planned, not started). Its Part A is written against the `rateCard` Server Action that landed with `/study`, and Part B collides with the Quiz port, so it must not start before architecture item 3.
 
 **Next: Phase 4.** Admin sentence audit + on-demand generation. Then Phase 5 (multi-user) and Phase 6 (further enhancements), both tracked only in SPEC.md §13 for now.
 
@@ -25,22 +25,11 @@ The finding: the app is an App Router shell around a client-side SPA. All six in
 - **Reads stay route handlers; writes become Server Actions.** Reads keep a documented, cacheable HTTP surface and are still needed for the imperative refetch paths ("Check for more", retry, "Play again"). Writes have no external consumer and gain typed arguments plus a shorter path. Action names and their guards are specified in SPEC §9.2; follow them rather than inventing new ones.
 - **No opt-in rendering flags.** `cacheComponents`, View Transitions and the React Compiler are all opt-in and would put a live Railway deployment at the mercy of a Next minor bump. This also rules out `use cache`, which is gated behind `cacheComponents`, so the caching work below uses React's stable `cache()` instead. (Verified against 16.2.7: only `viewTransition` is still under the `experimental.` namespace, so do not go looking for the other two there.)
 
-### 2. Reference implementation on `/study`
-
-Do one mode properly, then port. Steps are ordered because each depends on the last.
-
-- [ ] **Normalize server-side.** `src/app/api/cards/queue/route.ts` returns raw Prisma rows, so every due card ships its full FSRS internals (`stability`, `difficulty`, `reps`, `lapses`, `elapsedDays`, `scheduledDays`, `state`, `lastReview`, `due`) to a client that reads none of them: `study-session.tsx:45` `toCard` discards all of it on arrival. Move that flattening into a shared `src/lib/study-cards.ts` exporting `buildSession(userId, level)`, and have both the route handler and the RSC call it. One shape, one definition, smaller payload.
-- [ ] **Split the page into a shell plus a streaming child.** `src/app/study/page.tsx` awaits `buildSession` in a nested async component under `<Suspense>`, not in the page function itself. Suspense only streams what is *below* the boundary, so awaiting in the page body renders nothing until the queue resolves and the boundary does nothing. This is the step that is easy to get subtly wrong.
-- [ ] **Seed the client from props.** `study-session.tsx` takes `initial` and drops the mount `useEffect` (`:106`) and the `cards === null` branch (`:177`). Keep `loadQueue` (`:83`) and the `requestIdRef` token (`:77`): both are still needed for the imperative refetch, which stays a route handler.
-- [ ] **Add `src/app/study/error.tsx`.** Once the first load happens on the server, a failure throws instead of rendering the in-component retry screen at `:190`. Without a route-level boundary it escapes to the root one and loses the session chrome. This moves from optional to required.
-- [ ] **Writes to a Server Action.** `src/app/study/actions.ts` exposes `rateCard` and `undoRating` calling the existing `reviewWord` / `undoLastReview`. **Keep every guard from the route handlers.** A Server Action compiles to a POST endpoint with an id discoverable in the client bundle, so it is exactly as reachable as the route was and its arguments are exactly as untrusted. No `revalidatePath` in either: the queue is client-owned session state, and revalidating would refetch the page mid-session.
-- [ ] **Instant advance.** `study-session.tsx:114` `rate`: advance `index` / `reviewed` / `flipped` immediately, run the action inside `useTransition`, roll all three back and surface the error on failure. `busy` is deleted, so the rating buttons stop disabling and rapid-fire rating works.
-  - **Not `useOptimistic` here.** It reconciles an optimistic value against server-derived state and reverts when the transition settles. `index` is client-owned state that no server response replaces, so there would be nothing to reconcile against. `useOptimistic` is the right tool in item 5, where the base value is a prop from an RSC.
-  - **Note the race.** Dropping `disabled` makes the concurrent double-rate more likely, not less. The SERIALIZABLE transaction at `review.ts:34` is what prevents a lost update; that comment becomes load-bearing and should say so.
+**Numbering here is stable, unlike the UI/UX section below.** Items 1 (the reads/writes convention plus the memoized profile read) and 2 (the `/study` reference implementation) have landed and are deleted, and the remaining numbers were **not** closed up over them, because Phase 3 and four UI/UX items all cross-reference these by number. "Architecture item 3" therefore means the same item tomorrow as it does today.
 
 ### 3. Port the three remaining session modes
 
-- [ ] `quiz-session.tsx`, `exam-session.tsx`, `grammar-session.tsx` against the `/study` reference: server-fetched initial payload, `<Suspense>` shell, route-level `error.tsx`, imperative refetch retained.
+- [ ] `quiz-session.tsx`, `exam-session.tsx`, `grammar-session.tsx` against the `/study` reference, which is now real code to copy rather than a description: `src/app/study/page.tsx` (shell plus streaming child, and note **which** awaits sit in the page body and why), `src/lib/study-cards.ts` (the shared normalizer), `src/app/study/actions.ts` (guards reproduced, no `revalidatePath`), `src/app/study/error.tsx`, and `study-session.tsx`'s optimistic `rate`. Each mode also gains its `metadata` title (UI/UX item 3) and the shared `SessionLoading` fallback.
 - [ ] `grammar-session.tsx:121` write path to a Server Action alongside the vocab one.
 - [ ] Delete `POST /api/review`, `POST /api/review/undo` and `POST /api/grammar/review` only once all four modes are ported, not before. The seven read routes (`cards/queue`, `quiz`, `exam`, `browse`, `words/[id]/sentence`, `grammar/queue`, `grammar/browse`) all stay, as does `demo/login`, `dev/login` and the Auth.js catch-all.
 
@@ -82,12 +71,12 @@ Rating or answering leaves focus on `<body>`, so a keyboard user re-Tabs from th
 
 **Downgraded from "highest-frequency defect" on 2026-07-26**, when the study-mode keyboard shortcuts shipped: a document-level handler means a keyboard user drives the whole session without needing focus to be anywhere in particular, so the ten-to-twenty re-Tabs per session are no longer on the main path. What remains is the screen-reader case, which the shortcuts do not help: an SR user is told nothing about where they now are, and browse-mode quick-nav keys intercept the digits before the handler ever sees them. Still worth fixing, no longer urgent.
 
-**Sequenced behind architecture items 2 and 3**, which rewrite both mechanisms below. Fixing it first means writing it twice; the rewrite is also the natural place to put the focus move.
+**Sequenced behind architecture item 3**, which rewrites both mechanisms below. Fixing it first means writing it twice; the rewrite is also the natural place to put the focus move.
 
 - [ ] `src/components/study-session.tsx:443` and `src/components/grammar-session.tsx:365`: rating a card sets `flipped = false`, which unmounts the four rating buttons out from under the focused element, so focus falls to `<body>`.
 - [ ] `src/components/quiz-session.tsx:192` and `src/components/exam-session.tsx:317`: the chosen option takes `disabled={answered}`, and browsers blur a control the moment it is disabled.
 - [ ] Fix is the same in all four: after each transition, move focus deliberately to the control that is now the next step (the "Show answer" button, or the "Continue" button). A ref plus an effect keyed on the transition, not an `autoFocus`.
-- [ ] Note that dropping `busy`/`disabled` in architecture item 2 removes the *second* cause outright, and leaves only the unmount case to handle.
+- [ ] Note that `/study` has already dropped `busy`/`disabled`, which removed the *second* cause there outright; architecture item 3 does the same for the other three, leaving only the unmount case to handle.
 
 ### 2. The magic-link flow leaves the brand at its most fragile moment
 
@@ -98,7 +87,7 @@ One bullet left, and it is not pullable on its own:
 ### 3. Missing headings and page titles
 
 - [ ] No `<h1>` on `/home`, `/grammar`, or any of the four session screens. The hub's "TODAY" / "STUDY MODES" / "LEVEL" labels are `<p>` elements, so heading navigation finds nothing at all on the app's default page. Landing, browse, stats, signin, onboarding and the error routes all have one already.
-- [ ] 10 of 14 routes never set a title. `src/app/layout.tsx:7` defines `template: "%s · Bayana"` and only `/browse`, `/grammar/browse` and the two new `/auth` screens use it; everything else renders the default string in the tab, in history, and in the PWA task switcher. **Partly absorbed**: architecture items 2 and 3 rewrite each session `page.tsx` and should add its `metadata` export in the same edit, leaving only `/home`, `/grammar` and `/onboarding` here.
+- [ ] 9 of 14 routes never set a title. `src/app/layout.tsx:7` defines `template: "%s · Bayana"` and only `/browse`, `/grammar/browse`, `/study` and the two `/auth` screens use it; everything else renders the default string in the tab, in history, and in the PWA task switcher. **Partly absorbed**: `/study` got its title when it was rewritten, and architecture item 3 rewrites the other three session `page.tsx` files and should add each `metadata` export in the same edit, leaving only `/home`, `/grammar` and `/onboarding` here.
 
 ### 4. Smaller UX items
 
@@ -129,17 +118,17 @@ One bullet left, and it is not pullable on its own:
 
 Resolves SPEC §15 open question #1. Makes Quiz and Flashcard modes genuinely complementary: MC answers seed the FSRS schedule, and MC question selection is informed by the user's FSRS state. No new schema, since it reuses `ReviewState` and `ReviewLog`.
 
-**Sequenced behind the architecture workstream.** Part A was originally written against `POST /api/review`, which that work deletes in favour of a Server Action, and Part B changes `buildQuiz`'s signature in the same file the port touches. Starting here first means writing Part A twice.
+**Sequenced behind the architecture workstream.** Part B changes `buildQuiz`'s signature in the same file the Quiz port touches, and Part A is now written against the `rateCard` action that landed with `/study`. Starting here first means writing Part A twice.
 
 ### Part A: MC answers write FSRS ratings
 
-- [ ] `src/components/quiz-session.tsx`: in `choose(i)`, call the `rateCard` Server Action (architecture item 2) with `{ wordId: current.wordId, rating: correct ? 3 : 1 }`. Fire inside a transition without blocking the UI, matching the optimistic advance the flashcard loop uses; the quiz must stay snappy. No UI change.
+- [ ] `src/components/quiz-session.tsx`: in `choose(i)`, call the `rateCard` Server Action (shipped, `app/study/actions.ts`) with `{ wordId: current.wordId, rating: correct ? 3 : 1 }`. Fire inside a transition without blocking the UI, matching the optimistic advance the flashcard loop uses; the quiz must stay snappy. No UI change.
 - [ ] **Decide before coding**: correct → Good (3) or Hard (2)? MC is recognition-only (easier than flashcard active recall), so Hard is more conservative and gives a shorter interval. Good is simpler and still rewards the answer. Log the choice in DECISIONS.md.
 
 ### Part B: 50/50 MC source split (review pool + new)
 
 - [ ] `src/lib/quiz.ts` `buildQuiz(level, count, userId)`: add `userId`; split target selection into two pools: (a) words with `ReviewState` for this user at this level, ordered by `due asc` (near-due first, for reinforcement); (b) words with no `ReviewState` (new words, randomly sampled). Take `floor(count/2)` from (a) and `ceil(count/2)` from (b); if either pool is smaller than its half, fill from the other.
-- [ ] `src/app/api/quiz/route.ts`: pass `userId` (already available from `getCurrentUserId()`) into `buildQuiz`. Note that after the architecture port this route has a second caller, the `/quiz` RSC, so the change lands in one shared helper rather than in the handler.
+- [ ] `src/app/api/quiz/route.ts`: pass `userId` (already available from `getCurrentUserId()`) into `buildQuiz`. Note that after the Quiz port this route has a second caller, the `/quiz` RSC, so the change lands in one shared helper rather than in the handler, exactly as `buildSession` now serves both `/study` callers.
 
 ### Part C: SPEC + open-question housekeeping
 
@@ -229,7 +218,7 @@ Lower-priority findings from the app review, roughly ordered. Pull into a phase 
 
 ### Code quality / tests
 
-- [ ] Dedup session components: byte-identical `Centered` in 4 files, duplicated `RATINGS` arrays, duplicated `shuffle` (`review.ts` / `grammar-review.ts`), ~80-line `getStudyQueue` / `getGrammarQueue` overlap. **Partly absorbed** by architecture item 2, whose shared `study-cards.ts` is the natural home for the normalization half; the `Centered` and `RATINGS` duplication is untouched by it and stays here.
+- [ ] Dedup session components: byte-identical `Centered` in 4 files, duplicated `RATINGS` arrays, duplicated `shuffle` (`review.ts` / `grammar-review.ts`), ~80-line `getStudyQueue` / `getGrammarQueue` overlap. **Partly absorbed** by the landed `/study` work, whose `src/lib/study-cards.ts` is the natural home for the normalization half; the `Centered` and `RATINGS` duplication is untouched by it and stays here.
 - [ ] Exam-session's local `HighlightedSentence` → shared component.
 - [ ] Extract quiz/exam scoring helpers (`pickDistractors`, similarity fns, currently module-private) so they can be unit-tested; then test them + the highlighted-sentence token pipeline.
 - [ ] Log hygiene: audit `console.error` calls for payloads that shouldn't be logged.

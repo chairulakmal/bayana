@@ -3,10 +3,20 @@
 // Returns one session's worth of cards for the current user: due cards (oldest first,
 // capped to `limit`), plus new words filling the remaining slots. Defaults to 20 cards
 // per session. `limit` is clamped to 1–100 to prevent abuse.
+//
+// This route is no longer how a session gets its *first* payload: the `/study` page renders
+// that server-side (§8.1). What it still serves is the imperative refetch, "Check for more",
+// "Another session?", and the load-failure retry, all of which re-request a queue from a
+// component that is already mounted. It stays a route handler rather than becoming an action
+// because a cacheable GET is the right shape for a read, and because it can be exercised with
+// curl while developing (§14.16).
+//
+// It returns `buildSession`'s flattened payload, the same shape the page hands the client, so
+// the two entry points cannot drift apart.
 
 import { NextResponse } from "next/server";
 import { getCurrentUserId } from "@/lib/current-user";
-import { getStudyQueue } from "@/lib/review";
+import { buildSession } from "@/lib/study-cards";
 import { Level } from "@/generated/prisma/enums";
 
 export const runtime = "nodejs"; // Prisma needs the Node runtime, not Edge
@@ -36,8 +46,8 @@ export async function GET(request: Request) {
   const sessionLimit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 100) : 20;
 
   try {
-    const queue = await getStudyQueue(userId, { level: levelParam as Level, sessionLimit });
-    return NextResponse.json(queue);
+    const session = await buildSession(userId, { level: levelParam as Level, sessionLimit });
+    return NextResponse.json(session);
   } catch (err) {
     console.error("GET /api/cards/queue failed:", err);
     return NextResponse.json({ error: "Failed to build study queue" }, { status: 500 });

@@ -2,37 +2,26 @@
 
 // Flashcard-mode study screen (Phase 1a, JP→EN).
 //
-// Flow: load the queue once → show one card at a time → tap to flip (reveal reading,
-// meaning, example sentence) → rate Again/Hard/Good/Easy → advance. Undo reverts the
+// Flow: receive the first queue as a prop → show one card at a time → tap to flip (reveal
+// reading, meaning, example sentence) → rate Again/Hard/Good/Easy → advance. Undo reverts the
 // last rating. Mobile-first: single centered card, full-width thumb-reachable controls.
 //
 // The session's card list is fixed at load time, so "undo" simply steps back to the
 // previous card to be re-rated; newly-due cards appear on the next load.
+//
+// **The first queue is built by the server** (`app/study/page.tsx`) and arrives in `initial`,
+// so this component has no loading state and never fetches on mount. It keeps `loadQueue` for
+// the imperative refetches only ("Check for more", "Another session?", and the retry after a
+// failed refetch), which stay a `GET` route handler (§14.16). Writes go to the Server Actions
+// in `app/study/actions.ts`.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { Parrot } from "@/components/parrot";
 import { SessionHeader, SessionHeaderLink, SessionHeaderButton } from "@/components/session-header";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
-
-// --- shapes returned by GET /api/cards/queue ---
-type QueueWord = {
-  id: string;
-  expression: string;
-  reading: string;
-  meaning: string;
-  sentences: { japanese: string; reading: string; english: string }[];
-};
-type QueueResponse = { due: { word: QueueWord }[]; newWords: QueueWord[]; totalDue: number };
-
-// A normalized card for the session.
-type StudyCard = {
-  wordId: string;
-  expression: string;
-  reading: string;
-  meaning: string;
-  sentence: { japanese: string; reading: string; english: string } | null;
-};
+import { rateCard, undoRating } from "@/app/study/actions";
+import type { StudyCard, StudySessionPayload } from "@/lib/study-cards";
 
 type Rating = 1 | 2 | 3 | 4;
 
@@ -43,52 +32,54 @@ const RATINGS: { value: Rating; label: string; cls: string }[] = [
   { value: 4, label: "Easy", cls: "rate-easy" },
 ];
 
-function toCard(word: QueueWord): StudyCard {
-  const s = word.sentences[0] ?? null;
-  return {
-    wordId: word.id,
-    expression: word.expression,
-    reading: word.reading,
-    meaning: word.meaning,
-    sentence: s ? { japanese: s.japanese, reading: s.reading, english: s.english } : null,
-  };
-}
-
-export function StudySession({ level }: { level: string }) {
-  const [cards, setCards] = useState<StudyCard[] | null>(null); // null = still loading
+export function StudySession({
+  level,
+  initial,
+}: {
+  level: string;
+  /** The first session, built during the page render. See `app/study/page.tsx`. */
+  initial: StudySessionPayload;
+}) {
+  // Seeded from the server render, so there is no null state and no first paint without cards.
+  // `useState` initialisers only run on mount, which is correct here rather than a hazard: a
+  // re-render with a fresh `initial` would mean the page had been revalidated underneath a
+  // session in progress, and §9.2 states why neither rating action revalidates `/study`.
+  const [cards, setCards] = useState<StudyCard[]>(initial.cards);
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
-  const [busy, setBusy] = useState(false); // disables controls during a request
   const [reviewed, setReviewed] = useState<string[]>([]); // wordIds, for undo
   const [error, setError] = useState<string | null>(null);
   // sessionDone: true after the last card is rated — shows the session-complete screen
   // instead of immediately auto-loading the next batch. remainingDue is the totalDue
-  // count from the last queue fetch (pre-cap), used for the "N more waiting" hint.
+  // count from the last queue build (pre-cap), used for the "N more waiting" hint.
   const [sessionDone, setSessionDone] = useState(false);
-  const [remainingDue, setRemainingDue] = useState(0);
-  // Distinguishes "fetch failed" from "queue is genuinely empty" — both leave cards
-  // as [], but they need different screens: a failure must offer a retry, not claim
-  // "All caught up!" (same pattern as grammar-session.tsx).
+  const [remainingDue, setRemainingDue] = useState(initial.totalDue);
+  // Distinguishes "refetch failed" from "queue is genuinely empty": both can leave the
+  // session with nothing to show, but they need different screens, and a failure must offer a
+  // retry rather than claiming "All caught up!". Only a *refetch* can set this now: a failed
+  // first build throws during the server render and is caught by `app/study/error.tsx`.
   const [loadFailed, setLoadFailed] = useState(false);
+  // Ratings run inside a transition so the optimistic advance stays interruptible: React can
+  // process the next card's keystroke while the previous write is still in flight.
+  const [, startTransition] = useTransition();
 
-  // loadQueue is called both from the initial effect and imperatively (the
-  // "Check for more" / retry button), so a plain effect-cleanup `cancelled` flag
-  // can't guard it — a request token does: each call gets its own id, and a
-  // response only applies state if it's still the most recent call in flight.
+  // loadQueue is only ever called imperatively now ("Check for more", "Another session?",
+  // retry), which is exactly why it still needs a request token rather than an effect-cleanup
+  // `cancelled` flag: there is no effect to clean up, and a user can tap twice. Each call takes
+  // its own id and a response applies state only if it is still the most recent one in flight.
   const requestIdRef = useRef(0);
 
-  // Fetch the queue and flatten due + new into one ordered list. Called on mount and
-  // again whenever a batch is exhausted (auto-refetch), so cards that have become due
-  // mid-session — e.g. a card you rated "Again", or a learning-step card — cycle back
-  // without a manual reload.
+  // Refetch the queue. No longer called on mount (the server built the first one), but still
+  // needed whenever a batch is exhausted, so cards that became due mid-session (one rated
+  // "Again", or a learning-step card) cycle back without a manual reload.
   const loadQueue = useCallback(async () => {
     const requestId = ++requestIdRef.current;
     try {
       const res = await fetch(`/api/cards/queue?level=${encodeURIComponent(level)}`);
       if (!res.ok) throw new Error(`queue ${res.status}`);
-      const data: QueueResponse = await res.json();
+      const data: StudySessionPayload = await res.json();
       if (requestIdRef.current !== requestId) return;
-      setCards([...data.due.map((d) => toCard(d.word)), ...data.newWords.map(toCard)]);
+      setCards(data.cards);
       setRemainingDue(data.totalDue);
       setIndex(0);
       setReviewed([]);
@@ -100,66 +91,79 @@ export function StudySession({ level }: { level: string }) {
       if (requestIdRef.current !== requestId) return;
       setError("Couldn't load your study queue.");
       setLoadFailed(true);
-      setCards((prev) => prev ?? []);
+      // `cards` is left alone on purpose: a failed refetch must not discard the session that
+      // is already on screen, and the retry screen below is what the user sees meanwhile.
     }
   }, [level]);
 
-  useEffect(() => {
-    // loadQueue() is async — setState only runs after awaiting fetch, not synchronously here.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadQueue();
-  }, [loadQueue]);
-
-  const current = cards && index < cards.length ? cards[index] : null;
+  const current = index < cards.length ? cards[index] : null;
 
   const rate = useCallback(
-    async (rating: Rating) => {
-      if (!current || !cards || busy) return;
-      setBusy(true);
-      setError(null);
-      try {
-        const res = await fetch("/api/review", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ wordId: current.wordId, rating }),
-        });
-        if (!res.ok) throw new Error(`review ${res.status}`);
+    (rating: Rating) => {
+      if (!current) return;
+      // Snapshot both facts the rollback needs, before any state starts moving.
+      const wordId = current.wordId;
+      const wasLastCard = index >= cards.length - 1;
 
-        // Advance uniformly — including on the last card — so `index` always equals
-        // the number of cards rated and `reviewed` always holds every rated wordId.
-        // That invariant is what lets a single undo implementation serve both the
-        // mid-session header button and the completion screen (previously the last
-        // card was never pushed onto `reviewed`, so it could not be un-rated).
-        setReviewed((r) => [...r, current.wordId]);
-        setIndex((i) => i + 1);
-        setFlipped(false);
-        if (index >= cards.length - 1) {
-          // Last card in the session → show the session-complete screen. The user
-          // chooses whether to start another session or go home. We don't auto-refetch
-          // so there's a clear stopping point (FSRS sessions should feel finite).
-          setSessionDone(true);
-        }
-      } catch {
-        setError("Failed to save your review.");
-      } finally {
-        setBusy(false);
+      // **Advance first, ask the server second.** Rating is the one action a user performs
+      // twenty times in a row, and making each one wait on a round trip made a session feel
+      // like it was buffering. All three pieces of state move now and are rolled back together
+      // if the write fails.
+      //
+      // Advance uniformly, including on the last card, so `index` always equals the number of
+      // cards rated and `reviewed` always holds every rated wordId. That invariant is what
+      // lets one undo implementation serve both the header button and the completion screen.
+      //
+      // **Not `useOptimistic`.** It reconciles an optimistic value against server-derived
+      // state and reverts when the transition settles. `index` is client-owned state that no
+      // server response ever replaces, so there is nothing to reconcile against; the base
+      // value would have to come from the server for that hook to mean anything.
+      setReviewed((r) => [...r, wordId]);
+      setIndex((i) => i + 1);
+      setFlipped(false);
+      if (wasLastCard) {
+        // Last card → the session-complete screen. No auto-refetch, so there is a clear
+        // stopping point (FSRS sessions should feel finite).
+        setSessionDone(true);
       }
+      setError(null);
+
+      startTransition(async () => {
+        try {
+          await rateCard({ wordId, rating });
+        } catch {
+          // Put the card back exactly as it was: same index, same history, and revealed,
+          // because it was revealed at the moment it was rated.
+          setReviewed((r) => r.slice(0, -1));
+          setIndex((i) => Math.max(0, i - 1));
+          setFlipped(true);
+          if (wasLastCard) setSessionDone(false);
+          setError("Failed to save your review.");
+        }
+      });
     },
-    [current, cards, index, busy],
+    [current, cards.length, index],
   );
 
+  // Undo keeps an in-flight guard even though rating no longer has one, and the asymmetry is
+  // the point rather than an oversight. Two quick ratings hit two *different* cards, which is
+  // what rapid-fire rating means and is now supported. Two quick undos hit the *same* card: the
+  // second finds no log row left to roll back, so the action throws and the user is shown a
+  // failure for something that did in fact work once. A ref, not state, so taking the guard
+  // costs no render; the button's `disabled` stays tied to the history alone so it never
+  // flickers mid-tap.
+  const undoing = useRef(false);
+
+  // Deliberately not optimistic, unlike `rate`. Undo is a corrective action taken once, not on
+  // the hot path, so the round trip is affordable, and rolling back a rollback is materially
+  // harder to reason about than rolling back an advance.
   const undo = useCallback(async () => {
-    if (busy || reviewed.length === 0) return;
-    setBusy(true);
+    if (undoing.current || reviewed.length === 0) return;
+    undoing.current = true;
     setError(null);
     const wordId = reviewed[reviewed.length - 1];
     try {
-      const res = await fetch("/api/review/undo", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ wordId }),
-      });
-      if (!res.ok) throw new Error(`undo ${res.status}`);
+      await undoRating({ wordId });
       setReviewed((r) => r.slice(0, -1));
       setIndex((i) => Math.max(0, i - 1));
       setFlipped(false);
@@ -169,9 +173,9 @@ export function StudySession({ level }: { level: string }) {
     } catch {
       setError("Failed to undo.");
     } finally {
-      setBusy(false);
+      undoing.current = false;
     }
-  }, [busy, reviewed]);
+  }, [reviewed]);
 
   // --- keyboard shortcuts (SPEC §8.4) ---
   //
@@ -187,11 +191,11 @@ export function StudySession({ level }: { level: string }) {
     {
       space: flipped ? undefined : () => setFlipped(true),
       enter: flipped ? undefined : () => setFlipped(true),
-      "1": flipped ? () => void rate(1) : undefined,
-      "2": flipped ? () => void rate(2) : undefined,
-      "3": flipped ? () => void rate(3) : undefined,
-      "4": flipped ? () => void rate(4) : undefined,
-      // No `flipped` guard: undo self-guards on `busy` and an empty history, and the
+      "1": flipped ? () => rate(1) : undefined,
+      "2": flipped ? () => rate(2) : undefined,
+      "3": flipped ? () => rate(3) : undefined,
+      "4": flipped ? () => rate(4) : undefined,
+      // No `flipped` guard: undo self-guards on its in-flight ref and an empty history, and the
       // whole point of undo is that it is reachable the instant you realise the mistake.
       u: () => void undo(),
     },
@@ -199,20 +203,13 @@ export function StudySession({ level }: { level: string }) {
   );
 
   // --- render states ---
+  //
+  // There is no loading branch. The first queue arrives as a prop, and the wait that used to
+  // live here is now `<Suspense>`'s fallback in `app/study/page.tsx` (`SessionLoading`).
 
-  if (cards === null) {
-    return (
-      <Centered>
-        <Parrot expr="sleepy" style={{ width: 84, height: 94 }} />
-        <p className="mt-3" style={{ color: "var(--ink-soft)" }}>
-          Loading…
-        </p>
-      </Centered>
-    );
-  }
-
-  // Load failure: the queue fetch failed, so we know nothing about what's due —
-  // offer a retry instead of the misleading "All caught up!" empty state.
+  // Refetch failure: we no longer know what is due, so offer a retry rather than the
+  // misleading "All caught up!" empty state. Only reachable from `loadQueue`: a failed
+  // *first* build throws on the server and lands in `app/study/error.tsx` instead.
   if (loadFailed && !sessionDone) {
     return (
       <Centered>
@@ -224,7 +221,7 @@ export function StudySession({ level }: { level: string }) {
           {error ?? "Something went wrong loading your study queue."}
         </p>
         <div className="mt-6 flex gap-3">
-          <button onClick={() => void loadQueue()} disabled={busy} className="btn btn-primary">
+          <button onClick={() => void loadQueue()} className="btn btn-primary">
             Try again
           </button>
           <Link href="/home" className="btn btn-ghost">
@@ -242,7 +239,7 @@ export function StudySession({ level }: { level: string }) {
     const allCaughtUp = !sessionDone;
     // remainingDue is totalDue from the last fetch; subtract the session size for an
     // estimate. "Again" cards may have cycled back in, so we call it approximate.
-    const approxRemaining = Math.max(0, remainingDue - (cards?.length ?? 0));
+    const approxRemaining = Math.max(0, remainingDue - cards.length);
     return (
       <Centered>
         <Parrot
@@ -263,7 +260,7 @@ export function StudySession({ level }: { level: string }) {
           )}
         </p>
         <div className="mt-6 flex gap-3">
-          <button onClick={() => void loadQueue()} disabled={busy} className="btn btn-primary">
+          <button onClick={() => void loadQueue()} className="btn btn-primary">
             {allCaughtUp ? "Check for more" : "Another session?"}
           </button>
           <Link href="/home" className="btn btn-ghost">
@@ -273,7 +270,7 @@ export function StudySession({ level }: { level: string }) {
         {/* Escape hatch for a fat-fingered rating on the LAST card — before, undo
             was only reachable mid-session, so that one mistake was unrecoverable. */}
         {!allCaughtUp && reviewed.length > 0 && (
-          <button onClick={() => void undo()} disabled={busy} className="btn btn-ghost mt-3 text-sm">
+          <button onClick={() => void undo()} className="btn btn-ghost mt-3 text-sm">
             Undo last rating
           </button>
         )}
@@ -320,7 +317,7 @@ export function StudySession({ level }: { level: string }) {
         right={
           <SessionHeaderButton
             onClick={undo}
-            disabled={busy || reviewed.length === 0}
+            disabled={reviewed.length === 0}
             title="Undo last rating (U)"
           >
             Undo
@@ -441,7 +438,7 @@ export function StudySession({ level }: { level: string }) {
         {flipped ? (
           <div className="grid grid-cols-4 gap-2">
             {RATINGS.map((r) => (
-              <button key={r.value} onClick={() => rate(r.value)} disabled={busy} className={`rate ${r.cls}`}>
+              <button key={r.value} onClick={() => rate(r.value)} className={`rate ${r.cls}`}>
                 {r.label}
                 {/* .rate has no flex gap of its own (unlike .btn), so the badge brings its
                     own spacing. It collapses with the badge when display:none applies. */}
