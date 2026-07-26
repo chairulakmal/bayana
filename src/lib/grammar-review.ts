@@ -9,10 +9,9 @@
 //   getGrammarStats     – counts for the inline stats panel on /grammar.
 
 import { db, serializableTxn } from "@/lib/db";
+import { getStudySettings } from "@/lib/profile";
 import { schedulerFor, toCard, fromCard } from "@/lib/fsrs";
 import type { Grade } from "ts-fsrs";
-
-const DEFAULT_PROFILE = { desiredRetention: 0.9, fsrsParams: [] as number[], newCardsPerDay: 10 };
 
 // Grammar levels are plain strings (not the vocab `Level` enum) so new levels need no
 // schema change — see SPEC.md §16 (2026-06-29, decision (c)). Shared here so both
@@ -28,8 +27,7 @@ export async function reviewGrammarPoint(
   const now = new Date();
 
   // Per-user config, not per-card state — safe to read outside the transaction.
-  const rawProfile = await db.userProfile.findUnique({ where: { userId } });
-  const profile = rawProfile ?? DEFAULT_PROFILE;
+  const profile = await getStudySettings(userId);
 
   // Read-compute-write as one atomic unit, same reasoning as reviewWord (review.ts):
   // concurrent ratings of the same card would otherwise lose one update.
@@ -69,7 +67,7 @@ export async function getGrammarQueue(
 ) {
   const sessionLimit = opts.sessionLimit ?? 20;
   const now = new Date();
-  const profile = (await db.userProfile.findUnique({ where: { userId } })) ?? DEFAULT_PROFILE;
+  const profile = await getStudySettings(userId);
 
   const [totalDue, due] = await Promise.all([
     db.grammarProgress.count({ where: { userId, due: { lte: now } } }),
