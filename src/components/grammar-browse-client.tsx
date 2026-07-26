@@ -113,6 +113,8 @@ export function GrammarBrowseClient({ level }: { level: string }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search pattern, reading, or meaning…"
+          // See browse-client: a placeholder is not an accessible name.
+          aria-label="Search grammar points"
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
@@ -138,7 +140,9 @@ export function GrammarBrowseClient({ level }: { level: string }) {
         )}
       </div>
 
-      <p className="mt-3 text-[12px]" style={{ color: "var(--ink-faint)" }}>
+      {/* Live result count, same reasoning as browse-client: filtering is per keystroke and
+          this line is the only feedback that a query matched anything. */}
+      <p role="status" className="mt-3 text-[12px]" style={{ color: "var(--ink-faint)" }}>
         {q
           ? `${matchCount.toLocaleString()} match${matchCount !== 1 ? "es" : ""}`
           : `${totalPoints.toLocaleString()} grammar points · ${lessons.length} lessons`}

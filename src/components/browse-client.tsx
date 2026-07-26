@@ -156,6 +156,10 @@ export function BrowseClient({ level }: { level: string }) {
             setOpenId(null);
           }}
           placeholder="Search kanji, reading, or meaning…"
+          // A placeholder is not an accessible name: it is not exposed by every screen
+          // reader, and it disappears the moment the field has content, so a user who tabs
+          // back to a filled field would hear only its value.
+          aria-label="Search words"
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
@@ -191,8 +195,13 @@ export function BrowseClient({ level }: { level: string }) {
         )}
       </div>
 
-      {/* Result count */}
-      <p className="mt-3 text-[12px]" style={{ color: "var(--ink-faint)" }}>
+      {/* Result count. `role="status"` (implicitly aria-live="polite" + atomic) makes the
+          count audible: filtering happens per keystroke with no other feedback, so a screen
+          reader user typing a query had no way to know whether anything matched. Matching
+          the precedent in `quiz-session.tsx`, the live node is part of the normal render
+          rather than mounted when the number first changes — a live region created at the
+          moment it has something to say is frequently not announced at all. */}
+      <p role="status" className="mt-3 text-[12px]" style={{ color: "var(--ink-faint)" }}>
         {q
           ? `${filtered.length.toLocaleString()} match${filtered.length !== 1 ? "es" : ""}`
           : `${words.length.toLocaleString()} words`}
@@ -229,6 +238,11 @@ export function BrowseClient({ level }: { level: string }) {
                 <button
                   type="button"
                   onClick={() => void toggle(word)}
+                  // The vocab half of the accordion; the grammar lesson toggles already
+                  // carry theirs. Without it the row announces as a plain button and its
+                  // open/closed state is conveyed only by the ▲/▼ glyph, which is
+                  // aria-hidden precisely because it reads as noise.
+                  aria-expanded={isOpen}
                   className="flex w-full items-baseline gap-3 px-4 py-3 text-left"
                 >
                   <span
@@ -253,6 +267,12 @@ export function BrowseClient({ level }: { level: string }) {
                       before the chevron so it doesn't shift the layout when absent. */}
                   <span
                     className="flex-shrink-0 self-center rounded-full"
+                    // `role="img"` is what makes the label count. `aria-label` on a bare
+                    // <span> has no implicit role to attach to, so most screen readers
+                    // discard it and the "in your deck" signal was silently sighted-only.
+                    // Only when started: an unlabelled role="img" would announce an empty
+                    // image on every other row.
+                    role={word.started ? "img" : undefined}
                     aria-label={word.started ? "In your deck" : undefined}
                     style={{
                       width: 6,
