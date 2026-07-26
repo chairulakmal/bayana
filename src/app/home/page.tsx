@@ -186,12 +186,21 @@ export default async function HomePage() {
         <ModeTile href="/study" emoji="🎴" title="Flashcards" subtitle={flashcardSubtitle(snapshot)} />
         <ModeTile href="/quiz" emoji="⚡" title="Quiz" subtitle="Quick multiple-choice" />
         <ModeTile href="/exam" emoji="📝" title="Exam" subtitle="JLPT-style reading & writing" />
-        {/* Always a live link, never disabled. Only N3 grammar is seeded (SPEC §4.1), but
-            this tile is the *only* UI path to `/grammar` now that the nav tab is gone, so
-            disabling it on other levels would strand the grammar section (and any progress
-            already made on it) behind a level switch. The subtitle carries the caveat
-            instead. */}
-        <ModeTile href="/grammar" emoji="✏️" title="Grammar" subtitle={grammarSubtitle(snapshot)} />
+        {/* Disabled on levels with no seeded deck (only N3 is seeded, SPEC §4.1). This
+            reverses the earlier "no tile is ever disabled" rule, deliberately and with a
+            known cost: this tile is the only UI path to `/grammar`, and `pickNextAction`
+            cannot substitute for it because every count in `getGrammarStats` is level-scoped,
+            so a non-N3 user's grammarDue is always 0. A user who studied N3 grammar and then
+            switched level therefore loses access to it, and their reviews come due unseen
+            until they switch back. Accepted by the author against the alternative of a tile
+            that looks actionable on four levels where it leads nowhere (SPEC §14.14). */}
+        <ModeTile
+          href="/grammar"
+          emoji="✏️"
+          title="Grammar"
+          subtitle={grammarSubtitle(snapshot)}
+          disabled={snapshot.grammarTotal === 0}
+        />
       </div>
 
       {/* ── Level ────────────────────────────────────────────────────────────
@@ -297,21 +306,77 @@ function Stat({
 /**
  * One mode tile in the 2x2 grid (BRAND.md §7 surface).
  *
- * Every tile is a live link. There is deliberately no disabled variant: each of these is the
- * only route to its mode, so a dimmed tile would make a whole section of the app
- * unreachable. Where a mode has a caveat, the subtitle states it.
+ * `disabled` renders the tile as inert content rather than a link, for a mode that genuinely
+ * has nothing behind it on the active level. Only the Grammar tile uses it, and only where no
+ * deck is seeded; the cost of that (the mode becomes unreachable, not merely empty) is
+ * recorded at the call site and in SPEC §14.14.
+ *
+ * The disabled treatment is built from tokens, never `opacity`. BRAND.md §3 forbids
+ * compositing a passing contrast pair with alpha, which is precisely how a "greyed out"
+ * control ends up below AA. The tile instead recedes by *losing* elevation — paper fill
+ * instead of white, no shadow — and its text steps down the ink ramp to values that still
+ * clear 4.5 : 1. The emoji is greyscaled rather than faded, which is safe because it is
+ * decorative and carries no contrast obligation.
  */
 function ModeTile({
   href,
   emoji,
   title,
   subtitle,
+  disabled = false,
 }: {
   href: string;
   emoji: string;
   title: string;
   subtitle: string;
+  disabled?: boolean;
 }) {
+  const body = (
+    <>
+      <span
+        className="text-[28px] leading-none"
+        style={disabled ? { filter: "grayscale(1)" } : undefined}
+        aria-hidden
+      >
+        {emoji}
+      </span>
+      <span
+        className="mt-2 block text-[17px] leading-tight"
+        style={{
+          fontFamily: "var(--f-display)",
+          fontWeight: 600,
+          color: disabled ? "var(--ink-soft)" : "var(--ink)",
+        }}
+      >
+        {title}
+      </span>
+      <span
+        className="mt-0.5 block text-[12px] leading-snug"
+        style={{ color: disabled ? "var(--ink-faint)" : "var(--ink-soft)" }}
+      >
+        {subtitle}
+      </span>
+    </>
+  );
+
+  if (disabled) {
+    return (
+      // A plain div, not a <Link> or a disabled <button>. There is no action here to describe,
+      // so giving it control semantics only to mark them unavailable would announce a button
+      // that never existed; the subtitle already states why the mode is not open.
+      <div
+        className="rounded-[var(--r-lg)] p-4"
+        style={{
+          background: "var(--paper)",
+          border: "1px solid var(--line)",
+          minHeight: 104,
+        }}
+      >
+        {body}
+      </div>
+    );
+  }
+
   return (
     <Link
       href={href}
@@ -323,18 +388,7 @@ function ModeTile({
         minHeight: 104,
       }}
     >
-      <span className="text-[28px] leading-none" aria-hidden>
-        {emoji}
-      </span>
-      <span
-        className="mt-2 block text-[17px] leading-tight"
-        style={{ fontFamily: "var(--f-display)", fontWeight: 600, color: "var(--ink)" }}
-      >
-        {title}
-      </span>
-      <span className="mt-0.5 block text-[12px] leading-snug" style={{ color: "var(--ink-soft)" }}>
-        {subtitle}
-      </span>
+      {body}
     </Link>
   );
 }
