@@ -1,73 +1,41 @@
-# Bayana — Brand & Design Guide
+# Bayana: Brand & Design Guide
 
-**ばやな · 毎日ちょっとずつ — spaced-repetition JLPT vocabulary and grammar, with
-AI-written example sentences.**
+**ばやな · 毎日ちょっとずつ · spaced-repetition JLPT vocabulary and grammar, with AI-written example sentences.**
 
-This is the source of truth for Bayana's visual language: build every screen against the
-tokens and rules here, not against a screenshot or an older comp. It covers personality
-and voice, the mascot Pī, color, typography, iconography, the app icon, components, and
-the CSS custom properties that implement all of it (§8).
+This is the source of truth for Bayana's visual language: build every screen against the tokens and rules here, not against a screenshot or an older comp. It covers personality and voice, the mascot Pī, color, typography, iconography, the app icon, components, and the CSS custom properties that implement all of it (§8).
 
-It was distilled from an interactive guide kept locally in `notes/bayana/bayana-brand/`
-(gitignored: `bayana Brand Guide.html` + `styles.css` + `brand.js`). That guide is a
-historical exploration, useful for anything not yet captured here, but **this file wins**
-wherever they disagree, because it is the version the repo and the code can see. Where the
-guide describes a gamified product Bayana did not become (XP, lives, gems, leagues), it is
-a record of an idea, not a spec; §5 says what the app actually ships.
+It was distilled from an interactive guide kept locally in `notes/bayana/bayana-brand/` (gitignored: `bayana Brand Guide.html` + `styles.css` + `brand.js`). That guide is a historical exploration, useful for anything not yet captured here, but **this file wins** wherever they disagree, because it is the version the repo and the code can see. Where the guide describes a gamified product Bayana did not become (XP, lives, gems, leagues), it is a record of an idea, not a spec; §5 says what the app actually ships.
 
-**The app is light-only.** There is no dark ramp here and none in the code; `globals.css`
-declares `color-scheme: light` so a phone in dark mode cannot paint UA-owned chrome (form
-controls, scrollbars) in dark styling against these cream surfaces. Whether to design a
-dark palette at all is still open (TODO.md).
+**The app is light-only.** There is no dark ramp here and none in the code; `globals.css` declares `color-scheme: light` so a phone in dark mode cannot paint UA-owned chrome (form controls, scrollbars) in dark styling against these cream surfaces. Whether to design a dark palette at all is still open (TODO.md).
 
-It complements **[SPEC.md](SPEC.md)** (the architecture/engineering doc): SPEC §8.4 owns
-the responsive/mobile-first *rules*, this file owns the *look, feel, and tokens*.
+It complements **[SPEC.md](SPEC.md)** (the architecture/engineering doc): SPEC §8.4 owns the responsive/mobile-first *rules*, this file owns the *look, feel, and tokens*.
 
-> **Platform focus.** Bayana is a **mobile-first web app** (no native apps). The design
-> target is the **phone browser at the iPhone SE baseline — 375 × 667 CSS px**: every
-> screen must look right and be fully usable there *first*, with full-width, thumb-reachable
-> controls (≥ 44 × 44 px) low in the viewport. Larger phones, tablets, and desktop are
-> additive breakpoints, never the design center — desktop stays usable but caps width and
-> centers rather than stretching. Design and review at 375 px wide before anything else.
-> (Engineering rules and rationale: SPEC §8.4.)
+> **Platform focus.** Bayana is a **mobile-first web app** (no native apps). The design target is the **phone browser at the iPhone SE baseline (375 × 667 CSS px)**: every screen must look right and be fully usable there *first*, with full-width, thumb-reachable controls (≥ 44 × 44 px) low in the viewport. Larger phones, tablets, and desktop are additive breakpoints, never the design center; desktop stays usable but caps width and centers rather than stretching. Design and review at 375 px wide before anything else. (Engineering rules and rationale: SPEC §8.4.)
 
 ---
 
 ## 1. Personality & voice
 
-Bayana is **cheerful, never preachy** — the friend who texts you "頑張って！" at 8am.
-Energetic, warm, proudly bite-sized. We celebrate every word and never make you feel
-behind.
+Bayana is **cheerful, never preachy**: the friend who texts you "頑張って！" at 8am. Energetic, warm, proudly bite-sized. We celebrate every word and never make you feel behind.
 
 | Trait | What it means in the UI |
 |-------|--------------------------|
 | **Playful** | Bright color, springy buttons, a parrot who reacts. Studying feels like a game, not homework. |
 | **Encouraging** | Cheer the streak, shrug off the miss. Tone is always "let's go," never "you failed." |
-| **Bite-sized** | Ten words, two minutes. Every screen does one clear thing — a lesson fits between train stops. |
+| **Bite-sized** | Ten words, two minutes. Every screen does one clear thing; a lesson fits between train stops. |
 | **Bilingual** | Japanese leads, English supports. Rounded type carries both scripts in one friendly voice. |
 
-**Microcopy:** short, kind, lightly bilingual. Pair a Japanese phrase with an English gloss
-(`おしい · almost`). Never scold on a wrong answer — flash, acknowledge, move on.
+**Microcopy:** short, kind, lightly bilingual. Pair a Japanese phrase with an English gloss (`おしい · almost`). Never scold on a wrong answer: flash, acknowledge, move on.
 
 ---
 
-## 2. Mascot — Pī (ピー)
+## 2. Mascot: Pī (ピー)
 
-A pint-sized tropical parrot, named after the most beloved pet-bird name in Japan. Pī is
-the study buddy: cheers your streak, naps when you're away, goes wide-eyed on an N1 word.
-Built from soft rounded shapes — a **magenta body**, a **three-feather crest** (yellow /
-pink / cream), a **hooked yellow beak**, white eyes, pink cheeks.
+A pint-sized tropical parrot, named after the most beloved pet-bird name in Japan. Pī is the study buddy: cheers your streak, naps when you're away, goes wide-eyed on an N1 word. Built from soft rounded shapes: a **magenta body**, a **three-feather crest** (yellow / pink / cream), a **hooked yellow beak**, white eyes, pink cheeks.
 
-The canonical geometry is [src/components/parrot.tsx](src/components/parrot.tsx)
-(`viewBox="0 0 240 268"`), the committed, typed component every screen renders. It was
-ported from `brand.js` in the local guide, but that file is gitignored, so it cannot be the
-source of truth for something the app depends on. The favicon at
-[src/app/icon.svg](src/app/icon.svg) is the same geometry as a static "happy" head.
+The canonical geometry is [src/components/parrot.tsx](src/components/parrot.tsx) (`viewBox="0 0 240 268"`), the committed, typed component every screen renders. It was ported from `brand.js` in the local guide, but that file is gitignored, so it cannot be the source of truth for something the app depends on. The favicon at [src/app/icon.svg](src/app/icon.svg) is the same geometry as a static "happy" head.
 
-**Expressions** — a small fixed cast. Reuse these; don't invent poses. Each is the same
-silhouette with only the **eyes and beak** changing, so the family always reads as one bird.
-Four expressions cover more moments than there are expressions, so the mapping below is the
-full list of sanctioned uses, not just the obvious ones.
+**Expressions**: a small fixed cast. Reuse these; don't invent poses. Each is the same silhouette with only the **eyes and beak** changing, so the family always reads as one bird. Four expressions cover more moments than there are expressions, so the mapping below is the full list of sanctioned uses, not just the obvious ones.
 
 | Mood | When to show it |
 |------|-----------------|
@@ -76,11 +44,7 @@ full list of sanctioned uses, not just the obvious ones.
 | **Wink** | Hint / tip / closing invitation |
 | **Sleepy** | Low-energy states: loading, an empty queue, a failed load |
 
-**Sleepy carries the error state on purpose.** There is no sad or alarmed Pī, and there will
-not be one: a mascot that looks upset when a fetch fails makes a technical failure feel like
-the learner's fault, which is exactly what §1 forbids. Sleepy reads as "nothing happening
-here," which is true of loading, empty, and broken alike, and the copy beside it carries the
-actual distinction.
+**Sleepy carries the error state on purpose.** There is no sad or alarmed Pī, and there will not be one: a mascot that looks upset when a fetch fails makes a technical failure feel like the learner's fault, which is exactly what §1 forbids. Sleepy reads as "nothing happening here," which is true of loading, empty, and broken alike, and the copy beside it carries the actual distinction.
 
 **Do:** keep Pī upright and full-color. **Don't:** rotate, desaturate, recolor, or stretch.
 
@@ -88,17 +52,15 @@ actual distinction.
 
 ## 3. Color
 
-A loud, sugary palette. Four candy brights do the talking — **magenta leads**, **yellow
-brings energy**, **pink and cream soften** — over a deep plum **ink** that keeps everything
-legible.
+A loud, sugary palette. Four candy brights do the talking (**magenta leads**, **yellow brings energy**, **pink and cream soften**) over a deep plum **ink** that keeps everything legible.
 
 ### Hero palette
 | Token | Hex | Name | Role |
 |-------|-----|------|------|
-| `--magenta` | `#ff61f8` | Parrot Magenta | Hero identity — big shapes, mascot, key moments |
-| `--yellow` | `#ffea6c` | Sunbeam Yellow | Energy & rewards — streaks, highlights, secondary buttons |
-| `--pink` | `#ffa6fb` | Bubblegum Pink | Soft support — surfaces, belly, gentle fills |
-| `--cream` | `#fffba7` | Custard Cream | Calm support — backgrounds, cards, wings |
+| `--magenta` | `#ff61f8` | Parrot Magenta | Hero identity: big shapes, mascot, key moments |
+| `--yellow` | `#ffea6c` | Sunbeam Yellow | Energy & rewards: streaks, highlights, secondary buttons |
+| `--pink` | `#ffa6fb` | Bubblegum Pink | Soft support: surfaces, belly, gentle fills |
+| `--cream` | `#fffba7` | Custard Cream | Calm support: backgrounds, cards, wings |
 
 ### Ramps (100 → 700)
 - **Magenta:** `#ffd6ff` `#ffb1ff` `#ff88ff` **`#ff61f8`** `#d128cc` `#a600a3` `#760075`
@@ -120,13 +82,9 @@ legible.
 | `--line` | `#efe4e9` | Borders / dividers |
 
 ### N1 "premium" accent
-`--murasaki` `#3d1452` (imperial purple — historically Japan's highest-rank colour, the
-*forbidden colour* 禁色 reserved for the elite) + `--gold` `#f0c75e` (kin). Reserved for the
-**N1 level chip** so the top level feels earned. Chosen deliberately bluer/deeper than the
-magenta ramp so N1 reads as *special*, not merely "a darker N2." Purple + gold is the
-classic imperial pairing. Not for general decoration.
+`--murasaki` `#3d1452` (imperial purple, historically Japan's highest-rank colour, the *forbidden colour* 禁色 reserved for the elite) + `--gold` `#f0c75e` (kin). Reserved for the **N1 level chip** so the top level feels earned. Chosen deliberately bluer/deeper than the magenta ramp so N1 reads as *special*, not merely "a darker N2." Purple + gold is the classic imperial pairing. Not for general decoration.
 
-### Functional (system states only — never decoration)
+### Functional (system states only, never decoration)
 | State | Hex | JP |
 |-------|-----|----|
 | **Correct** | `--good` `#2fbf71` | 正解 |
@@ -135,11 +93,9 @@ classic imperial pairing. Not for general decoration.
 
 ### Contrast
 
-**The rule that bites: never put white text on bright magenta or yellow.** Drop to **Grape
-(`--grape` / mag-600+)** whenever you need white type on a magenta surface.
+**The rule that bites: never put white text on bright magenta or yellow.** Drop to **Grape (`--grape` / mag-600+)** whenever you need white type on a magenta surface.
 
-Measured ratios, all against `--paper` unless stated. Every pairing below clears WCAG AA
-(4.5 : 1 for normal text):
+Measured ratios, all against `--paper` unless stated. Every pairing below clears WCAG AA (4.5 : 1 for normal text):
 
 | Pairing | Ratio | Use |
 |---------|-------|-----|
@@ -151,24 +107,12 @@ Measured ratios, all against `--paper` unless stated. Every pairing below clears
 | White on Grape | 5.6 : 1 | Primary buttons |
 | Ink-faint on Paper | 4.8 : 1 | Tertiary text; the floor, nothing quieter than this |
 
-**The text ramp is three steps and stops.** `--ink` → `--ink-soft` → `--ink-faint`, and
-`--ink-faint` sits deliberately just above the AA floor: it is the quietest the app is
-allowed to get. `--ink-faint` was `#9a8597` until 2026-07-26, which measured 3.25 : 1 and
-failed AA. It was described here as a disabled/hint value but was doing real work across
-~60 call sites (furigana readings, stat labels, tile subtitles), so it was darkened rather
-than renamed.
+**The text ramp is three steps and stops.** `--ink` → `--ink-soft` → `--ink-faint`, and `--ink-faint` sits deliberately just above the AA floor: it is the quietest the app is allowed to get. `--ink-faint` was `#9a8597` until 2026-07-26, which measured 3.25 : 1 and failed AA. It was described here as a disabled/hint value but was doing real work across ~60 call sites (furigana readings, stat labels, tile subtitles), so it was darkened rather than renamed.
 
 **Two ways this palette gets quietly broken.** Both were live bugs, both are now rules:
 
-- **Never composite a contrast-passing pair with `opacity`.** A ratio is a property of the
-  final pixels, not of the tokens. `--ink-faint` at `opacity: .65` measures ~2 : 1; a
-  `.chip-n5` or `.chip-n2` (white text) at `opacity: .55` measures ~3.2 : 1. If an element
-  needs to recede, reach for a quieter token or a smaller size, not a lower alpha. Opacity
-  is fine for *transient* states (a pending row, a disabled control) where nothing must be
-  read.
-- **`outline` belongs to the browser's focus ring; selection is `box-shadow`.** Drawing a
-  selected state with `outline` forces `outline: none` onto every unselected sibling, which
-  silently removes their focus indicator. See §7.
+- **Never composite a contrast-passing pair with `opacity`.** A ratio is a property of the final pixels, not of the tokens. `--ink-faint` at `opacity: .65` measures ~2 : 1; a `.chip-n5` or `.chip-n2` (white text) at `opacity: .55` measures ~3.2 : 1. If an element needs to recede, reach for a quieter token or a smaller size, not a lower alpha. Opacity is fine for *transient* states (a pending row, a disabled control) where nothing must be read.
+- **`outline` belongs to the browser's focus ring; selection is `box-shadow`.** Drawing a selected state with `outline` forces `outline: none` onto every unselected sibling, which silently removes their focus indicator. See §7.
 
 ---
 
@@ -180,44 +124,22 @@ than renamed.
 | Body | **Nunito** | `--f-body` | 200–1000 (variable) | Paragraphs, glosses, secondary text. |
 | Japanese | **M PLUS Rounded 1c** | `--f-jp` | 400, 700 | All kana/kanji, rounded to match the Latin voice. No variable version exists, so each weight is a separate download. Fallback `"Hiragino Maru Gothic ProN"`. |
 
-The faces are declared in `src/app/fonts.ts` and self-hosted by `next/font` (SPEC §14.12),
-not requested from Google at runtime. The two Latin families load as **variable** fonts, so
-any weight inside their range is free: use whatever the design calls for without editing
-anything. **The Japanese family is the opposite**, and the rest of this section is about
-why.
+The faces are declared in `src/app/fonts.ts` and self-hosted by `next/font` (SPEC §14.12), not requested from Google at runtime. The two Latin families load as **variable** fonts, so any weight inside their range is free: use whatever the design calls for without editing anything. **The Japanese family is the opposite**, and the rest of this section is about why.
 
-**Japanese always uses `--f-jp`, even inline within English.** This is the rule most often
-broken, because breaking it looks *almost* right: **neither Fredoka nor Nunito contains a
-single CJK glyph**, so Japanese set in them does not fail visibly. It silently falls
-through the font stack to `system-ui`, and the text renders in the reader's OS font next to
-brand-face Latin. Any string mixing scripts has to mark up its Japanese run:
+**Japanese always uses `--f-jp`, even inline within English.** This is the rule most often broken, because breaking it looks *almost* right: **neither Fredoka nor Nunito contains a single CJK glyph**, so Japanese set in them does not fail visibly. It silently falls through the font stack to `system-ui`, and the text renders in the reader's OS font next to brand-face Latin. Any string mixing scripts has to mark up its Japanese run:
 
 ```jsx
 <span lang="ja" className="jp">問題１</span> score: {readingScore} / {readingTotal}
 ```
 
-That is also why a component prop holding mixed-script copy should be a `ReactNode` rather
-than a `string`: a bare string can only carry one face. Where a label is conceptually one
-value with two scripts (the JLPT level names, the exam prompts), store the halves
-separately rather than concatenating them.
+That is also why a component prop holding mixed-script copy should be a `ReactNode` rather than a `string`: a bare string can only carry one face. Where a label is conceptually one value with two scripts (the JLPT level names, the exam prompts), store the halves separately rather than concatenating them.
 
-**Adding a Japanese weight is expensive; adding a Latin one is free.** Google splits CJK
-into ~126 `unicode-range` chunks, so each M PLUS weight costs ~126 `@font-face` rules and
-roughly 30 KB gzipped *in the CSS itself*, before any glyph is painted. That CSS is now
-inlined into the page, so the cost is paid on the critical path of every page load rather
-than in a separate request. The app loads two Japanese weights, and 252 of the 260
-`@font-face` rules it serves are M PLUS. **Do not add a third without a specific reason**:
-the 800 that used to be loaded was dropped precisely because it was one third of the
-Japanese payload for a difference only visible on large headwords.
+**Adding a Japanese weight is expensive; adding a Latin one is free.** Google splits CJK into ~126 `unicode-range` chunks, so each M PLUS weight costs ~126 `@font-face` rules and roughly 30 KB gzipped *in the CSS itself*, before any glyph is painted. That CSS is now inlined into the page, so the cost is paid on the critical path of every page load rather than in a separate request. The app loads two Japanese weights, and 252 of the 260 `@font-face` rules it serves are M PLUS. **Do not add a third without a specific reason**: the 800 that used to be loaded was dropped precisely because it was one third of the Japanese payload for a difference only visible on large headwords.
 
 The two constraints interact, so keep them straight:
 
-- **A Latin weight the app uses but does not "load" is fine.** The variable fonts cover
-  their whole range; nothing needs to be declared.
-- **A Japanese weight used but not loaded is a defect.** The browser synthesises a
-  faux-bold from the nearest loaded weight, which is heavier and blurrier than the real
-  face. If a design needs JP 800, the choice is to add it in `fonts.ts` and accept ~126
-  more rules, or to use 700. Silently requesting it is the one option that is always wrong.
+- **A Latin weight the app uses but does not "load" is fine.** The variable fonts cover their whole range; nothing needs to be declared.
+- **A Japanese weight used but not loaded is a defect.** The browser synthesises a faux-bold from the nearest loaded weight, which is heavier and blurrier than the real face. If a design needs JP 800, the choice is to add it in `fonts.ts` and accept ~126 more rules, or to use 700. Silently requesting it is the one option that is always wrong.
 
 Headings are rounded and friendly, never thin or condensed.
 
@@ -225,42 +147,22 @@ Headings are rounded and friendly, never thin or condensed.
 
 ## 5. Iconography
 
-One rounded family, sharing Pī's DNA: **rounded, geometric, single-weight**, drawn on a
-**24px grid** with rounded caps and joins. `--ink-faint` at rest, `--grape` when active.
+One rounded family, sharing Pī's DNA: **rounded, geometric, single-weight**, drawn on a **24px grid** with rounded caps and joins. `--ink-faint` at rest, `--grape` when active.
 
-**The shipped set is the three `BottomNav` tabs** (`home`, `stats`, `browse`), as inline
-stroked SVG in [src/components/bottom-nav.tsx](src/components/bottom-nav.tsx). Draw any new
-icon to match those: 26px rendered on a 24px viewBox, `strokeWidth` 2 to 2.5, `round` caps
-and joins, filled only to mark the active tab.
+**The shipped set is the three `BottomNav` tabs** (`home`, `stats`, `browse`), as inline stroked SVG in [src/components/bottom-nav.tsx](src/components/bottom-nav.tsx). Draw any new icon to match those: 26px rendered on a 24px viewBox, `strokeWidth` 2 to 2.5, `round` caps and joins, filled only to mark the active tab.
 
-Everything else in the UI that reads as an icon is an **emoji**, deliberately: the study
-modes (🎴 ⚡ 📝 ✏️), the pace note (🌱), the demo notice (👋). Emoji ship at zero cost, carry
-the playful register §1 asks for, and none of them are load-bearing: every one sits beside
-a text label and is marked `aria-hidden`. Don't replace them with drawn icons without a
-reason, and don't let one carry meaning on its own.
+Everything else in the UI that reads as an icon is an **emoji**, deliberately: the study modes (🎴 ⚡ 📝 ✏️), the pace note (🌱), the demo notice (👋). Emoji ship at zero cost, carry the playful register §1 asks for, and none of them are load-bearing: every one sits beside a text label and is marked `aria-hidden`. Don't replace them with drawn icons without a reason, and don't let one carry meaning on its own.
 
-> **Not built:** the local guide's `brand.js` also defines `flame`, `star`, `heart`, `gem`,
-> `bolt`, and `trophy`. Those belong to a gamified product with streaks, XP, lives, and
-> leagues, none of which Bayana has, and none of which are on the roadmap (SPEC §13).
-> Treat that set as a historical exploration, not a spec.
+> **Not built:** the local guide's `brand.js` also defines `flame`, `star`, `heart`, `gem`, `bolt`, and `trophy`. Those belong to a gamified product with streaks, XP, lives, and leagues, none of which Bayana has, and none of which are on the roadmap (SPEC §13). Treat that set as a historical exploration, not a spec.
 
 ---
 
 ## 6. App icon & favicon
 
-**One artwork, one tile: Pī's face on `--yellow`, ~22% corner radius.**
-[src/app/icon.svg](src/app/icon.svg) is the single source; `scripts/gen-pwa-icons.mjs`
-rasterises it to `public/icon-{192,512,maskable}.png`, so the favicon, the installed app
-icon, and the Android adaptive icon are the same file at different sizes and never drift.
+**One artwork, one tile: Pī's face on `--yellow`, ~22% corner radius.** [src/app/icon.svg](src/app/icon.svg) is the single source; `scripts/gen-pwa-icons.mjs` rasterises it to `public/icon-{192,512,maskable}.png`, so the favicon, the installed app icon, and the Android adaptive icon are the same file at different sizes and never drift.
 
-- **Yellow, not magenta.** The guide called a magenta tile canonical with yellow as an
-  alternate; every shipped icon is yellow, and that is the correct call rather than an
-  oversight. Pī's body is magenta, so a magenta tile is tone-on-tone and muddies at 16px,
-  while magenta-on-yellow is the brand's strongest pairing and stays legible in a browser
-  tab. The maskable icon follows the same reasoning (SPEC §14 / DECISIONS 2026-06-04).
-- **Simplified face, not the full bird.** The icon drops Pī's tail and feet so the head and
-  body fill the tile. The crest is kept, but note its centre feather is yellow-on-yellow and
-  reads as negative space; at favicon size Pī has two visible feathers, by design.
+- **Yellow, not magenta.** The guide called a magenta tile canonical with yellow as an alternate; every shipped icon is yellow, and that is the correct call rather than an oversight. Pī's body is magenta, so a magenta tile is tone-on-tone and muddies at 16px, while magenta-on-yellow is the brand's strongest pairing and stays legible in a browser tab. The maskable icon follows the same reasoning (SPEC §14 / DECISIONS 2026-06-04).
+- **Simplified face, not the full bird.** The icon drops Pī's tail and feet so the head and body fill the tile. The crest is kept, but note its centre feather is yellow-on-yellow and reads as negative space; at favicon size Pī has two visible feathers, by design.
 - **Minimum sizes:** app 64px · UI 40px · favicon 24px.
 - **Clear space:** keep a margin equal to the height of Pī's eye on all sides.
 
@@ -268,11 +170,7 @@ icon, and the Android adaptive icon are the same file at different sizes and nev
 
 ## 7. Components
 
-Everything is **chunky, rounded, and pressable**. The signature interaction is the
-**springy "lip"**: primary buttons carry a solid bottom shadow (`0 5px 0 <edge>`) that
-compresses to `0 1px 0` on `:active`, with `translateY(4px)` — it makes the app feel like a
-toy. (Note: in **Quiz mode** this springiness is the *one* animation we keep; SPEC §8.2
-calls for minimal motion otherwise, and we respect `prefers-reduced-motion`.)
+Everything is **chunky, rounded, and pressable**. The signature interaction is the **springy "lip"**: primary buttons carry a solid bottom shadow (`0 5px 0 <edge>`) that compresses to `0 1px 0` on `:active`, with `translateY(4px)`. It makes the app feel like a toy. (Note: in **Quiz mode** this springiness is the *one* animation we keep; SPEC §8.2 calls for minimal motion otherwise, and we respect `prefers-reduced-motion`.)
 
 | Button | Class | Fill | Text | Lip | Use |
 |--------|-------|------|------|-----|-----|
@@ -280,52 +178,26 @@ calls for minimal motion otherwise, and we respect `prefers-reduced-motion`.)
 | **Pop** | `.btn-pop` | `--magenta` | ink | `--mag-500` | High-energy (Check) |
 | **Ghost** | `.btn-ghost` | white | grape | `--line` (+ inset pink ring) | Low-emphasis ("Maybe later") |
 
-A yellow **Secondary** button was specified here for a long time and never built; the
-yellow-plus-`--yel-edge` pairing lives on instead as `.rate-hard`, one of the four Flashcard
-rating buttons below. Ghost is the app's actual secondary, and every paired CTA in the
-product is Primary + Ghost. Add `.btn-secondary` only when a screen genuinely needs a third
-weight, not to satisfy this table.
+A yellow **Secondary** button was specified here for a long time and never built; the yellow-plus-`--yel-edge` pairing lives on instead as `.rate-hard`, one of the four Flashcard rating buttons below. Ghost is the app's actual secondary, and every paired CTA in the product is Primary + Ghost. Add `.btn-secondary` only when a screen genuinely needs a third weight, not to satisfy this table.
 
-- **JLPT level chips:** difficulty ramps with the palette — easy greens/yellows (N5) up
-  through deep magenta/plum. **N1 is the exception: imperial purple + gold** (murasaki +
-  kin, §3) — the "endgame" chip, set apart from the magenta ramp on purpose. Pill-shaped,
-  Fredoka 600. **Always full opacity**: the chip is its control's label, and two of the five
-  (N5, N2) use white text that fails contrast the moment it is faded (§3). Mark the selected
-  one with a ring, never by dimming the rest. Ring colour comes from
-  [`RING_COLOR`](src/components/level-chip.ts), not `currentColor`, for the same reason.
-- **Flashcard:** white surface, `--r-lg` (28px) radius, soft shadow; big kanji (`--f-jp`
-  800), magenta reading, ink gloss, example sentence in a `--surface-cream` inset box.
-- **MC answer:** correct option lifts with a **green lip**; wrong flashes **coral**
-  (`--bad`) then moves on — no scolding.
+- **JLPT level chips:** difficulty ramps with the palette: easy greens/yellows (N5) up through deep magenta/plum. **N1 is the exception: imperial purple + gold** (murasaki + kin, §3), the "endgame" chip, set apart from the magenta ramp on purpose. Pill-shaped, Fredoka 600. **Always full opacity**: the chip is its control's label, and two of the five (N5, N2) use white text that fails contrast the moment it is faded (§3). Mark the selected one with a ring, never by dimming the rest. Ring colour comes from [`RING_COLOR`](src/components/level-chip.ts), not `currentColor`, for the same reason.
+- **Flashcard:** white surface, `--r-lg` (28px) radius, soft shadow; big kanji (`--f-jp` 800), magenta reading, ink gloss, example sentence in a `--surface-cream` inset box.
+- **MC answer:** correct option lifts with a **green lip**; wrong flashes **coral** (`--bad`) then moves on, no scolding.
 - **Progress:** rounded track (`--cream-100`), magenta→mag-500 gradient fill.
-- **Session chrome** (the `/study` and `/quiz` header pills): quiet, but never below the
-  floors. Recede with size and a quieter token, never with container opacity: a 0.65 on the
-  row took Home and Undo to ~2 : 1 (§3).
+- **Session chrome** (the `/study` and `/quiz` header pills): quiet, but never below the floors. Recede with size and a quieter token, never with container opacity: a 0.65 on the row took Home and Undo to ~2 : 1 (§3).
 
 ### Focus and hit targets
 
-Two rules that apply to every interactive element, in addition to the ≥ 44 × 44 px floor in
-the platform note at the top of this file:
+Two rules that apply to every interactive element, in addition to the ≥ 44 × 44 px floor in the platform note at the top of this file:
 
-- **Every control shows a visible keyboard focus indicator.** The browser's default ring is
-  fine and is the default answer: leave `outline` alone and it works. If a control must
-  suppress it for visual reasons, it takes `.focus-ring` (a `--mag-300` halo), and it takes
-  it in the same commit. `outline: none` without a replacement is a defect, including the
-  implicit one you create by using `outline` to draw a selected state.
-- **A control may be smaller than 44px, but its hit target may not.** `.tap-44` expands a
-  small control's tap area vertically without changing what is painted, which is how the
-  session-header pills and the level chips stay visually quiet while staying tappable.
-  Expansion is vertical only, so adjacent chips in a row can never steal each other's taps;
-  give chip rows enough horizontal padding to clear 44px on their own.
+- **Every control shows a visible keyboard focus indicator.** The browser's default ring is fine and is the default answer: leave `outline` alone and it works. If a control must suppress it for visual reasons, it takes `.focus-ring` (a `--mag-300` halo), and it takes it in the same commit. `outline: none` without a replacement is a defect, including the implicit one you create by using `outline` to draw a selected state.
+- **A control may be smaller than 44px, but its hit target may not.** `.tap-44` expands a small control's tap area vertically without changing what is painted, which is how the session-header pills and the level chips stay visually quiet while staying tappable. Expansion is vertical only, so adjacent chips in a row can never steal each other's taps; give chip rows enough horizontal padding to clear 44px on their own.
 
 ---
 
 ## 8. Design tokens (CSS custom properties)
 
-This block mirrors [src/app/globals.css](src/app/globals.css), which is the copy the code
-actually reads. If the two ever disagree, `globals.css` is what ships and this section is
-the bug. (It used to name the local guide's `styles.css` as its match target, which put the
-canonical tokens in a gitignored file.) Use these verbatim when building the UI.
+This block mirrors [src/app/globals.css](src/app/globals.css), which is the copy the code actually reads. If the two ever disagree, `globals.css` is what ships and this section is the bug. (It used to name the local guide's `styles.css` as its match target, which put the canonical tokens in a gitignored file.) Use these verbatim when building the UI.
 
 ```css
 :root {
@@ -364,17 +236,8 @@ canonical tokens in a gitignored file.) Use these verbatim when building the UI.
 }
 ```
 
-`globals.css` also defines the `.btn*` / `.rate*` / `.opt*` / `.chip*` component classes and
-the `.focus-ring` / `.tap-44` accessibility utilities (§7); the block above is only the
-token layer.
+`globals.css` also defines the `.btn*` / `.rate*` / `.opt*` / `.chip*` component classes and the `.focus-ring` / `.tap-44` accessibility utilities (§7); the block above is only the token layer.
 
-**No `--maxw`.** This section used to declare `--maxw:1120px`, which no stylesheet defined
-and nothing consumed. Width capping is done with Tailwind: `max-w-md` for app screens (the
-mobile-first column) and `max-w-5xl` for the marketing page.
+**No `--maxw`.** This section used to declare `--maxw:1120px`, which no stylesheet defined and nothing consumed. Width capping is done with Tailwind: `max-w-md` for app screens (the mobile-first column) and `max-w-5xl` for the marketing page.
 
-**The three type tokens are indirections, not families.** The `--font-*` properties they
-point at are defined by `next/font` in [src/app/fonts.ts](src/app/fonts.ts) and applied to
-`<html>` by the root layout; each already carries its own fallback chain, which is why the
-tokens above declare no stack of their own. Nothing is fetched from Google at runtime, and
-the CSP no longer permits it (SPEC §11.3, §14.12). To change a face, edit `fonts.ts`: the
-~200 call sites reference `--f-display` / `--f-body` / `--f-jp` and never a family name.
+**The three type tokens are indirections, not families.** The `--font-*` properties they point at are defined by `next/font` in [src/app/fonts.ts](src/app/fonts.ts) and applied to `<html>` by the root layout; each already carries its own fallback chain, which is why the tokens above declare no stack of their own. Nothing is fetched from Google at runtime, and the CSP no longer permits it (SPEC §11.3, §14.12). To change a face, edit `fonts.ts`: the ~200 call sites reference `--f-display` / `--f-body` / `--f-jp` and never a family name.
