@@ -8,6 +8,15 @@
 // the FSRS math happens in JS between reading a card's state and writing it back, so
 // two concurrent requests for the same card (e.g. a double-tapped rating button)
 // would otherwise both compute from the same stale row and one update would be lost.
+//
+// **That transaction is now the only thing preventing the lost update, so treat it as
+// load-bearing rather than as belt-and-braces.** It used to be the second line of defence: the
+// study UI disabled its rating buttons while a write was in flight, so a double-tap could not
+// reach here twice in the first place. Since the optimistic-advance work the UI advances before
+// the write resolves and no longer disables anything, which makes rapid-fire rating a supported
+// interaction rather than an abuse case. Concurrent writes for one card are therefore *more*
+// likely than when this was written, not less. Do not relax the isolation level here on the
+// grounds that the client "wouldn't do that": the client is designed to do that.
 
 import { db, serializableTxn } from "@/lib/db";
 import { getStudySettings } from "@/lib/profile";

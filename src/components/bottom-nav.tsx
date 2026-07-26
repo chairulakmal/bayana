@@ -30,6 +30,10 @@ export function BottomNav() {
 
   return (
     <nav
+      // The app's only <nav>, so this name is not disambiguating two landmarks: it is what a
+      // screen reader's landmark list shows instead of a bare "navigation" entry. "Main", not
+      // "Main navigation": the role is appended when announced, so the longer string stutters.
+      aria-label="Main"
       className="fixed bottom-0 left-0 right-0 z-40"
       style={{
         background: "var(--surface)",
@@ -44,6 +48,11 @@ export function BottomNav() {
             <Link
               key={href}
               href={href}
+              // Which tab you are on was carried by grape plus font-weight 700 alone, both of
+              // which a screen reader cannot see, so the active tab announced identically to
+              // the other two. Emitted only when active: `aria-current="false"` is valid but
+              // pointless, since the attribute's absence is already what "not current" means.
+              aria-current={active ? "page" : undefined}
               className="flex flex-1 flex-col items-center justify-center gap-1.5 py-4"
               style={{ color: active ? "var(--grape)" : "var(--ink-faint)" }}
             >

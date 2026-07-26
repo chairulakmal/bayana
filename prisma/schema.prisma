@@ -276,3 +276,40 @@ model GrammarProgress {
   @@unique([userId, grammarPointId])
   @@index([userId, due])
 }
+
+/// Review history for grammar ratings: one row per rating event. The grammar counterpart of
+/// `ReviewLog`, with the same fields and the same purpose, keyed by grammarPointId instead of
+/// wordId. Like that model it is kept decoupled from User/GrammarPoint (indexed scalar ids, no
+/// FK relation) so it stays history that outlives row lifecycle.
+///
+/// This table is what makes grammar undo possible, and undo is why it was added. `GrammarProgress`
+/// holds only the *latest* state, so reversing a rating needs the prior one, and ts-fsrs
+/// reconstructs that from the review it is undoing (`rollback(card, log)`), the same mechanism
+/// vocab undo has always used. The alternatives were worse: ~8 `prev*` snapshot columns on
+/// `GrammarProgress` (single-purpose, and duplicated state that can disagree with itself), or
+/// accepting the prior FSRS state from the client, which is untrusted input on a scheduling row.
+///
+/// Note the honest scope of "append-only" here: rows are never *updated*, but a one-step undo
+/// deletes the row it reverses, exactly as `undoLastReview` does for vocab. Anything reading this
+/// as history must therefore treat it as "reviews that were not undone" rather than every rating
+/// event that ever happened. Grammar has no stats consumer yet, so nothing depends on that today.
+model GrammarReviewLog {
+  id             String    @id @default(cuid())
+  userId         String
+  grammarPointId String
+  // These mirror the ts-fsrs `ReviewLog` so `rollback()` can undo one step, and so the same
+  // `fromLog`/`toLog` adapter functions serve both queues without modification.
+  rating         Int // 1=Again, 2=Hard, 3=Good, 4=Easy
+  state          FsrsState // card state at review time
+  due            DateTime // due date this review assigned
+  stability      Float?
+  difficulty     Float?
+  elapsedDays    Int       @default(0)
+  scheduledDays  Int       @default(0)
+  learningSteps  Int       @default(0) // (re)learning step index at review time
+  reviewedAt     DateTime  @default(now())
+
+  @@index([userId, reviewedAt])
+  // Drives the undo lookup: "the most recent review of this point by this user".
+  @@index([userId, grammarPointId])
+}

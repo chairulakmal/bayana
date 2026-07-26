@@ -23,8 +23,8 @@ import { InfoBubble } from "@/components/info-bubble";
 /** Deck size, from `decks/*.csv` (8,101 imported Word rows) and the seeded N3 grammar deck.
  *  Kept here as named constants so the copy below can't drift from the real numbers the way
  *  the previous hardcoded "~8,800 words" claim had. */
-const WORD_COUNT = "8,100+";
-const GRAMMAR_POINT_COUNT = 220;
+const WORD_COUNT = "8,000+";
+const GRAMMAR_POINT_COUNT = "200+";
 
 export default async function Home() {
   const user = await getOptionalUser();
@@ -112,7 +112,7 @@ export default async function Home() {
             </div>
 
             <p className="mt-4 text-[13px]" style={{ color: "var(--ink-faint)" }}>
-              No sign-up, no email. Demo progress lives in your browser for 7 days.
+              Demo is live. No sign-up, no email.
               <br />
               <span style={{ color: "var(--ink-faint)" }}>
                 A personal, invite-only project, built in the open on{" "}
@@ -160,7 +160,7 @@ export default async function Home() {
         >
           <div className="mx-auto grid w-full max-w-5xl grid-cols-2 gap-6 px-5 py-8 sm:grid-cols-4">
             <Metric value={WORD_COUNT} label="words, N5 to N1" />
-            <Metric value="5" label="JLPT levels" />
+            <Metric value="ALL" label="JLPT levels" />
             <Metric value={String(GRAMMAR_POINT_COUNT)} label="N3 grammar points" />
             <Metric value="FSRS" label="the scheduler Anki uses" />
           </div>

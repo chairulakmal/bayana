@@ -41,7 +41,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     updateAge: 24 * 60 * 60,
   },
   trustHost: true, // behind Railway's proxy (not Vercel), so trust the forwarded host
-  pages: { signIn: "/auth/signin" },
+  // Every page Auth.js would otherwise render itself is named here. Anything left out falls
+  // back to its built-in equivalent under `/api/auth/*`: an unstyled white page in a system
+  // font with no mascot, served at the two moments the flow is most fragile (having just asked
+  // for a link, and having clicked a dead one). `verifyRequest` is the one that fires on the
+  // happy path, which is why its absence was the more expensive of the two.
+  //
+  // `error` covers post-form failures only (an expired or reused token, misconfiguration). The
+  // sign-in page keeps its own `?error=` handling for what fails during submission, because
+  // that path is our Server Action catching an `AuthError`, not an Auth.js redirect.
+  //
+  // No proxy change was needed for either route: `proxy.ts` already treats everything under
+  // `/auth` as public, which it must, since these screens exist to be seen without a session.
+  pages: {
+    signIn: "/auth/signin",
+    verifyRequest: "/auth/verify-request",
+    error: "/auth/error",
+  },
   providers: [
     Resend({
       apiKey: process.env.RESEND_API_KEY,
