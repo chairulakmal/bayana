@@ -18,22 +18,17 @@ Everything user-facing that is known-wrong or known-missing, promoted out of the
 
 Re-verified against the code 2026-07-26; sizes below are measured, not estimated, and items the font/accessibility work already closed were deleted rather than re-listed.
 
-### 1. Navigation parity
-
-- [ ] Grammar hub has no inline level switcher: `LevelPicker` is mounted only on `/home` (`src/app/home/page.tsx:212`), so switching level from `/grammar` costs a round trip through the hub. Note the picker needs empty-deck copy for the non-N3 levels, which `src/app/grammar/page.tsx` already computes as `hasDeck`.
-- [ ] Loading parity: `/grammar` and `/grammar/browse` fall back to the generic root `loading.tsx` spinner, while their vocabulary twins `/home` and `/browse` have layout-shaped skeletons (SPEC §8.4). `/grammar/browse` is the sharper gap of the two, since `GrammarBrowseClient` has the same two-wait shape `WordListSkeleton` was built for: its own client fetch is the long half, so it wants a lesson-shaped equivalent rather than a reuse.
-
-### 2. Performance: subset the Japanese face
+### 1. Performance: subset the Japanese face
 
 - [ ] `src/app/fonts.ts` now self-hosts M PLUS Rounded 1c at 400/700 with `preload: false`, but Google still slices Japanese into ~126 `unicode-range` chunks *per weight*, so ~252 `@font-face` rules are inlined into every page's CSS for glyphs that page will never use. Serving a `fonttools` subset of the ~2,500 characters the deck actually uses via `next/font/local` collapses that to a handful of rules.
   - **Re-measure before starting.** The ~66 KB-gzipped figure in SPEC §14.12 predates dropping weight 800 and moving both Latin faces to variable fonts, so the current cost is unknown.
   - Still a real project rather than a config change: it needs a build step plus a decided answer for what happens when a generated sentence contains a kanji outside the subset.
 
-### 3. UX correctness
+### 2. UX correctness
 
 - [ ] Day boundaries use local-*server* midnight (`setHours(0,0,0,0)`) in `getGrammarStats` and in `startOfToday` (`src/lib/home.ts`, which powers the hub's "done today"), so a user in another timezone can watch the count reset mid-session. Wire in a per-user timezone / day-start; the hub's helper is centralised, so the fix is one function.
 
-### 4. Open design question
+### 3. Open design question
 
 - [ ] Dark mode: support it or declare it an explicit non-goal, and log the call in DECISIONS.md. Interim state as of 2026-07-26 is light-only, now *declared* via `color-scheme: light` (`globals.css:18`) so UA chrome cannot paint dark against the cream surfaces. That closes the leak, not the question.
 

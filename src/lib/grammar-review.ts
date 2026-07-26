@@ -144,6 +144,23 @@ export async function getGrammarStats(userId: string, level: string) {
   return { total, started, mature, dueNow, studiedTodayCount, studiedToday: studiedTodayCount > 0 };
 }
 
+/**
+ * Which JLPT levels actually have grammar points seeded.
+ *
+ * Derived from the table rather than hardcoded to "N3", even though N3 is the only seeded
+ * deck today (SPEC §4.1). The restriction is a property of what has been imported, not of
+ * the design, so a literal would become wrong the moment a second deck lands and would be
+ * wrong *silently* — the level picker would keep telling users a seeded level is empty.
+ *
+ * One `groupBy` over ~220 rows, so it is cheap enough to call on a page render.
+ *
+ * @returns the set of level strings ("N3", …) with at least one GrammarPoint
+ */
+export async function getSeededGrammarLevels(): Promise<Set<string>> {
+  const rows = await db.grammarPoint.groupBy({ by: ["level"] });
+  return new Set(rows.map((row) => row.level));
+}
+
 function shuffle<T>(arr: T[]): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
