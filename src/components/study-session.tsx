@@ -321,20 +321,44 @@ export function StudySession({ level }: { level: string }) {
       {/* Card: tap anywhere to reveal the answer (BRAND.md §7 flashcard).
           Section is overflow-y-auto so long revealed sentences scroll within the section
           rather than pushing the footer off-screen. my-auto centers the card when it fits;
-          collapses to top when it overflows (avoids the Safari justify-center clip bug). */}
+          collapses to top when it overflows (avoids the Safari justify-center clip bug).
+
+          The card is a plain <div>, not a <button>. Wrapping it was costing three things:
+          Blink and WebKit apply `user-select: none` to button content, so a learner could
+          not select the word or the example sentence to paste into a dictionary, which on
+          a vocabulary app is a functional loss; a screen reader read the whole revealed card
+          (expression, reading, meaning, sentence, its reading, the translation) as one
+          enormous button name; and once flipped it was a focusable control that did
+          nothing. Tap-anywhere survives as the overlay below. */}
       <section className="flex flex-1 flex-col overflow-y-auto px-4 py-4">
-        <button
-          type="button"
-          onClick={() => !flipped && setFlipped(true)}
-          className="mx-auto my-auto flex w-full max-w-md flex-col items-center justify-center gap-5 rounded-[var(--r-lg)] px-6 py-10 text-center"
+        <div
+          className="relative mx-auto my-auto flex w-full max-w-md flex-col items-center justify-center gap-5 rounded-[var(--r-lg)] px-6 py-10 text-center"
           style={{
             background: "var(--surface)",
             border: "1px solid var(--line)",
             boxShadow: "var(--shadow)",
             minHeight: "55svh",
-            cursor: flipped ? "default" : "pointer",
           }}
         >
+          {/* Tap-anywhere-to-flip, as a transparent overlay that unmounts on reveal.
+              Pointer-only on purpose: aria-hidden plus tabIndex={-1} keeps it out of the
+              tab order and out of the accessibility tree, because the footer's "Show
+              answer" button already exposes this exact action. A labelled overlay would
+              put two identically-named buttons in the tree for one action; an unlabelled
+              focusable one would be a bare stop on the Tab path. It needs no z-index and
+              no particular DOM position: a positioned element paints above the card's
+              in-flow content whatever the tree order, and being out of flow it also sits
+              outside the flex layout, so it adds nothing to the `gap-5` rhythm. */}
+          {!flipped && (
+            <button
+              type="button"
+              aria-hidden
+              tabIndex={-1}
+              onClick={() => setFlipped(true)}
+              className="absolute inset-0 cursor-pointer rounded-[var(--r-lg)]"
+            />
+          )}
+
           <div lang="ja" className="jp text-6xl" style={{ fontWeight: 700, color: "var(--ink)", lineHeight: 1.1 }}>
             {current.expression}
           </div>
@@ -369,7 +393,7 @@ export function StudySession({ level }: { level: string }) {
               タップして答え · tap to reveal
             </span>
           )}
-        </button>
+        </div>
       </section>
 
       {error && (

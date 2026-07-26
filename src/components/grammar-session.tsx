@@ -255,20 +255,32 @@ export function GrammarSession({ level }: { level: string }) {
         right={null}
       />
 
-      {/* Card area: scrollable so long example sentences don't overflow. */}
+      {/* Card area: scrollable so long example sentences don't overflow.
+          A plain <div> with a tap-to-flip overlay rather than a wrapping <button>, for the
+          three reasons documented at the same spot in study-session.tsx (selectable text,
+          a sane screen-reader name, no inert control left behind after the flip). */}
       <section className="flex flex-1 flex-col overflow-y-auto px-4 py-4">
-        <button
-          type="button"
-          onClick={() => !flipped && setFlipped(true)}
-          className="mx-auto my-auto flex w-full max-w-md flex-col items-center justify-center gap-5 rounded-[var(--r-lg)] px-6 py-10 text-center"
+        <div
+          className="relative mx-auto my-auto flex w-full max-w-md flex-col items-center justify-center gap-5 rounded-[var(--r-lg)] px-6 py-10 text-center"
           style={{
             background: "var(--surface)",
             border: "1px solid var(--line)",
             boxShadow: "var(--shadow)",
             minHeight: "55svh",
-            cursor: flipped ? "default" : "pointer",
           }}
         >
+          {/* Pointer-only tap-anywhere overlay; see study-session.tsx for why it is
+              aria-hidden and untabbable rather than a second labelled control. */}
+          {!flipped && (
+            <button
+              type="button"
+              aria-hidden
+              tabIndex={-1}
+              onClick={() => setFlipped(true)}
+              className="absolute inset-0 cursor-pointer rounded-[var(--r-lg)]"
+            />
+          )}
+
           {/* Front: grammar pattern in large Japanese type */}
           <div
             lang="ja" className="jp text-5xl"
@@ -313,7 +325,7 @@ export function GrammarSession({ level }: { level: string }) {
               タップして答え · tap to reveal
             </span>
           )}
-        </button>
+        </div>
       </section>
 
       {error && (
