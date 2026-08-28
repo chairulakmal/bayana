@@ -55,7 +55,7 @@ When the author explicitly asks you to "just do it," do it, but the default mode
 
 ## Running it locally
 
-- **`npm run dev` starts Postgres (`docker compose up -d`) and serves on port 3887**, not 3000. The author runs the dev server; inspect it with `curl localhost:3887`.
+- **`npm run dev` serves on port 3887**, not 3000, and does not start Postgres: the database is a separate server the author starts himself. The author also runs the dev server; inspect it with `curl localhost:3887`.
 - **`next build` OOMs locally.** `.env` pins `NODE_OPTIONS=--max-old-space-size=256`, mirroring the Railway runtime budget, and that kills the TypeScript worker mid-build. Use `NODE_OPTIONS=--max-old-space-size=4096 npm run build`.
 - **`npm test`** runs Vitest once; `npm run test:watch` watches.
 - **Verify a change with `npm run lint` and `npm test`.** There is no typecheck script, so a full build is the only type check, and it needs the memory override above.

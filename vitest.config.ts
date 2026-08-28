@@ -28,8 +28,8 @@ export default defineConfig({
       //
       // Port 1 rather than the real 5432 so that a test which forgets to pass its fake deps
       // fails immediately with ECONNREFUSED instead of quietly reading and writing the
-      // developer's local database. Do not "fix" this by pointing it at the docker-compose
-      // instance; a suite that can reach real data is a suite that can destroy it.
+      // developer's local database. Do not "fix" this by pointing it at the real development
+      // database; a suite that can reach real data is a suite that can destroy it.
       DATABASE_URL: "postgresql://unused:unused@127.0.0.1:1/bayana_tests_never_connect",
       // The demo-cookie tests sign and verify real HMACs, so they need a key. A fixed,
       // obviously-fake value keeps them deterministic and keeps the developer's actual
