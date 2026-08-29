@@ -51,12 +51,13 @@ There is also whole-deck browse and search with live filtering.
 
 ## Running locally
 
-Prerequisites: Node 24+, Docker.
+Prerequisites: Node 24+ and a PostgreSQL 18 server. Docker is the easiest way to get one.
 
 ```bash
-# 1. Environment and database (Postgres on localhost:5887)
+# 1. Environment and database (Postgres on localhost:5432)
 cp .env.example .env
-docker compose up -d
+docker run -d --name bayana-db -p 5432:5432 \
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=bayana postgres:18
 
 # 2. Install dependencies, create tables, generate the Prisma client
 npm install
@@ -70,7 +71,7 @@ npx tsx scripts/import-csv.ts
 npm run dev
 ```
 
-Ports are themed 887 (ば・や・な): Postgres `5887`, app `3887`. To skip the magic-link round-trip locally, set `DEV_AUTH=1` in `.env` and visit `/api/dev/login`; it mints a real session for the seeded user and 404s in production.
+The app port is themed 887 (ば・や・な): `3887`, not 3000. Postgres uses its standard `5432`. To skip the magic-link round-trip locally, set `DEV_AUTH=1` in `.env` and visit `/api/dev/login`; it mints a real session for the seeded user and 404s in production.
 
 Two seeding steps are deliberately left out of the sequence above. Example sentences are generated separately (step 3 leaves them empty) because generation calls the Anthropic API and costs real money: run [scripts/seed-sentences.ts](scripts/seed-sentences.ts) and [scripts/collect-batch.ts](scripts/collect-batch.ts) with an `ANTHROPIC_API_KEY` if you want them. And `npx tsx scripts/seed-grammar.ts` needs a `decks/grammar-*.md` file that is gitignored on purpose: the grammar content comes from a source not licensed for redistribution, so the repo ships the schema and the seed script but you supply your own deck in the documented markdown shape (SPEC.md §4.1).
 
