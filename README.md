@@ -41,7 +41,7 @@ There is also whole-deck browse and search with live filtering.
 | Layer | What the code pins |
 |---|---|
 | App | Next.js 16.2.7 (App Router), React 19.2.4, TypeScript 5.9 |
-| Data | Prisma 7.8 via the `pg` driver adapter, PostgreSQL 16 (Docker locally, Railway managed in production) |
+| Data | Prisma 7.8 via the `pg` driver adapter, PostgreSQL (18 locally, Railway managed in production) |
 | Scheduling | ts-fsrs 5.4 |
 | AI | @anthropic-ai/sdk 0.100, model `claude-haiku-4-5` (Messages + Batch API) |
 | Auth | Auth.js (next-auth 5 beta) with Resend magic links, plus signed demo cookies |
